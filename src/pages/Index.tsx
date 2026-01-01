@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowUp, Sliders } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Header from '@/components/streaming/Header';
@@ -60,6 +60,13 @@ const Index = () => {
   } = useMediaLibrary();
 
   const { isAdmin, login, logout } = useAdmin();
+
+  // Fallback: open settings even if the footer prop isn't wired (HMR / stale props)
+  useEffect(() => {
+    const listener = () => setView('settings');
+    window.addEventListener('gctv-open-settings', listener);
+    return () => window.removeEventListener('gctv-open-settings', listener);
+  }, []);
 
   // Go to detail page when clicking a media card
   const handleSelectMedia = (media: Media) => {

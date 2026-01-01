@@ -126,35 +126,25 @@ const MediaDetailPage = ({
           </div>
         </div>
 
-        {/* Content Section - Films or Series */}
+        {/* Content Section - Films and/or Series */}
         <section>
           <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground mb-6">
-            {isSerie ? 'Saisons' : 'Contenu'}
+            Contenu
           </h3>
 
           <div className="flex flex-wrap gap-4">
-            {isSerie && media.seasons && media.seasons.length > 0 ? (
-              media.seasons.map((season) => (
-                <button
-                  key={season.id}
-                  onClick={() => onPlay(media, season.id)}
-                  className="group relative min-w-[120px] aspect-video bg-primary/10 backdrop-blur-sm rounded-xl border-2 border-primary/50 hover:border-primary overflow-hidden transition-all shadow-card hover:shadow-glow"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-t from-background/60 via-transparent to-transparent" />
-                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Play size={24} className="text-primary" fill="currentColor" />
-                  </div>
-                  <div className="absolute bottom-2 left-0 right-0 text-center">
-                    <span className="text-xs font-bold text-foreground">Saison {season.number}</span>
-                  </div>
-                </button>
-              ))
-            ) : (
+            {/* Film button - show if has videoUrls */}
+            {media.videoUrls && (
               <button
                 onClick={() => onPlay(media)}
-                className="group relative min-w-[120px] aspect-video bg-primary/10 backdrop-blur-sm rounded-xl border-2 border-primary/50 hover:border-primary overflow-hidden transition-all shadow-card hover:shadow-glow"
+                className="group relative w-[180px] aspect-video rounded-xl border-2 border-primary/50 hover:border-primary overflow-hidden transition-all shadow-card hover:shadow-glow"
               >
-                <div className="absolute inset-0 bg-gradient-to-t from-background/60 via-transparent to-transparent" />
+                <img 
+                  src={media.image} 
+                  alt="Film"
+                  className="absolute inset-0 w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/40 to-transparent" />
                 <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                   <Play size={24} className="text-primary" fill="currentColor" />
                 </div>
@@ -162,6 +152,33 @@ const MediaDetailPage = ({
                   <span className="text-xs font-bold text-foreground">Film</span>
                 </div>
               </button>
+            )}
+
+            {/* Seasons buttons - show if has seasons */}
+            {media.seasons && media.seasons.length > 0 && media.seasons.map((season) => (
+              <button
+                key={season.id}
+                onClick={() => onPlay(media, season.id)}
+                className="group relative w-[180px] aspect-video rounded-xl border-2 border-primary/50 hover:border-primary overflow-hidden transition-all shadow-card hover:shadow-glow"
+              >
+                <img 
+                  src={media.image} 
+                  alt={`Saison ${season.number}`}
+                  className="absolute inset-0 w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/40 to-transparent" />
+                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Play size={24} className="text-primary" fill="currentColor" />
+                </div>
+                <div className="absolute bottom-2 left-0 right-0 text-center">
+                  <span className="text-xs font-bold text-foreground">Saison {season.number}</span>
+                </div>
+              </button>
+            ))}
+
+            {/* Fallback if nothing */}
+            {!media.videoUrls && (!media.seasons || media.seasons.length === 0) && (
+              <p className="text-muted-foreground text-sm">Aucun contenu disponible</p>
             )}
           </div>
         </section>

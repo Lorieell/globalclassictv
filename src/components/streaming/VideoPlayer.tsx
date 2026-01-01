@@ -118,12 +118,15 @@ const VideoPlayer = ({ media, initialSeasonId, initialEpisodeId, onBack, onProgr
 
   return (
     <div className="min-h-screen bg-background animate-fade-in">
-      {/* Banner image header */}
-      <div className="relative h-[120px] md:h-[180px] overflow-hidden">
+      {/* Banner image header - clickable for back */}
+      <div 
+        onClick={onBack}
+        className="relative h-[120px] md:h-[180px] overflow-hidden cursor-pointer group"
+      >
         <img 
           src={media.image} 
           alt={media.title}
-          className="w-full h-full object-cover object-top scale-110 blur-sm"
+          className="w-full h-full object-cover object-top scale-110 blur-sm group-hover:scale-115 transition-transform duration-300"
         />
         <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-background" />
       </div>
@@ -139,7 +142,10 @@ const VideoPlayer = ({ media, initialSeasonId, initialEpisodeId, onBack, onProgr
             <ChevronLeft size={18} />
             Retour
           </Button>
-          <h1 className="font-display text-3xl md:text-4xl font-black uppercase text-primary tracking-tight">
+          <h1 
+            onClick={onBack}
+            className="font-display text-3xl md:text-4xl font-black uppercase text-primary tracking-tight cursor-pointer hover:opacity-80 transition-opacity"
+          >
             {media.title}
           </h1>
           <p className="text-muted-foreground uppercase text-sm tracking-wide">

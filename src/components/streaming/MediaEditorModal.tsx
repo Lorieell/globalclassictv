@@ -216,19 +216,23 @@ const MediaEditorModal = ({ isOpen, media, onClose, onSave }: MediaEditorModalPr
               </div>
             </div>
 
-            {formData.type === 'Film' && (
-              <div>
-                <label className="text-sm font-medium text-muted-foreground mb-1 block">
-                  Liens vidéo (séparés par des virgules)
-                </label>
-                <textarea
-                  placeholder="https://player1.com, https://player2.com"
-                  value={formData.videoUrls || ''}
-                  onChange={(e) => setFormData({ ...formData, videoUrls: e.target.value })}
-                  className="w-full bg-secondary/50 border border-border/50 rounded-xl px-4 py-3 outline-none focus:border-primary/50 h-20 resize-none text-foreground"
-                />
-              </div>
-            )}
+            {/* Always show video URLs for Film content */}
+            <div>
+              <label className="text-sm font-medium text-muted-foreground mb-1 block">
+                Liens vidéo Film (séparés par des virgules)
+              </label>
+              <textarea
+                placeholder="https://player1.com, https://player2.com"
+                value={formData.videoUrls || ''}
+                onChange={(e) => setFormData({ ...formData, videoUrls: e.target.value })}
+                className="w-full bg-secondary/50 border border-border/50 rounded-xl px-4 py-3 outline-none focus:border-primary/50 h-20 resize-none text-foreground"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                {formData.type === 'Série' 
+                  ? "Optionnel : ajoutez un film en plus des saisons" 
+                  : "URLs des lecteurs vidéo pour ce film"}
+              </p>
+            </div>
           </div>
 
           {/* Image Preview */}
@@ -241,8 +245,8 @@ const MediaEditorModal = ({ isOpen, media, onClose, onSave }: MediaEditorModalPr
           </div>
         </div>
 
-        {/* Seasons & Episodes (for Series) */}
-        {formData.type === 'Série' && (
+        {/* Seasons & Episodes (always available to add seasons to any media) */}
+        {(formData.type === 'Série' || (formData.seasons && formData.seasons.length > 0)) && (
           <div className="pt-6 border-t border-border/50">
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-display text-xl font-bold text-foreground">Saisons & Épisodes</h3>

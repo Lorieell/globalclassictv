@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Play, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Media } from '@/types/media';
@@ -12,13 +12,33 @@ const ResumeSection = ({ resumeList, onSelect }: ResumeSectionProps) => {
   const [slideIndex, setSlideIndex] = useState(0);
   const itemsPerSlide = 5;
   const containerRef = useRef<HTMLDivElement>(null);
+  const [stepPx, setStepPx] = useState(0);
 
   if (resumeList.length === 0) return null;
 
   const maxIndex = Math.max(0, resumeList.length - itemsPerSlide);
 
-  const goLeft = () => setSlideIndex(prev => Math.max(0, prev - 1));
-  const goRight = () => setSlideIndex(prev => Math.min(maxIndex, prev + 1));
+  const goLeft = () => setSlideIndex((prev) => Math.max(0, prev - 1));
+  const goRight = () => setSlideIndex((prev) => Math.min(maxIndex, prev + 1));
+
+  useEffect(() => {
+    const measure = () => {
+      const el = containerRef.current;
+      if (!el) return;
+      const items = el.querySelectorAll<HTMLElement>('[data-resume-item]');
+      if (items.length >= 2) {
+        setStepPx(items[1].offsetLeft - items[0].offsetLeft);
+        return;
+      }
+      if (items.length === 1) {
+        setStepPx(items[0].getBoundingClientRect().width);
+      }
+    };
+
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [resumeList.length]);
 
   return (
     <section className="mb-16 relative">
@@ -54,14 +74,20 @@ const ResumeSection = ({ resumeList, onSelect }: ResumeSectionProps) => {
       {/* Slider Window */}
       <div className="overflow-hidden p-2 -m-2" ref={containerRef}>
         <div 
-          className="flex transition-transform duration-[800ms] ease-[cubic-bezier(0.2,1,0.3,1)] gap-5"
-          style={{ transform: `translateX(-${slideIndex * (100 / itemsPerSlide)}%)` }}
+          className="flex w-full transition-transform duration-[800ms] ease-[cubic-bezier(0.2,1,0.3,1)] gap-5"
+          style={{
+            transform:
+              stepPx > 0
+                ? `translateX(-${slideIndex * stepPx}px)`
+                : `translateX(-${slideIndex * (100 / itemsPerSlide)}%)`,
+          }}
         >
           {resumeList.map((media) => (
-            <div 
+            <div
               key={media.id}
+              data-resume-item
               onClick={() => onSelect(media)}
-              className="min-w-[calc(20%-16px)] flex-shrink-0 group cursor-pointer"
+              className="flex-[0_0_calc((100%_-_5rem)/5)] max-w-[calc((100%_-_5rem)/5)] flex-shrink-0 group cursor-pointer"
             >
               <div className="aspect-video bg-card rounded-3xl border border-border/30 overflow-hidden relative hover:border-primary/50 transition-all shadow-card">
                 {/* Image */}

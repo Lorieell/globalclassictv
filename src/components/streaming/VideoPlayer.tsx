@@ -1,22 +1,40 @@
 import { useState, useEffect } from 'react';
-import { ChevronLeft, Play, Tv } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Play, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Media, Season, Episode } from '@/types/media';
 
 interface VideoPlayerProps {
   media: Media;
+  initialSeasonId?: string;
+  initialEpisodeId?: string;
   onBack: () => void;
   onProgress?: (mediaId: string, progress: number) => void;
 }
 
-const VideoPlayer = ({ media, onBack, onProgress }: VideoPlayerProps) => {
+const VideoPlayer = ({ media, initialSeasonId, initialEpisodeId, onBack, onProgress }: VideoPlayerProps) => {
   const isSerie = media.type === 'Série';
-  const [selectedSeason, setSelectedSeason] = useState<Season | null>(
-    isSerie && media.seasons?.[0] ? media.seasons[0] : null
-  );
-  const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(
-    selectedSeason?.episodes?.[0] ?? null
-  );
+  
+  // Find initial season
+  const getInitialSeason = () => {
+    if (!isSerie || !media.seasons?.length) return null;
+    if (initialSeasonId) {
+      return media.seasons.find(s => s.id === initialSeasonId) || media.seasons[0];
+    }
+    return media.seasons[0];
+  };
+
+  const [selectedSeason, setSelectedSeason] = useState<Season | null>(getInitialSeason());
+  
+  // Find initial episode
+  const getInitialEpisode = () => {
+    if (!selectedSeason?.episodes?.length) return null;
+    if (initialEpisodeId) {
+      return selectedSeason.episodes.find(e => e.id === initialEpisodeId) || selectedSeason.episodes[0];
+    }
+    return selectedSeason.episodes[0];
+  };
+
+  const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(getInitialEpisode());
   const [sourceIndex, setSourceIndex] = useState(0);
 
   const currentEpisode = isSerie ? selectedEpisode : null;
@@ -26,7 +44,32 @@ const VideoPlayer = ({ media, onBack, onProgress }: VideoPlayerProps) => {
     .filter(Boolean);
   const currentUrl = videoUrls[sourceIndex] || '';
 
-  // Simulate progress for demo
+  // Get all episodes for navigation
+  const allEpisodes = selectedSeason?.episodes || [];
+  const currentEpisodeIndex = allEpisodes.findIndex(e => e.id === selectedEpisode?.id);
+
+  const goToPrevEpisode = () => {
+    if (currentEpisodeIndex > 0) {
+      setSelectedEpisode(allEpisodes[currentEpisodeIndex - 1]);
+      setSourceIndex(0);
+    }
+  };
+
+  const goToNextEpisode = () => {
+    if (currentEpisodeIndex < allEpisodes.length - 1) {
+      setSelectedEpisode(allEpisodes[currentEpisodeIndex + 1]);
+      setSourceIndex(0);
+    }
+  };
+
+  const goToLastEpisode = () => {
+    if (allEpisodes.length > 0) {
+      setSelectedEpisode(allEpisodes[allEpisodes.length - 1]);
+      setSourceIndex(0);
+    }
+  };
+
+  // Progress tracking
   useEffect(() => {
     if (currentUrl && onProgress) {
       const timeout = setTimeout(() => {
@@ -36,136 +79,210 @@ const VideoPlayer = ({ media, onBack, onProgress }: VideoPlayerProps) => {
     }
   }, [currentUrl, media.id, onProgress]);
 
+  // Update episode when season changes
+  useEffect(() => {
+    if (selectedSeason?.episodes?.length) {
+      setSelectedEpisode(selectedSeason.episodes[0]);
+      setSourceIndex(0);
+    }
+  }, [selectedSeason]);
+
   return (
-    <div className="max-w-7xl mx-auto p-4 md:p-8 animate-fade-in-up">
-      <Button
-        variant="ghost"
-        onClick={onBack}
-        className="mb-6 text-muted-foreground hover:text-foreground gap-2 -ml-2"
-      >
-        <ChevronLeft size={20} />
-        Retour au catalogue
-      </Button>
+    <div className="min-h-screen bg-background animate-fade-in">
+      {/* Banner image header */}
+      <div className="relative h-[120px] md:h-[180px] overflow-hidden">
+        <img 
+          src={media.image} 
+          alt={media.title}
+          className="w-full h-full object-cover object-top scale-110 blur-sm"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-background" />
+      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Main Player */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="aspect-video bg-card rounded-3xl overflow-hidden shadow-card border border-border/50 relative">
-            {currentUrl ? (
-              <iframe 
-                src={currentUrl} 
-                className="w-full h-full" 
-                allowFullScreen 
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              />
-            ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground gap-4">
-                <Play size={64} className="opacity-30" />
-                <p className="text-sm">Aucune source vidéo disponible</p>
-              </div>
+      <div className="max-w-6xl mx-auto px-4 md:px-8 -mt-8 relative z-10">
+        {/* Title and type */}
+        <div className="mb-4">
+          <Button
+            variant="ghost"
+            onClick={onBack}
+            className="mb-2 text-muted-foreground hover:text-foreground gap-1 -ml-3 text-sm"
+          >
+            <ChevronLeft size={18} />
+            Retour
+          </Button>
+          <h1 className="font-display text-3xl md:text-4xl font-black uppercase text-primary tracking-tight">
+            {media.title}
+          </h1>
+          <p className="text-muted-foreground uppercase text-sm tracking-wide">
+            {isSerie && selectedSeason ? `Saison ${selectedSeason.number}` : media.type}
+          </p>
+          
+          {/* Quality/Language badges */}
+          <div className="flex gap-2 mt-2">
+            {media.quality && (
+              <span className="px-3 py-1 bg-destructive/20 border border-destructive/50 rounded-md text-xs font-bold text-destructive">
+                {media.quality}
+              </span>
+            )}
+            {media.language && (
+              <span className="px-3 py-1 bg-primary/20 border border-primary/50 rounded-md text-xs font-bold text-primary">
+                {media.language}
+              </span>
             )}
           </div>
+        </div>
 
-          {/* Source Selector */}
-          {videoUrls.length > 1 && (
-            <div className="flex flex-wrap gap-2">
-              {videoUrls.map((_, i) => (
-                <Button
-                  key={i}
-                  variant={sourceIndex === i ? 'default' : 'outline'}
-                  onClick={() => setSourceIndex(i)}
-                  className={`rounded-xl ${sourceIndex === i ? 'bg-primary text-primary-foreground' : 'bg-secondary/50 border-border/50'}`}
+        {/* Controls row: Episode selector + Player selector */}
+        <div className="flex flex-wrap gap-3 mb-4">
+          {isSerie && selectedSeason && (
+            <>
+              {/* Season selector */}
+              {media.seasons && media.seasons.length > 1 && (
+                <select
+                  value={selectedSeason.id}
+                  onChange={(e) => {
+                    const season = media.seasons?.find(s => s.id === e.target.value);
+                    if (season) setSelectedSeason(season);
+                  }}
+                  className="bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
                 >
-                  Lecteur {i + 1}
-                </Button>
+                  {media.seasons.map(s => (
+                    <option key={s.id} value={s.id}>Saison {s.number}</option>
+                  ))}
+                </select>
+              )}
+
+              {/* Episode selector */}
+              <select
+                value={selectedEpisode?.id || ''}
+                onChange={(e) => {
+                  const ep = selectedSeason.episodes?.find(ep => ep.id === e.target.value);
+                  if (ep) {
+                    setSelectedEpisode(ep);
+                    setSourceIndex(0);
+                  }
+                }}
+                className="bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+              >
+                {selectedSeason.episodes?.map(ep => (
+                  <option key={ep.id} value={ep.id}>Épisode {ep.number}</option>
+                ))}
+              </select>
+            </>
+          )}
+
+          {/* Player selector */}
+          {videoUrls.length > 0 && (
+            <select
+              value={sourceIndex}
+              onChange={(e) => setSourceIndex(parseInt(e.target.value))}
+              className="bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+            >
+              {videoUrls.map((_, i) => (
+                <option key={i} value={i}>Lecteur {i + 1}</option>
               ))}
-            </div>
+            </select>
           )}
+        </div>
 
-          {/* Info */}
-          <div className="space-y-3">
-            <h1 className="font-display text-4xl md:text-5xl font-bold text-foreground tracking-tight">
-              {media.title}
-            </h1>
-            {isSerie && selectedEpisode && (
-              <p className="text-primary font-semibold text-lg">
-                Saison {selectedSeason?.number} - Épisode {selectedEpisode.number}: {selectedEpisode.title}
-              </p>
-            )}
-            <p className="text-muted-foreground leading-relaxed">
-              {media.description || 'Aucune description disponible pour ce programme.'}
-            </p>
+        {/* Current selection info */}
+        {isSerie && selectedEpisode && (
+          <p className="text-xs text-muted-foreground mb-4 uppercase tracking-wide">
+            Dernière sélection : <span className="text-foreground">Épisode {selectedEpisode.number} - {selectedEpisode.title}</span>
+          </p>
+        )}
+
+        {/* Navigation bar */}
+        {isSerie && allEpisodes.length > 1 && (
+          <div className="bg-primary/10 border border-primary/20 rounded-xl p-3 flex flex-wrap items-center justify-center gap-3 mb-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={goToPrevEpisode}
+              disabled={currentEpisodeIndex <= 0}
+              className="gap-2 rounded-xl border-border"
+            >
+              <RotateCcw size={14} />
+              Précédent
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={goToLastEpisode}
+              className="gap-2 rounded-xl border-border"
+            >
+              <RotateCcw size={14} />
+              Dernier épisode
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={goToNextEpisode}
+              disabled={currentEpisodeIndex >= allEpisodes.length - 1}
+              className="gap-2 rounded-xl bg-primary text-primary-foreground"
+            >
+              Suivant
+              <ChevronRight size={14} />
+            </Button>
           </div>
-        </div>
+        )}
 
-        {/* Sidebar */}
-        <div className="space-y-6">
-          {isSerie && media.seasons && media.seasons.length > 0 ? (
-            <div className="bg-card rounded-3xl p-6 border border-border/50 shadow-card">
-              <h3 className="font-display text-xl font-bold mb-4 flex items-center gap-3 text-foreground uppercase tracking-wide">
-                <Tv size={20} className="text-primary" />
-                Épisodes
-              </h3>
+        {/* Player change hint */}
+        <p className="text-center text-xs text-muted-foreground mb-4">
+          Pub insistante ou vidéo indisponible ? <span className="text-foreground font-semibold">Changez de lecteur.</span>
+        </p>
 
-              {/* Season Tabs */}
-              <div className="flex gap-2 overflow-x-auto pb-4 mb-4 border-b border-border/50 scrollbar-hide">
-                {media.seasons.map((season) => (
-                  <Button
-                    key={season.id}
-                    variant={selectedSeason?.number === season.number ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => {
-                      setSelectedSeason(season);
-                      setSelectedEpisode(season.episodes?.[0] ?? null);
-                      setSourceIndex(0);
-                    }}
-                    className={`rounded-xl whitespace-nowrap ${
-                      selectedSeason?.number === season.number 
-                        ? 'bg-primary text-primary-foreground' 
-                        : 'bg-secondary/50 border-border/50'
-                    }`}
-                  >
-                    Saison {season.number}
-                  </Button>
-                ))}
-              </div>
-
-              {/* Episodes List */}
-              <div className="space-y-2 max-h-[400px] overflow-y-auto scrollbar-hide pr-1">
-                {selectedSeason?.episodes?.map((ep) => (
-                  <button
-                    key={ep.id}
-                    onClick={() => { setSelectedEpisode(ep); setSourceIndex(0); }}
-                    className={`w-full text-left p-3 rounded-xl transition-all flex items-center gap-3 ${
-                      selectedEpisode?.id === ep.id 
-                        ? 'bg-primary/20 border border-primary/30' 
-                        : 'bg-secondary/30 hover:bg-secondary/50 border border-transparent'
-                    }`}
-                  >
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${
-                      selectedEpisode?.id === ep.id 
-                        ? 'bg-primary text-primary-foreground' 
-                        : 'bg-muted text-muted-foreground'
-                    }`}>
-                      {ep.number}
-                    </div>
-                    <span className="truncate text-sm font-medium text-foreground">
-                      {ep.title}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
+        {/* Video Player */}
+        <div className="aspect-video bg-card rounded-2xl overflow-hidden shadow-card border border-border/50 mb-8">
+          {currentUrl ? (
+            <iframe 
+              src={currentUrl} 
+              className="w-full h-full" 
+              allowFullScreen 
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            />
           ) : (
-            <div className="rounded-3xl overflow-hidden shadow-card border border-border/50">
-              <img 
-                src={media.image} 
-                alt={media.title}
-                className="w-full aspect-[2/3] object-cover"
-              />
+            <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground gap-4">
+              <Play size={64} className="opacity-30" />
+              <p className="text-sm">Aucune source vidéo disponible</p>
             </div>
           )}
         </div>
+
+        {/* Bottom navigation (duplicate for convenience) */}
+        {isSerie && allEpisodes.length > 1 && (
+          <div className="bg-primary/10 border border-primary/20 rounded-xl p-3 flex flex-wrap items-center justify-center gap-3 mb-8">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={goToPrevEpisode}
+              disabled={currentEpisodeIndex <= 0}
+              className="gap-2 rounded-xl border-border"
+            >
+              <RotateCcw size={14} />
+              Précédent
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={goToLastEpisode}
+              className="gap-2 rounded-xl border-border"
+            >
+              <RotateCcw size={14} />
+              Dernier épisode
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={goToNextEpisode}
+              disabled={currentEpisodeIndex >= allEpisodes.length - 1}
+              className="gap-2 rounded-xl bg-primary text-primary-foreground"
+            >
+              Suivant
+              <ChevronRight size={14} />
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

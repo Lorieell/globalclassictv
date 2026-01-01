@@ -5,6 +5,7 @@ import Header from '@/components/streaming/Header';
 import HeroSection from '@/components/streaming/HeroSection';
 import ResumeSection from '@/components/streaming/ResumeSection';
 import MediaGrid from '@/components/streaming/MediaGrid';
+import MediaDetailPage from '@/components/streaming/MediaDetailPage';
 import VideoPlayer from '@/components/streaming/VideoPlayer';
 import AdminLoginModal from '@/components/streaming/AdminLoginModal';
 import MediaEditorModal from '@/components/streaming/MediaEditorModal';
@@ -13,11 +14,13 @@ import { useMediaLibrary } from '@/hooks/useMediaLibrary';
 import { useAdmin } from '@/hooks/useAdmin';
 import type { Media, HeroItem } from '@/types/media';
 
-type ViewType = 'home' | 'films' | 'series' | 'player';
+type ViewType = 'home' | 'films' | 'series' | 'watchlist' | 'detail' | 'player';
 
 const Index = () => {
   const [view, setView] = useState<ViewType>('home');
   const [selectedMedia, setSelectedMedia] = useState<Media | null>(null);
+  const [playerSeasonId, setPlayerSeasonId] = useState<string | undefined>();
+  const [playerEpisodeId, setPlayerEpisodeId] = useState<string | undefined>();
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [showEditor, setShowEditor] = useState(false);
   const [showHeroEditor, setShowHeroEditor] = useState(false);
@@ -29,29 +32,60 @@ const Index = () => {
     series, 
     heroItems, 
     resumeList,
+    watchlistMedia,
     loading,
     addMedia,
     updateMedia,
     deleteMedia,
     updateProgress,
     saveHeroItems,
+    toggleWatchlist,
+    isInWatchlist,
   } = useMediaLibrary();
 
   const { isAdmin, login, logout } = useAdmin();
 
+  // Go to detail page when clicking a media card
   const handleSelectMedia = (media: Media) => {
     setSelectedMedia(media);
+    setView('detail');
+  };
+
+  // Play from hero - go to detail page first
+  const handlePlayHero = (mediaId: string) => {
+    const media = library.find(m => m.id === mediaId);
+    if (media) {
+      setSelectedMedia(media);
+      setView('detail');
+    }
+  };
+
+  // Play from detail page
+  const handlePlayFromDetail = (media: Media, seasonId?: string, episodeId?: string) => {
+    setSelectedMedia(media);
+    setPlayerSeasonId(seasonId);
+    setPlayerEpisodeId(episodeId);
     setView('player');
   };
 
-  const handlePlayHero = (mediaId: string) => {
-    const media = library.find(m => m.id === mediaId);
-    if (media) handleSelectMedia(media);
+  // Resume playing
+  const handleResumeSelect = (media: Media) => {
+    setSelectedMedia(media);
+    setPlayerSeasonId(undefined);
+    setPlayerEpisodeId(undefined);
+    setView('player');
   };
 
   const handleBack = () => {
-    setSelectedMedia(null);
-    setView('home');
+    if (view === 'player') {
+      // Go back to detail page
+      setView('detail');
+      setPlayerSeasonId(undefined);
+      setPlayerEpisodeId(undefined);
+    } else {
+      setSelectedMedia(null);
+      setView('home');
+    }
   };
 
   const handleAddMedia = () => {
@@ -82,9 +116,9 @@ const Index = () => {
     updateProgress(mediaId, progress);
   };
 
-  const currentLibrary = view === 'films' ? films : view === 'series' ? series : library;
-  const gridTitle = view === 'films' ? 'Films' : view === 'series' ? 'Séries' : 'Tout le catalogue';
-  const gridIcon = view === 'films' ? 'film' : view === 'series' ? 'serie' : 'all';
+  const currentLibrary = view === 'films' ? films : view === 'series' ? series : view === 'watchlist' ? watchlistMedia : library;
+  const gridTitle = view === 'films' ? 'Films' : view === 'series' ? 'Séries' : view === 'watchlist' ? 'Ma Watchlist' : 'Tout le catalogue';
+  const gridIcon = view === 'films' ? 'film' : view === 'series' ? 'serie' : view === 'watchlist' ? 'watchlist' : 'all';
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -101,9 +135,19 @@ const Index = () => {
       <main className="min-h-[calc(100vh-140px)]">
         {view === 'player' && selectedMedia ? (
           <VideoPlayer 
-            media={selectedMedia} 
+            media={selectedMedia}
+            initialSeasonId={playerSeasonId}
+            initialEpisodeId={playerEpisodeId}
             onBack={handleBack}
             onProgress={handleProgress}
+          />
+        ) : view === 'detail' && selectedMedia ? (
+          <MediaDetailPage
+            media={selectedMedia}
+            onBack={handleBack}
+            onPlay={handlePlayFromDetail}
+            isInWatchlist={isInWatchlist(selectedMedia.id)}
+            onToggleWatchlist={toggleWatchlist}
           />
         ) : (
           <div className="p-4 md:p-8 max-w-[1600px] mx-auto">
@@ -128,16 +172,17 @@ const Index = () => {
                   onPlay={handlePlayHero}
                 />
                 
+                {/* Resume Section - between Hero and Catalog */}
                 <ResumeSection 
                   resumeList={resumeList}
-                  onSelect={handleSelectMedia}
+                  onSelect={handleResumeSelect}
                 />
               </>
             )}
 
             <MediaGrid
               title={gridTitle}
-              icon={gridIcon as 'all' | 'film' | 'serie'}
+              icon={gridIcon as 'all' | 'film' | 'serie' | 'watchlist'}
               media={currentLibrary}
               loading={loading}
               isAdmin={isAdmin}

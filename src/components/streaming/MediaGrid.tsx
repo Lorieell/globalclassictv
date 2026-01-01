@@ -1,11 +1,11 @@
-import { Plus, Film, Tv, LayoutGrid } from 'lucide-react';
+import { Plus, Film, Tv, LayoutGrid, Bookmark } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import MediaCard from './MediaCard';
 import type { Media } from '@/types/media';
 
 interface MediaGridProps {
   title: string;
-  icon?: 'all' | 'film' | 'serie';
+  icon?: 'all' | 'film' | 'serie' | 'watchlist';
   media: Media[];
   loading?: boolean;
   isAdmin?: boolean;
@@ -26,7 +26,7 @@ const MediaGrid = ({
   onEdit,
   onDelete 
 }: MediaGridProps) => {
-  const Icon = icon === 'film' ? Film : icon === 'serie' ? Tv : LayoutGrid;
+  const Icon = icon === 'film' ? Film : icon === 'serie' ? Tv : icon === 'watchlist' ? Bookmark : LayoutGrid;
 
   return (
     <section className="mb-12">

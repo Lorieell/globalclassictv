@@ -18,6 +18,10 @@ const MediaEditorModal = ({ isOpen, media, onClose, onSave }: MediaEditorModalPr
     image: '',
     type: 'Film',
     description: '',
+    synopsis: '',
+    genres: '',
+    quality: '',
+    language: '',
     videoUrls: '',
     seasons: [],
   });
@@ -26,6 +30,10 @@ const MediaEditorModal = ({ isOpen, media, onClose, onSave }: MediaEditorModalPr
     if (media) {
       setFormData({
         ...media,
+        synopsis: media.synopsis || '',
+        genres: media.genres || '',
+        quality: media.quality || '',
+        language: media.language || '',
         seasons: media.seasons || [],
       });
     }
@@ -49,6 +57,10 @@ const MediaEditorModal = ({ isOpen, media, onClose, onSave }: MediaEditorModalPr
       image: formData.image,
       type: formData.type as 'Film' | 'Série',
       description: formData.description || '',
+      synopsis: formData.synopsis,
+      genres: formData.genres,
+      quality: formData.quality,
+      language: formData.language,
       videoUrls: formData.videoUrls,
       seasons: formData.seasons,
     });
@@ -151,13 +163,57 @@ const MediaEditorModal = ({ isOpen, media, onClose, onSave }: MediaEditorModalPr
             </div>
 
             <div>
-              <label className="text-sm font-medium text-muted-foreground mb-1 block">Description</label>
+              <label className="text-sm font-medium text-muted-foreground mb-1 block">Description courte</label>
               <textarea
-                placeholder="Synopsis..."
+                placeholder="Description courte..."
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="w-full bg-secondary/50 border border-border/50 rounded-xl px-4 py-3 outline-none focus:border-primary/50 h-24 resize-none text-foreground"
+                className="w-full bg-secondary/50 border border-border/50 rounded-xl px-4 py-3 outline-none focus:border-primary/50 h-20 resize-none text-foreground"
               />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-muted-foreground mb-1 block">Synopsis complet</label>
+              <textarea
+                placeholder="Synopsis détaillé..."
+                value={formData.synopsis || ''}
+                onChange={(e) => setFormData({ ...formData, synopsis: e.target.value })}
+                className="w-full bg-secondary/50 border border-border/50 rounded-xl px-4 py-3 outline-none focus:border-primary/50 h-28 resize-none text-foreground"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-muted-foreground mb-1 block">Genres (séparés par virgules)</label>
+              <input
+                type="text"
+                placeholder="Action, Drame, Science-Fiction..."
+                value={formData.genres || ''}
+                onChange={(e) => setFormData({ ...formData, genres: e.target.value })}
+                className="w-full bg-secondary/50 border border-border/50 rounded-xl px-4 py-3 outline-none focus:border-primary/50 text-foreground"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-muted-foreground mb-1 block">Qualité</label>
+                <input
+                  type="text"
+                  placeholder="HD, FHD, 4K..."
+                  value={formData.quality || ''}
+                  onChange={(e) => setFormData({ ...formData, quality: e.target.value })}
+                  className="w-full bg-secondary/50 border border-border/50 rounded-xl px-4 py-3 outline-none focus:border-primary/50 text-foreground"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-muted-foreground mb-1 block">Langue</label>
+                <input
+                  type="text"
+                  placeholder="VF, VOSTFR..."
+                  value={formData.language || ''}
+                  onChange={(e) => setFormData({ ...formData, language: e.target.value })}
+                  className="w-full bg-secondary/50 border border-border/50 rounded-xl px-4 py-3 outline-none focus:border-primary/50 text-foreground"
+                />
+              </div>
             </div>
 
             {formData.type === 'Film' && (

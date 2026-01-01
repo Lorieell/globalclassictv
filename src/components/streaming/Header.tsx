@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
+import { Bookmark } from 'lucide-react';
 import { Search, LayoutGrid, Film, Tv, Settings, LogOut, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import logo from '@/assets/logo.png';
 import type { Media } from '@/types/media';
 
-type ViewType = 'home' | 'films' | 'series' | 'player';
+type ViewType = 'home' | 'films' | 'series' | 'watchlist' | 'detail' | 'player';
 
 interface HeaderProps {
   view: ViewType;
@@ -49,6 +50,7 @@ const Header = ({
     { id: 'home' as const, label: 'Accueil', icon: LayoutGrid },
     { id: 'films' as const, label: 'Films', icon: Film },
     { id: 'series' as const, label: 'Séries', icon: Tv },
+    { id: 'watchlist' as const, label: 'Watchlist', icon: Bookmark },
   ];
 
   return (

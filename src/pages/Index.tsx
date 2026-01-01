@@ -18,21 +18,7 @@ import type { Media, HeroItem } from '@/types/media';
 
 type ViewType = 'home' | 'films' | 'series' | 'watchlist' | 'detail' | 'player';
 
-interface SectionLayouts {
-  films: LayoutType;
-  series: LayoutType;
-  all: LayoutType;
-  watchlist: LayoutType;
-}
-
-const LAYOUTS_STORAGE_KEY = 'gctv-section-layouts';
-
-const defaultLayouts: SectionLayouts = {
-  films: 'grid',
-  series: 'grid',
-  all: 'grid',
-  watchlist: 'grid',
-};
+const LAYOUT_STORAGE_KEY = 'gctv-layout';
 
 const Index = () => {
   const [view, setView] = useState<ViewType>('home');
@@ -43,15 +29,14 @@ const Index = () => {
   const [showEditor, setShowEditor] = useState(false);
   const [showHeroEditor, setShowHeroEditor] = useState(false);
   const [editingMedia, setEditingMedia] = useState<Partial<Media> | null>(null);
-  const [sectionLayouts, setSectionLayouts] = useState<SectionLayouts>(() => {
-    const stored = localStorage.getItem(LAYOUTS_STORAGE_KEY);
-    return stored ? JSON.parse(stored) : defaultLayouts;
+  const [layout, setLayout] = useState<LayoutType>(() => {
+    const stored = localStorage.getItem(LAYOUT_STORAGE_KEY);
+    return (stored as LayoutType) || 'grid';
   });
 
-  const handleLayoutChange = (section: keyof SectionLayouts, newLayout: LayoutType) => {
-    const updated = { ...sectionLayouts, [section]: newLayout };
-    setSectionLayouts(updated);
-    localStorage.setItem(LAYOUTS_STORAGE_KEY, JSON.stringify(updated));
+  const handleLayoutChange = (newLayout: LayoutType) => {
+    setLayout(newLayout);
+    localStorage.setItem(LAYOUT_STORAGE_KEY, newLayout);
   };
 
   const { 
@@ -240,50 +225,19 @@ const Index = () => {
               </>
             )}
 
-            {view === 'home' ? (
-              <>
-                <MediaGrid
-                  title="Films"
-                  icon="film"
-                  media={films}
-                  loading={loading}
-                  isAdmin={isAdmin}
-                  layout={sectionLayouts.films}
-                  onLayoutChange={(l) => handleLayoutChange('films', l)}
-                  onSelect={handleSelectMedia}
-                  onAdd={handleAddMedia}
-                  onEdit={handleEditMedia}
-                  onDelete={deleteMedia}
-                />
-                <MediaGrid
-                  title="Séries"
-                  icon="serie"
-                  media={series}
-                  loading={loading}
-                  isAdmin={isAdmin}
-                  layout={sectionLayouts.series}
-                  onLayoutChange={(l) => handleLayoutChange('series', l)}
-                  onSelect={handleSelectMedia}
-                  onAdd={handleAddMedia}
-                  onEdit={handleEditMedia}
-                  onDelete={deleteMedia}
-                />
-              </>
-            ) : (
-              <MediaGrid
-                title={gridTitle}
-                icon={gridIcon as 'all' | 'film' | 'serie' | 'watchlist'}
-                media={currentLibrary}
-                loading={loading}
-                isAdmin={isAdmin}
-                layout={sectionLayouts[view === 'watchlist' ? 'watchlist' : 'all']}
-                onLayoutChange={(l) => handleLayoutChange(view === 'watchlist' ? 'watchlist' : 'all', l)}
-                onSelect={handleSelectMedia}
-                onAdd={handleAddMedia}
-                onEdit={handleEditMedia}
-                onDelete={deleteMedia}
-              />
-            )}
+            <MediaGrid
+              title={gridTitle}
+              icon={gridIcon as 'all' | 'film' | 'serie' | 'watchlist'}
+              media={currentLibrary}
+              loading={loading}
+              isAdmin={isAdmin}
+              layout={layout}
+              onLayoutChange={handleLayoutChange}
+              onSelect={handleSelectMedia}
+              onAdd={handleAddMedia}
+              onEdit={handleEditMedia}
+              onDelete={deleteMedia}
+            />
           </div>
         )}
       </main>

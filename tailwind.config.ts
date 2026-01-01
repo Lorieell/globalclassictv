@@ -44,6 +44,10 @@ export default {
           DEFAULT: "hsl(var(--accent))",
           foreground: "hsl(var(--accent-foreground))",
         },
+        purple: {
+          DEFAULT: "hsl(var(--purple))",
+          foreground: "hsl(var(--purple-foreground))",
+        },
         popover: {
           DEFAULT: "hsl(var(--popover))",
           foreground: "hsl(var(--popover-foreground))",
@@ -104,6 +108,8 @@ export default {
         "slide-in-left": "slide-in-left 0.5s ease-out",
         "fade-in-up": "fade-in-up 0.5s ease-out",
         shimmer: "shimmer 2s infinite linear",
+        "ambient-pulse": "ambient-pulse 8s ease-in-out infinite",
+        "ambient-float": "ambient-float 20s ease-in-out infinite",
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',

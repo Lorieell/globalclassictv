@@ -14,8 +14,6 @@ const ResumeSection = ({ resumeList, onSelect }: ResumeSectionProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [stepPx, setStepPx] = useState(0);
 
-  if (resumeList.length === 0) return null;
-
   const maxIndex = Math.max(0, resumeList.length - itemsPerSlide);
 
   const goLeft = () => setSlideIndex((prev) => Math.max(0, prev - 1));
@@ -39,6 +37,8 @@ const ResumeSection = ({ resumeList, onSelect }: ResumeSectionProps) => {
     window.addEventListener('resize', measure);
     return () => window.removeEventListener('resize', measure);
   }, [resumeList.length]);
+
+  if (resumeList.length === 0) return null;
 
   return (
     <section className="mb-16 relative">

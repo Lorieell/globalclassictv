@@ -200,5 +200,6 @@ export const useMediaLibrary = () => {
     updateHeroItem,
     deleteHeroItem,
     updateProgress,
+    saveHeroItems,
   };
 };

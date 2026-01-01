@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Search, LayoutGrid, Film, Tv, Settings, LogOut, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import logo from '@/assets/logo.png';
 import type { Media } from '@/types/media';
 
 type ViewType = 'home' | 'films' | 'series' | 'player';
@@ -51,17 +52,26 @@ const Header = ({
   ];
 
   return (
-    <header className="sticky top-0 z-50 px-4 md:px-8 py-4 border-b border-border/30 bg-background/80 backdrop-blur-xl">
+    <header className="sticky top-0 z-50 px-4 md:px-8 py-3 border-b border-border/30 bg-background/80 backdrop-blur-xl">
       <div className="flex items-center justify-between gap-4">
         {/* Logo */}
         <div 
           className="flex items-center gap-3 cursor-pointer group"
           onClick={() => setView('home')}
         >
-          <div className="w-3 h-3 rounded-full bg-primary glow-primary group-hover:scale-110 transition-transform" />
-          <h1 className="font-display text-xl md:text-2xl font-bold tracking-tight text-foreground">
-            GLOBAL CLASSIC TV
-          </h1>
+          <img 
+            src={logo} 
+            alt="Global Classic TV" 
+            className="w-10 h-10 md:w-12 md:h-12 object-contain group-hover:scale-105 transition-transform"
+          />
+          <div className="hidden sm:block">
+            <h1 className="font-display text-lg md:text-xl font-bold tracking-tight text-foreground leading-none">
+              GLOBAL CLASSIC TV
+            </h1>
+            <p className="text-[8px] text-muted-foreground uppercase tracking-widest">
+              Streaming Premium
+            </p>
+          </div>
         </div>
 
         {/* Navigation */}
@@ -95,7 +105,7 @@ const Header = ({
                 value={searchQuery}
                 onFocus={() => setIsSearchOpen(true)}
                 onChange={(e) => { setSearchQuery(e.target.value); setIsSearchOpen(true); }}
-                className="w-40 md:w-64 bg-secondary/50 border border-border/50 rounded-xl pl-10 pr-4 py-2.5 outline-none focus:border-primary/50 focus:bg-secondary/80 transition-all text-sm text-foreground placeholder:text-muted-foreground"
+                className="w-32 md:w-64 bg-secondary/50 border border-border/50 rounded-xl pl-10 pr-4 py-2.5 outline-none focus:border-primary/50 focus:bg-secondary/80 transition-all text-sm text-foreground placeholder:text-muted-foreground"
               />
               {searchQuery && (
                 <button
@@ -173,7 +183,7 @@ const Header = ({
       </div>
 
       {/* Mobile Navigation */}
-      <nav className="flex lg:hidden items-center justify-center gap-2 mt-4">
+      <nav className="flex lg:hidden items-center justify-center gap-2 mt-3">
         {navItems.map(({ id, label, icon: Icon }) => (
           <Button
             key={id}

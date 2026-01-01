@@ -100,7 +100,7 @@ const Footer = ({ isAdmin, onSettingsClick }: FooterProps) => {
               </a>
 
               {/* Admin Settings Button */}
-              {isAdmin && onSettingsClick && (
+              {isAdmin && (
                 <Button
                   onClick={onSettingsClick}
                   variant="ghost"

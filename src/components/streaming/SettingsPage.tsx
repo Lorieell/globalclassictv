@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Link2, Megaphone, Instagram, Youtube, Twitter } from 'lucide-react';
+import { ArrowLeft, Link2, Megaphone, Palette, FolderOpen, Instagram, Youtube, Twitter, Sun, Moon, Monitor, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -38,12 +38,24 @@ interface AdSettings {
   rightLinkUrl: string;
 }
 
+interface AppearanceSettings {
+  theme: 'dark' | 'light' | 'system';
+  accentColor: string;
+}
+
+interface ContentSettings {
+  categories: string[];
+  genres: string[];
+}
+
 interface SettingsPageProps {
   onBack: () => void;
 }
 
 const SOCIAL_STORAGE_KEY = 'gctv-social-links';
 const ADS_STORAGE_KEY = 'gctv-ads-settings';
+const APPEARANCE_STORAGE_KEY = 'gctv-appearance';
+const CONTENT_STORAGE_KEY = 'gctv-content-settings';
 
 const defaultLinks: SocialLinks = {
   instagram: 'https://instagram.com',
@@ -63,7 +75,17 @@ const defaultAds: AdSettings = {
   rightLinkUrl: '',
 };
 
-type SettingsTab = 'links' | 'ads';
+const defaultAppearance: AppearanceSettings = {
+  theme: 'dark',
+  accentColor: '#E91E8C',
+};
+
+const defaultContent: ContentSettings = {
+  categories: ['Film', 'Série', 'Anime', 'Documentaire'],
+  genres: ['Action', 'Comédie', 'Drame', 'Horreur', 'Romance', 'Sci-Fi', 'Thriller'],
+};
+
+type SettingsTab = 'links' | 'ads' | 'appearance' | 'content';
 
 const SettingsPage = ({ onBack }: SettingsPageProps) => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('links');
@@ -80,6 +102,21 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
     return stored ? JSON.parse(stored) : defaultAds;
   });
 
+  // Appearance state
+  const [appearance, setAppearance] = useState<AppearanceSettings>(() => {
+    const stored = localStorage.getItem(APPEARANCE_STORAGE_KEY);
+    return stored ? JSON.parse(stored) : defaultAppearance;
+  });
+
+  // Content state
+  const [content, setContent] = useState<ContentSettings>(() => {
+    const stored = localStorage.getItem(CONTENT_STORAGE_KEY);
+    return stored ? JSON.parse(stored) : defaultContent;
+  });
+
+  const [newCategory, setNewCategory] = useState('');
+  const [newGenre, setNewGenre] = useState('');
+
   const saveLinks = () => {
     localStorage.setItem(SOCIAL_STORAGE_KEY, JSON.stringify(links));
     toast.success('Liens sauvegardés');
@@ -88,6 +125,44 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
   const saveAds = () => {
     localStorage.setItem(ADS_STORAGE_KEY, JSON.stringify(ads));
     toast.success('Paramètres des pubs sauvegardés');
+  };
+
+  const saveAppearance = () => {
+    localStorage.setItem(APPEARANCE_STORAGE_KEY, JSON.stringify(appearance));
+    // Apply theme
+    if (appearance.theme === 'light') {
+      document.documentElement.classList.remove('dark');
+    } else {
+      document.documentElement.classList.add('dark');
+    }
+    toast.success('Apparence sauvegardée');
+  };
+
+  const saveContent = () => {
+    localStorage.setItem(CONTENT_STORAGE_KEY, JSON.stringify(content));
+    toast.success('Contenu sauvegardé');
+  };
+
+  const addCategory = () => {
+    if (newCategory.trim() && !content.categories.includes(newCategory.trim())) {
+      setContent(prev => ({ ...prev, categories: [...prev.categories, newCategory.trim()] }));
+      setNewCategory('');
+    }
+  };
+
+  const removeCategory = (cat: string) => {
+    setContent(prev => ({ ...prev, categories: prev.categories.filter(c => c !== cat) }));
+  };
+
+  const addGenre = () => {
+    if (newGenre.trim() && !content.genres.includes(newGenre.trim())) {
+      setContent(prev => ({ ...prev, genres: [...prev.genres, newGenre.trim()] }));
+      setNewGenre('');
+    }
+  };
+
+  const removeGenre = (genre: string) => {
+    setContent(prev => ({ ...prev, genres: prev.genres.filter(g => g !== genre) }));
   };
 
   const socialItems = [
@@ -101,6 +176,23 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
   const menuItems = [
     { key: 'links', icon: Link2, label: 'Liens' },
     { key: 'ads', icon: Megaphone, label: 'Pubs' },
+    { key: 'appearance', icon: Palette, label: 'Apparence' },
+    { key: 'content', icon: FolderOpen, label: 'Contenu' },
+  ];
+
+  const themeOptions = [
+    { value: 'dark', label: 'Sombre', icon: Moon },
+    { value: 'light', label: 'Clair', icon: Sun },
+    { value: 'system', label: 'Système', icon: Monitor },
+  ];
+
+  const accentColors = [
+    { value: '#E91E8C', label: 'Rose' },
+    { value: '#8B5CF6', label: 'Violet' },
+    { value: '#3B82F6', label: 'Bleu' },
+    { value: '#10B981', label: 'Vert' },
+    { value: '#F59E0B', label: 'Orange' },
+    { value: '#EF4444', label: 'Rouge' },
   ];
 
   return (
@@ -123,15 +215,15 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
       </div>
 
       <div className="max-w-[1600px] mx-auto px-4 md:px-8 py-8">
-        <div className="flex gap-8">
+        <div className="flex flex-col md:flex-row gap-8">
           {/* Sidebar */}
-          <div className="w-64 shrink-0">
-            <nav className="space-y-1">
+          <div className="md:w-64 shrink-0">
+            <nav className="flex md:flex-col gap-2 md:gap-1 overflow-x-auto md:overflow-visible pb-2 md:pb-0">
               {menuItems.map(({ key, icon: Icon, label }) => (
                 <button
                   key={key}
                   onClick={() => setActiveTab(key as SettingsTab)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all duration-200 ${
+                  className={`flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all duration-200 whitespace-nowrap ${
                     activeTab === key
                       ? 'bg-primary/20 text-primary border border-primary/30'
                       : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
@@ -146,6 +238,7 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
 
           {/* Content */}
           <div className="flex-1 max-w-2xl">
+            {/* LIENS */}
             {activeTab === 'links' && (
               <div className="space-y-6">
                 <div>
@@ -190,6 +283,7 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
               </div>
             )}
 
+            {/* PUBS */}
             {activeTab === 'ads' && (
               <div className="space-y-6">
                 <div>
@@ -224,7 +318,7 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-foreground">URL de redirection (au clic)</Label>
+                        <Label className="text-foreground">URL de redirection</Label>
                         <Input
                           value={ads.leftLinkUrl}
                           onChange={(e) => setAds(prev => ({ ...prev, leftLinkUrl: e.target.value }))}
@@ -232,21 +326,6 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
                           className="bg-muted/50 border-border"
                         />
                       </div>
-                      {ads.leftImageUrl && (
-                        <div className="pt-2">
-                          <Label className="text-foreground mb-2 block">Aperçu</Label>
-                          <div className="w-[120px] bg-muted/30 rounded-lg overflow-hidden border border-border/50">
-                            <img 
-                              src={ads.leftImageUrl} 
-                              alt="Aperçu pub gauche" 
-                              className="w-full h-auto"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="120" height="200"><rect fill="%23333" width="120" height="200"/><text fill="%23666" x="50%" y="50%" text-anchor="middle" dy=".3em" font-size="12">Erreur</text></svg>';
-                              }}
-                            />
-                          </div>
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>
@@ -276,7 +355,7 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-foreground">URL de redirection (au clic)</Label>
+                        <Label className="text-foreground">URL de redirection</Label>
                         <Input
                           value={ads.rightLinkUrl}
                           onChange={(e) => setAds(prev => ({ ...prev, rightLinkUrl: e.target.value }))}
@@ -284,27 +363,151 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
                           className="bg-muted/50 border-border"
                         />
                       </div>
-                      {ads.rightImageUrl && (
-                        <div className="pt-2">
-                          <Label className="text-foreground mb-2 block">Aperçu</Label>
-                          <div className="w-[120px] bg-muted/30 rounded-lg overflow-hidden border border-border/50">
-                            <img 
-                              src={ads.rightImageUrl} 
-                              alt="Aperçu pub droite" 
-                              className="w-full h-auto"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="120" height="200"><rect fill="%23333" width="120" height="200"/><text fill="%23666" x="50%" y="50%" text-anchor="middle" dy=".3em" font-size="12">Erreur</text></svg>';
-                              }}
-                            />
-                          </div>
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>
 
                 <Button onClick={saveAds} className="bg-primary text-primary-foreground">
                   Enregistrer les pubs
+                </Button>
+              </div>
+            )}
+
+            {/* APPARENCE */}
+            {activeTab === 'appearance' && (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-xl font-semibold text-foreground mb-2">Apparence</h2>
+                  <p className="text-muted-foreground text-sm">
+                    Personnalisez le thème et les couleurs du site.
+                  </p>
+                </div>
+
+                {/* Theme Selection */}
+                <div className="bg-card/50 border border-border/50 rounded-xl p-6 space-y-4">
+                  <h3 className="font-semibold text-foreground">Thème</h3>
+                  <div className="grid grid-cols-3 gap-3">
+                    {themeOptions.map(({ value, label, icon: Icon }) => (
+                      <button
+                        key={value}
+                        onClick={() => setAppearance(prev => ({ ...prev, theme: value as 'dark' | 'light' | 'system' }))}
+                        className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                          appearance.theme === value
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-border/50 text-muted-foreground hover:border-border hover:text-foreground'
+                        }`}
+                      >
+                        <Icon size={24} />
+                        <span className="text-sm font-medium">{label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Accent Color */}
+                <div className="bg-card/50 border border-border/50 rounded-xl p-6 space-y-4">
+                  <h3 className="font-semibold text-foreground">Couleur d'accent</h3>
+                  <div className="flex flex-wrap gap-3">
+                    {accentColors.map(({ value, label }) => (
+                      <button
+                        key={value}
+                        onClick={() => setAppearance(prev => ({ ...prev, accentColor: value }))}
+                        className={`w-12 h-12 rounded-full border-4 transition-all ${
+                          appearance.accentColor === value
+                            ? 'border-foreground scale-110'
+                            : 'border-transparent hover:scale-105'
+                        }`}
+                        style={{ backgroundColor: value }}
+                        title={label}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <Button onClick={saveAppearance} className="bg-primary text-primary-foreground">
+                  Enregistrer l'apparence
+                </Button>
+              </div>
+            )}
+
+            {/* CONTENU */}
+            {activeTab === 'content' && (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-xl font-semibold text-foreground mb-2">Contenu</h2>
+                  <p className="text-muted-foreground text-sm">
+                    Gérez les catégories et les genres disponibles pour vos médias.
+                  </p>
+                </div>
+
+                {/* Categories */}
+                <div className="bg-card/50 border border-border/50 rounded-xl p-6 space-y-4">
+                  <h3 className="font-semibold text-foreground">Catégories</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {content.categories.map(cat => (
+                      <span
+                        key={cat}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-primary/10 text-primary border border-primary/20 text-sm"
+                      >
+                        {cat}
+                        <button
+                          onClick={() => removeCategory(cat)}
+                          className="ml-1 hover:text-destructive transition-colors"
+                        >
+                          <X size={14} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      value={newCategory}
+                      onChange={(e) => setNewCategory(e.target.value)}
+                      placeholder="Nouvelle catégorie"
+                      className="bg-muted/50 border-border"
+                      onKeyDown={(e) => e.key === 'Enter' && addCategory()}
+                    />
+                    <Button onClick={addCategory} size="icon" variant="outline">
+                      <Plus size={18} />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Genres */}
+                <div className="bg-card/50 border border-border/50 rounded-xl p-6 space-y-4">
+                  <h3 className="font-semibold text-foreground">Genres</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {content.genres.map(genre => (
+                      <span
+                        key={genre}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-muted/50 text-foreground border border-border/50 text-sm"
+                      >
+                        {genre}
+                        <button
+                          onClick={() => removeGenre(genre)}
+                          className="ml-1 hover:text-destructive transition-colors"
+                        >
+                          <X size={14} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      value={newGenre}
+                      onChange={(e) => setNewGenre(e.target.value)}
+                      placeholder="Nouveau genre"
+                      className="bg-muted/50 border-border"
+                      onKeyDown={(e) => e.key === 'Enter' && addGenre()}
+                    />
+                    <Button onClick={addGenre} size="icon" variant="outline">
+                      <Plus size={18} />
+                    </Button>
+                  </div>
+                </div>
+
+                <Button onClick={saveContent} className="bg-primary text-primary-foreground">
+                  Enregistrer le contenu
                 </Button>
               </div>
             )}

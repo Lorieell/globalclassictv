@@ -103,12 +103,8 @@ const Footer = ({ isAdmin, onSettingsClick }: FooterProps) => {
               {isAdmin && (
                 <Button
                   onClick={() => {
-                    console.log('Settings button clicked, onSettingsClick:', typeof onSettingsClick);
-                    if (onSettingsClick) {
-                      onSettingsClick();
-                    } else {
-                      console.error('onSettingsClick is undefined!');
-                    }
+                    if (onSettingsClick) return onSettingsClick();
+                    window.dispatchEvent(new Event('gctv-open-settings'));
                   }}
                   variant="ghost"
                   size="icon"

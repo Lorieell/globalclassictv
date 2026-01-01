@@ -5,7 +5,7 @@ const STORAGE_KEY = 'gctv-library';
 const HERO_STORAGE_KEY = 'gctv-hero';
 const PROGRESS_KEY = 'gctv-progress';
 const WATCHLIST_KEY = 'gctv-watchlist';
-
+const POSITION_KEY = 'gctv-position';
 // Demo data
 const initialLibrary: Media[] = [
   {
@@ -128,16 +128,16 @@ export const useMediaLibrary = () => {
   const [library, setLibrary] = useState<Media[]>([]);
   const [heroItems, setHeroItems] = useState<HeroItem[]>([]);
   const [watchProgress, setWatchProgress] = useState<Record<string, number>>({});
+  const [watchPosition, setWatchPosition] = useState<Record<string, { seasonId?: string; episodeId?: string }>>({});
   const [watchlist, setWatchlist] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
-
   // Load from localStorage
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     const storedHero = localStorage.getItem(HERO_STORAGE_KEY);
     const storedProgress = localStorage.getItem(PROGRESS_KEY);
+    const storedPosition = localStorage.getItem(POSITION_KEY);
     const storedWatchlist = localStorage.getItem(WATCHLIST_KEY);
-
     if (stored) {
       setLibrary(JSON.parse(stored));
     } else {
@@ -156,10 +156,13 @@ export const useMediaLibrary = () => {
       setWatchProgress(JSON.parse(storedProgress));
     }
 
+    if (storedPosition) {
+      setWatchPosition(JSON.parse(storedPosition));
+    }
+
     if (storedWatchlist) {
       setWatchlist(JSON.parse(storedWatchlist));
     }
-
     setLoading(false);
   }, []);
 
@@ -175,9 +178,16 @@ export const useMediaLibrary = () => {
   };
 
   const updateProgress = (mediaId: string, progress: number) => {
-    const newProgress = { ...watchProgress, [mediaId]: progress };
+    const clamped = Math.max(0, Math.min(100, Math.round(progress)));
+    const newProgress = { ...watchProgress, [mediaId]: clamped };
     setWatchProgress(newProgress);
     localStorage.setItem(PROGRESS_KEY, JSON.stringify(newProgress));
+  };
+
+  const updatePosition = (mediaId: string, seasonId?: string, episodeId?: string) => {
+    const next = { ...watchPosition, [mediaId]: { seasonId, episodeId } };
+    setWatchPosition(next);
+    localStorage.setItem(POSITION_KEY, JSON.stringify(next));
   };
 
   const toggleWatchlist = (mediaId: string) => {
@@ -237,6 +247,7 @@ export const useMediaLibrary = () => {
     heroItems,
     resumeList,
     watchProgress,
+    watchPosition,
     watchlist,
     watchlistMedia,
     loading,
@@ -247,6 +258,7 @@ export const useMediaLibrary = () => {
     updateHeroItem,
     deleteHeroItem,
     updateProgress,
+    updatePosition,
     saveHeroItems,
     toggleWatchlist,
     isInWatchlist,

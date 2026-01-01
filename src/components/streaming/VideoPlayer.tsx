@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { ChevronLeft, ChevronRight, Play, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Media, Season, Episode } from '@/types/media';
@@ -9,9 +9,10 @@ interface VideoPlayerProps {
   initialEpisodeId?: string;
   onBack: () => void;
   onProgress?: (mediaId: string, progress: number) => void;
+  onPosition?: (mediaId: string, seasonId: string, episodeId: string) => void;
 }
 
-const VideoPlayer = ({ media, initialSeasonId, initialEpisodeId, onBack, onProgress }: VideoPlayerProps) => {
+const VideoPlayer = ({ media, initialSeasonId, initialEpisodeId, onBack, onProgress, onPosition }: VideoPlayerProps) => {
   const isSerie = media.type === 'Série';
   
   // Find initial season
@@ -69,23 +70,51 @@ const VideoPlayer = ({ media, initialSeasonId, initialEpisodeId, onBack, onProgr
     }
   };
 
-  // Progress tracking
-  useEffect(() => {
-    if (currentUrl && onProgress) {
-      const timeout = setTimeout(() => {
-        onProgress(media.id, Math.floor(Math.random() * 60) + 20);
-      }, 3000);
-      return () => clearTimeout(timeout);
-    }
-  }, [currentUrl, media.id, onProgress]);
+  const initialEpisodeAppliedRef = useRef(false);
 
-  // Update episode when season changes
+  const flatEpisodes = useMemo(() => {
+    if (!isSerie || !media.seasons?.length) return [] as Array<{ seasonId: string; episodeId: string }>;
+    return media.seasons.flatMap((season) =>
+      (season.episodes || []).map((ep) => ({ seasonId: season.id, episodeId: ep.id }))
+    );
+  }, [isSerie, media.seasons]);
+
+  const currentFlatIndex = useMemo(() => {
+    if (!isSerie || !selectedSeason || !selectedEpisode) return -1;
+    return flatEpisodes.findIndex(
+      (x) => x.seasonId === selectedSeason.id && x.episodeId === selectedEpisode.id
+    );
+  }, [flatEpisodes, isSerie, selectedSeason, selectedEpisode]);
+
+  // Save last position + compute progress (series = episode-based)
   useEffect(() => {
-    if (selectedSeason?.episodes?.length) {
-      setSelectedEpisode(selectedSeason.episodes[0]);
-      setSourceIndex(0);
+    if (!isSerie || !selectedSeason || !selectedEpisode) return;
+
+    onPosition?.(media.id, selectedSeason.id, selectedEpisode.id);
+
+    if (onProgress && flatEpisodes.length > 0 && currentFlatIndex >= 0) {
+      const pct = Math.round(((currentFlatIndex + 1) / flatEpisodes.length) * 100);
+      onProgress(media.id, pct);
     }
-  }, [selectedSeason]);
+  }, [currentFlatIndex, flatEpisodes.length, isSerie, media.id, onPosition, onProgress, selectedEpisode, selectedSeason]);
+
+  // Update episode when season changes (keep initialEpisodeId on first mount)
+  useEffect(() => {
+    if (!selectedSeason?.episodes?.length) return;
+
+    if (!initialEpisodeAppliedRef.current && initialEpisodeId) {
+      const ep = selectedSeason.episodes.find((e) => e.id === initialEpisodeId);
+      if (ep) {
+        setSelectedEpisode(ep);
+        setSourceIndex(0);
+        initialEpisodeAppliedRef.current = true;
+        return;
+      }
+    }
+
+    setSelectedEpisode(selectedSeason.episodes[0]);
+    setSourceIndex(0);
+  }, [initialEpisodeId, selectedSeason]);
 
   return (
     <div className="min-h-screen bg-background animate-fade-in">

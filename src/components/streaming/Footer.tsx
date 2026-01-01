@@ -102,7 +102,14 @@ const Footer = ({ isAdmin, onSettingsClick }: FooterProps) => {
               {/* Admin Settings Button */}
               {isAdmin && (
                 <Button
-                  onClick={onSettingsClick}
+                  onClick={() => {
+                    console.log('Settings button clicked, onSettingsClick:', typeof onSettingsClick);
+                    if (onSettingsClick) {
+                      onSettingsClick();
+                    } else {
+                      console.error('onSettingsClick is undefined!');
+                    }
+                  }}
                   variant="ghost"
                   size="icon"
                   className="ml-2 text-primary hover:bg-primary/10"

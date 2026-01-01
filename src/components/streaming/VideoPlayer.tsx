@@ -136,22 +136,6 @@ const VideoPlayer = ({ media, initialSeasonId, initialEpisodeId, onBack, onProgr
         <div className="flex flex-wrap gap-3 mb-4">
           {isSerie && selectedSeason && (
             <>
-              {/* Season selector */}
-              {media.seasons && media.seasons.length > 1 && (
-                <select
-                  value={selectedSeason.id}
-                  onChange={(e) => {
-                    const season = media.seasons?.find(s => s.id === e.target.value);
-                    if (season) setSelectedSeason(season);
-                  }}
-                  className="bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
-                >
-                  {media.seasons.map(s => (
-                    <option key={s.id} value={s.id}>Saison {s.number}</option>
-                  ))}
-                </select>
-              )}
-
               {/* Episode selector */}
               <select
                 value={selectedEpisode?.id || ''}

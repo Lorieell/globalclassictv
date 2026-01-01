@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { ArrowLeft, Link2, Megaphone, Palette, FolderOpen, Instagram, Youtube, Twitter, Sun, Moon, Monitor, Plus, X } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { ArrowLeft, Link2, Megaphone, Palette, FolderOpen, Instagram, Youtube, Twitter, Sun, Moon, Monitor, Plus, X, Upload, Image } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -87,6 +87,59 @@ const defaultContent: ContentSettings = {
 
 type SettingsTab = 'links' | 'ads' | 'appearance' | 'content';
 
+// Helper to convert file to base64
+const fileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+  });
+};
+
+// Apply theme to document
+const applyTheme = (theme: 'dark' | 'light' | 'system') => {
+  const root = document.documentElement;
+  if (theme === 'system') {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    root.classList.toggle('light', !prefersDark);
+  } else {
+    root.classList.toggle('light', theme === 'light');
+  }
+};
+
+// Apply accent color
+const applyAccentColor = (hexColor: string) => {
+  // Convert hex to HSL
+  const hex = hexColor.replace('#', '');
+  const r = parseInt(hex.substring(0, 2), 16) / 255;
+  const g = parseInt(hex.substring(2, 4), 16) / 255;
+  const b = parseInt(hex.substring(4, 6), 16) / 255;
+
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  let h = 0, s = 0;
+  const l = (max + min) / 2;
+
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+      case g: h = ((b - r) / d + 2) / 6; break;
+      case b: h = ((r - g) / d + 4) / 6; break;
+    }
+  }
+
+  const hue = Math.round(h * 360);
+  const saturation = Math.round(s * 100);
+  const lightness = Math.round(l * 100);
+
+  document.documentElement.style.setProperty('--primary', `${hue} ${saturation}% ${lightness}%`);
+  document.documentElement.style.setProperty('--primary-glow', `${hue} ${saturation}% ${Math.min(lightness + 10, 100)}%`);
+  document.documentElement.style.setProperty('--ring', `${hue} ${saturation}% ${lightness}%`);
+};
+
 const SettingsPage = ({ onBack }: SettingsPageProps) => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('links');
   
@@ -117,6 +170,18 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
   const [newCategory, setNewCategory] = useState('');
   const [newGenre, setNewGenre] = useState('');
 
+  // Drag states
+  const [leftDragging, setLeftDragging] = useState(false);
+  const [rightDragging, setRightDragging] = useState(false);
+  const leftInputRef = useRef<HTMLInputElement>(null);
+  const rightInputRef = useRef<HTMLInputElement>(null);
+
+  // Apply saved theme on mount
+  useEffect(() => {
+    applyTheme(appearance.theme);
+    applyAccentColor(appearance.accentColor);
+  }, []);
+
   const saveLinks = () => {
     localStorage.setItem(SOCIAL_STORAGE_KEY, JSON.stringify(links));
     toast.success('Liens sauvegardés');
@@ -124,22 +189,20 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
 
   const saveAds = () => {
     localStorage.setItem(ADS_STORAGE_KEY, JSON.stringify(ads));
+    window.dispatchEvent(new Event('gctv-ads-updated'));
     toast.success('Paramètres des pubs sauvegardés');
   };
 
   const saveAppearance = () => {
     localStorage.setItem(APPEARANCE_STORAGE_KEY, JSON.stringify(appearance));
-    // Apply theme
-    if (appearance.theme === 'light') {
-      document.documentElement.classList.remove('dark');
-    } else {
-      document.documentElement.classList.add('dark');
-    }
+    applyTheme(appearance.theme);
+    applyAccentColor(appearance.accentColor);
     toast.success('Apparence sauvegardée');
   };
 
   const saveContent = () => {
     localStorage.setItem(CONTENT_STORAGE_KEY, JSON.stringify(content));
+    window.dispatchEvent(new Event('gctv-content-updated'));
     toast.success('Contenu sauvegardé');
   };
 
@@ -164,6 +227,36 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
   const removeGenre = (genre: string) => {
     setContent(prev => ({ ...prev, genres: prev.genres.filter(g => g !== genre) }));
   };
+
+  // Handle file drop for ads
+  const handleDrop = useCallback(async (e: React.DragEvent, side: 'left' | 'right') => {
+    e.preventDefault();
+    side === 'left' ? setLeftDragging(false) : setRightDragging(false);
+    
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) {
+      try {
+        const base64 = await fileToBase64(file);
+        setAds(prev => ({ ...prev, [side === 'left' ? 'leftImageUrl' : 'rightImageUrl']: base64 }));
+        toast.success('Image ajoutée');
+      } catch {
+        toast.error('Erreur lors du chargement de l\'image');
+      }
+    }
+  }, []);
+
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>, side: 'left' | 'right') => {
+    const file = e.target.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+      try {
+        const base64 = await fileToBase64(file);
+        setAds(prev => ({ ...prev, [side === 'left' ? 'leftImageUrl' : 'rightImageUrl']: base64 }));
+        toast.success('Image ajoutée');
+      } catch {
+        toast.error('Erreur lors du chargement de l\'image');
+      }
+    }
+  }, []);
 
   const socialItems = [
     { key: 'instagram', icon: Instagram, label: 'Instagram' },
@@ -293,6 +386,16 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
                   </p>
                 </div>
 
+                {/* Explanation */}
+                <div className="bg-muted/30 border border-border/30 rounded-lg p-4 text-sm text-muted-foreground">
+                  <p className="mb-2"><strong>💡 Comment ça marche ?</strong></p>
+                  <p>Les pubs s'affichent sur les côtés de la page de détails des films/séries. Vous pouvez :</p>
+                  <ul className="list-disc list-inside mt-2 space-y-1">
+                    <li>Glisser-déposer une image ou entrer une URL</li>
+                    <li>Ajouter un lien de redirection (quand on clique sur la pub)</li>
+                  </ul>
+                </div>
+
                 {/* Left Ad */}
                 <div className="bg-card/50 border border-border/50 rounded-xl p-6 space-y-5">
                   <div className="flex items-center justify-between">
@@ -308,10 +411,42 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
 
                   {ads.leftEnabled && (
                     <div className="space-y-4 pt-4 border-t border-border/50">
+                      {/* Drag and drop zone */}
+                      <div
+                        onDragOver={(e) => { e.preventDefault(); setLeftDragging(true); }}
+                        onDragLeave={() => setLeftDragging(false)}
+                        onDrop={(e) => handleDrop(e, 'left')}
+                        onClick={() => leftInputRef.current?.click()}
+                        className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-all ${
+                          leftDragging 
+                            ? 'border-primary bg-primary/10' 
+                            : 'border-border hover:border-muted-foreground'
+                        }`}
+                      >
+                        {ads.leftImageUrl ? (
+                          <div className="space-y-2">
+                            <img src={ads.leftImageUrl} alt="Pub gauche" className="max-h-32 mx-auto rounded" />
+                            <p className="text-sm text-muted-foreground">Cliquez ou glissez pour remplacer</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-2 text-muted-foreground">
+                            <Upload className="mx-auto" size={32} />
+                            <p>Glissez une image ici ou cliquez pour parcourir</p>
+                          </div>
+                        )}
+                        <input
+                          ref={leftInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => handleFileSelect(e, 'left')}
+                        />
+                      </div>
+                      
                       <div className="space-y-2">
-                        <Label className="text-foreground">URL de l'image</Label>
+                        <Label className="text-foreground">Ou URL de l'image</Label>
                         <Input
-                          value={ads.leftImageUrl}
+                          value={ads.leftImageUrl.startsWith('data:') ? '' : ads.leftImageUrl}
                           onChange={(e) => setAds(prev => ({ ...prev, leftImageUrl: e.target.value }))}
                           placeholder="https://example.com/pub.png"
                           className="bg-muted/50 border-border"
@@ -345,10 +480,42 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
 
                   {ads.rightEnabled && (
                     <div className="space-y-4 pt-4 border-t border-border/50">
+                      {/* Drag and drop zone */}
+                      <div
+                        onDragOver={(e) => { e.preventDefault(); setRightDragging(true); }}
+                        onDragLeave={() => setRightDragging(false)}
+                        onDrop={(e) => handleDrop(e, 'right')}
+                        onClick={() => rightInputRef.current?.click()}
+                        className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-all ${
+                          rightDragging 
+                            ? 'border-primary bg-primary/10' 
+                            : 'border-border hover:border-muted-foreground'
+                        }`}
+                      >
+                        {ads.rightImageUrl ? (
+                          <div className="space-y-2">
+                            <img src={ads.rightImageUrl} alt="Pub droite" className="max-h-32 mx-auto rounded" />
+                            <p className="text-sm text-muted-foreground">Cliquez ou glissez pour remplacer</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-2 text-muted-foreground">
+                            <Upload className="mx-auto" size={32} />
+                            <p>Glissez une image ici ou cliquez pour parcourir</p>
+                          </div>
+                        )}
+                        <input
+                          ref={rightInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => handleFileSelect(e, 'right')}
+                        />
+                      </div>
+                      
                       <div className="space-y-2">
-                        <Label className="text-foreground">URL de l'image</Label>
+                        <Label className="text-foreground">Ou URL de l'image</Label>
                         <Input
-                          value={ads.rightImageUrl}
+                          value={ads.rightImageUrl.startsWith('data:') ? '' : ads.rightImageUrl}
                           onChange={(e) => setAds(prev => ({ ...prev, rightImageUrl: e.target.value }))}
                           placeholder="https://example.com/pub.png"
                           className="bg-muted/50 border-border"

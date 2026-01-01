@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ArrowLeft, Link2, Megaphone, Palette, FolderOpen, Instagram, Youtube, Twitter, Sun, Moon, Monitor, Plus, X, Upload, Image } from 'lucide-react';
+import { ArrowLeft, Link2, Megaphone, Palette, FolderOpen, Instagram, Youtube, Twitter, Sun, Moon, Monitor, Plus, X, Upload, Film, Tv, BookOpen, Music, Gamepad2, Mic, Globe, Sparkles, Heart, Skull, Laugh, Zap, Sword, Ghost, Rocket, Theater, Baby, Search, Mountain, Users, type LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,6 +19,50 @@ const DiscordIcon = ({ size = 20 }: { size?: number }) => (
     <path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/>
   </svg>
 );
+
+// Category type with icon
+interface CategoryOption {
+  name: string;
+  icon: LucideIcon;
+}
+
+// Predefined categories with icons
+const AVAILABLE_CATEGORIES: CategoryOption[] = [
+  { name: 'Film', icon: Film },
+  { name: 'Série', icon: Tv },
+  { name: 'Anime', icon: Sparkles },
+  { name: 'Documentaire', icon: BookOpen },
+  { name: 'Musique', icon: Music },
+  { name: 'Sport', icon: Users },
+  { name: 'Jeux', icon: Gamepad2 },
+  { name: 'Podcast', icon: Mic },
+  { name: 'Émission', icon: Theater },
+  { name: 'Enfants', icon: Baby },
+  { name: 'Court-métrage', icon: Film },
+  { name: 'Actualités', icon: Globe },
+];
+
+// Predefined genres with icons
+const AVAILABLE_GENRES: CategoryOption[] = [
+  { name: 'Action', icon: Zap },
+  { name: 'Comédie', icon: Laugh },
+  { name: 'Drame', icon: Heart },
+  { name: 'Horreur', icon: Skull },
+  { name: 'Romance', icon: Heart },
+  { name: 'Sci-Fi', icon: Rocket },
+  { name: 'Thriller', icon: Search },
+  { name: 'Fantastique', icon: Sparkles },
+  { name: 'Aventure', icon: Mountain },
+  { name: 'Animation', icon: Sparkles },
+  { name: 'Crime', icon: Search },
+  { name: 'Mystère', icon: Ghost },
+  { name: 'Guerre', icon: Sword },
+  { name: 'Western', icon: Mountain },
+  { name: 'Musical', icon: Music },
+  { name: 'Famille', icon: Users },
+  { name: 'Biographie', icon: BookOpen },
+  { name: 'Histoire', icon: BookOpen },
+];
 
 interface SocialLinks {
   instagram: string;
@@ -603,73 +647,69 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
                 <div>
                   <h2 className="text-xl font-semibold text-foreground mb-2">Contenu</h2>
                   <p className="text-muted-foreground text-sm">
-                    Gérez les catégories et les genres disponibles pour vos médias.
+                    Sélectionnez les catégories et genres disponibles pour vos médias.
                   </p>
                 </div>
 
-                {/* Categories */}
+                {/* Categories - selectable grid */}
                 <div className="bg-card/50 border border-border/50 rounded-xl p-6 space-y-4">
                   <h3 className="font-semibold text-foreground">Catégories</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {content.categories.map(cat => (
-                      <span
-                        key={cat}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-primary/10 text-primary border border-primary/20 text-sm"
-                      >
-                        {cat}
+                  <p className="text-sm text-muted-foreground">Cliquez pour activer/désactiver</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    {AVAILABLE_CATEGORIES.map(({ name, icon: Icon }) => {
+                      const isSelected = content.categories.includes(name);
+                      return (
                         <button
-                          onClick={() => removeCategory(cat)}
-                          className="ml-1 hover:text-destructive transition-colors"
+                          key={name}
+                          onClick={() => {
+                            if (isSelected) {
+                              setContent(prev => ({ ...prev, categories: prev.categories.filter(c => c !== name) }));
+                            } else {
+                              setContent(prev => ({ ...prev, categories: [...prev.categories, name] }));
+                            }
+                          }}
+                          className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all ${
+                            isSelected
+                              ? 'border-primary bg-primary/10 text-primary'
+                              : 'border-border/50 text-muted-foreground hover:border-border hover:text-foreground'
+                          }`}
                         >
-                          <X size={14} />
+                          <Icon size={20} />
+                          <span className="text-sm font-medium">{name}</span>
                         </button>
-                      </span>
-                    ))}
-                  </div>
-                  <div className="flex gap-2">
-                    <Input
-                      value={newCategory}
-                      onChange={(e) => setNewCategory(e.target.value)}
-                      placeholder="Nouvelle catégorie"
-                      className="bg-muted/50 border-border"
-                      onKeyDown={(e) => e.key === 'Enter' && addCategory()}
-                    />
-                    <Button onClick={addCategory} size="icon" variant="outline">
-                      <Plus size={18} />
-                    </Button>
+                      );
+                    })}
                   </div>
                 </div>
 
-                {/* Genres */}
+                {/* Genres - selectable grid */}
                 <div className="bg-card/50 border border-border/50 rounded-xl p-6 space-y-4">
                   <h3 className="font-semibold text-foreground">Genres</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {content.genres.map(genre => (
-                      <span
-                        key={genre}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-muted/50 text-foreground border border-border/50 text-sm"
-                      >
-                        {genre}
+                  <p className="text-sm text-muted-foreground">Cliquez pour activer/désactiver</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    {AVAILABLE_GENRES.map(({ name, icon: Icon }) => {
+                      const isSelected = content.genres.includes(name);
+                      return (
                         <button
-                          onClick={() => removeGenre(genre)}
-                          className="ml-1 hover:text-destructive transition-colors"
+                          key={name}
+                          onClick={() => {
+                            if (isSelected) {
+                              setContent(prev => ({ ...prev, genres: prev.genres.filter(g => g !== name) }));
+                            } else {
+                              setContent(prev => ({ ...prev, genres: [...prev.genres, name] }));
+                            }
+                          }}
+                          className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all ${
+                            isSelected
+                              ? 'border-secondary bg-secondary/10 text-secondary'
+                              : 'border-border/50 text-muted-foreground hover:border-border hover:text-foreground'
+                          }`}
                         >
-                          <X size={14} />
+                          <Icon size={20} />
+                          <span className="text-sm font-medium">{name}</span>
                         </button>
-                      </span>
-                    ))}
-                  </div>
-                  <div className="flex gap-2">
-                    <Input
-                      value={newGenre}
-                      onChange={(e) => setNewGenre(e.target.value)}
-                      placeholder="Nouveau genre"
-                      className="bg-muted/50 border-border"
-                      onKeyDown={(e) => e.key === 'Enter' && addGenre()}
-                    />
-                    <Button onClick={addGenre} size="icon" variant="outline">
-                      <Plus size={18} />
-                    </Button>
+                      );
+                    })}
                   </div>
                 </div>
 

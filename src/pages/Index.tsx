@@ -11,6 +11,7 @@ import AdminLoginModal from '@/components/streaming/AdminLoginModal';
 import MediaEditorModal from '@/components/streaming/MediaEditorModal';
 import HeroEditorModal from '@/components/streaming/HeroEditorModal';
 import SettingsPage from '@/components/streaming/SettingsPage';
+import GlobalAds from '@/components/streaming/GlobalAds';
 import Footer from '@/components/streaming/Footer';
 import { type LayoutType } from '@/components/streaming/LayoutToggle';
 import { useMediaLibrary } from '@/hooks/useMediaLibrary';
@@ -251,6 +252,9 @@ const Index = () => {
           </div>
         )}
       </main>
+
+      {/* Global Ads - shown on all pages except settings */}
+      {view !== 'settings' && <GlobalAds />}
 
       {/* Footer */}
       <Footer isAdmin={isAdmin} onSettingsClick={() => setView('settings')} />

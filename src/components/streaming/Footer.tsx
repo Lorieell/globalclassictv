@@ -1,9 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Instagram, Youtube, Twitter, ExternalLink, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import logoImage from '@/assets/logo.png';
 
 // Reddit icon component
@@ -31,6 +28,7 @@ interface SocialLinks {
 
 interface FooterProps {
   isAdmin?: boolean;
+  onSettingsClick?: () => void;
 }
 
 const SOCIAL_STORAGE_KEY = 'gctv-social-links';
@@ -44,19 +42,17 @@ const defaultLinks: SocialLinks = {
   shop: 'https://globaldealr.com',
 };
 
-const Footer = ({ isAdmin }: FooterProps) => {
-  const [showEditor, setShowEditor] = useState(false);
+const Footer = ({ isAdmin, onSettingsClick }: FooterProps) => {
   const [links, setLinks] = useState<SocialLinks>(() => {
     const stored = localStorage.getItem(SOCIAL_STORAGE_KEY);
     return stored ? JSON.parse(stored) : defaultLinks;
   });
-  const [editLinks, setEditLinks] = useState<SocialLinks>(links);
-
-  const handleSave = () => {
-    setLinks(editLinks);
-    localStorage.setItem(SOCIAL_STORAGE_KEY, JSON.stringify(editLinks));
-    setShowEditor(false);
-  };
+  
+  // Re-read links when component mounts or when returning from settings
+  useEffect(() => {
+    const stored = localStorage.getItem(SOCIAL_STORAGE_KEY);
+    if (stored) setLinks(JSON.parse(stored));
+  }, []);
 
   const socialItems = [
     { key: 'instagram', icon: Instagram, label: 'Instagram' },
@@ -103,13 +99,10 @@ const Footer = ({ isAdmin }: FooterProps) => {
                 <span className="text-sm font-medium">Shop</span>
               </a>
 
-              {/* Admin Edit Button */}
-              {isAdmin && (
+              {/* Admin Settings Button */}
+              {isAdmin && onSettingsClick && (
                 <Button
-                  onClick={() => {
-                    setEditLinks(links);
-                    setShowEditor(true);
-                  }}
+                  onClick={onSettingsClick}
                   variant="ghost"
                   size="icon"
                   className="ml-2 text-primary hover:bg-primary/10"
@@ -126,48 +119,6 @@ const Footer = ({ isAdmin }: FooterProps) => {
           </div>
         </div>
       </footer>
-
-      {/* Social Links Editor Modal */}
-      <Dialog open={showEditor} onOpenChange={setShowEditor}>
-        <DialogContent className="bg-card border-border max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-foreground">Modifier les liens</DialogTitle>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-4">
-            {socialItems.map(({ key, label }) => (
-              <div key={key} className="space-y-2">
-                <Label className="text-foreground">{label}</Label>
-                <Input
-                  value={editLinks[key as keyof SocialLinks]}
-                  onChange={(e) => setEditLinks(prev => ({ ...prev, [key]: e.target.value }))}
-                  placeholder={`URL ${label}`}
-                  className="bg-muted border-border"
-                />
-              </div>
-            ))}
-            
-            <div className="space-y-2">
-              <Label className="text-foreground">Shop (GlobalDealr)</Label>
-              <Input
-                value={editLinks.shop}
-                onChange={(e) => setEditLinks(prev => ({ ...prev, shop: e.target.value }))}
-                placeholder="URL du shop"
-                className="bg-muted border-border"
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={() => setShowEditor(false)}>
-              Annuler
-            </Button>
-            <Button onClick={handleSave} className="bg-primary text-primary-foreground">
-              Enregistrer
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </>
   );
 };

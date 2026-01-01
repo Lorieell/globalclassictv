@@ -10,13 +10,14 @@ import VideoPlayer from '@/components/streaming/VideoPlayer';
 import AdminLoginModal from '@/components/streaming/AdminLoginModal';
 import MediaEditorModal from '@/components/streaming/MediaEditorModal';
 import HeroEditorModal from '@/components/streaming/HeroEditorModal';
+import SettingsPage from '@/components/streaming/SettingsPage';
 import Footer from '@/components/streaming/Footer';
 import { type LayoutType } from '@/components/streaming/LayoutToggle';
 import { useMediaLibrary } from '@/hooks/useMediaLibrary';
 import { useAdmin } from '@/hooks/useAdmin';
 import type { Media, HeroItem } from '@/types/media';
 
-type ViewType = 'home' | 'films' | 'series' | 'watchlist' | 'detail' | 'player';
+type ViewType = 'home' | 'films' | 'series' | 'watchlist' | 'detail' | 'player' | 'settings';
 
 const LAYOUT_STORAGE_KEY = 'gctv-layout';
 
@@ -176,7 +177,9 @@ const Index = () => {
       />
 
       <main className="min-h-[calc(100vh-140px)]">
-        {view === 'player' && selectedMedia ? (
+        {view === 'settings' ? (
+          <SettingsPage onBack={() => setView('home')} />
+        ) : view === 'player' && selectedMedia ? (
           <VideoPlayer 
             media={selectedMedia}
             initialSeasonId={playerSeasonId}
@@ -243,7 +246,7 @@ const Index = () => {
       </main>
 
       {/* Footer */}
-      <Footer isAdmin={isAdmin} />
+      <Footer isAdmin={isAdmin} onSettingsClick={() => setView('settings')} />
 
       {/* Scroll to top */}
       <Button

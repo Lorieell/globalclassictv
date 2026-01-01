@@ -17,6 +17,10 @@ export interface Media {
   image: string;
   type: 'Film' | 'Série';
   description: string;
+  synopsis?: string;
+  genres?: string;
+  quality?: string;
+  language?: string;
   videoUrls?: string;
   seasons?: Season[];
   progress?: number;

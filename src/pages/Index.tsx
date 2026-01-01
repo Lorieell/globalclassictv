@@ -10,11 +10,15 @@ import VideoPlayer from '@/components/streaming/VideoPlayer';
 import AdminLoginModal from '@/components/streaming/AdminLoginModal';
 import MediaEditorModal from '@/components/streaming/MediaEditorModal';
 import HeroEditorModal from '@/components/streaming/HeroEditorModal';
+import Footer from '@/components/streaming/Footer';
+import { type LayoutType } from '@/components/streaming/LayoutToggle';
 import { useMediaLibrary } from '@/hooks/useMediaLibrary';
 import { useAdmin } from '@/hooks/useAdmin';
 import type { Media, HeroItem } from '@/types/media';
 
 type ViewType = 'home' | 'films' | 'series' | 'watchlist' | 'detail' | 'player';
+
+const LAYOUT_STORAGE_KEY = 'gctv-layout';
 
 const Index = () => {
   const [view, setView] = useState<ViewType>('home');
@@ -25,6 +29,15 @@ const Index = () => {
   const [showEditor, setShowEditor] = useState(false);
   const [showHeroEditor, setShowHeroEditor] = useState(false);
   const [editingMedia, setEditingMedia] = useState<Partial<Media> | null>(null);
+  const [layout, setLayout] = useState<LayoutType>(() => {
+    const stored = localStorage.getItem(LAYOUT_STORAGE_KEY);
+    return (stored as LayoutType) || 'grid';
+  });
+
+  const handleLayoutChange = (newLayout: LayoutType) => {
+    setLayout(newLayout);
+    localStorage.setItem(LAYOUT_STORAGE_KEY, newLayout);
+  };
 
   const { 
     library, 
@@ -218,6 +231,8 @@ const Index = () => {
               media={currentLibrary}
               loading={loading}
               isAdmin={isAdmin}
+              layout={layout}
+              onLayoutChange={handleLayoutChange}
               onSelect={handleSelectMedia}
               onAdd={handleAddMedia}
               onEdit={handleEditMedia}
@@ -226,6 +241,9 @@ const Index = () => {
           </div>
         )}
       </main>
+
+      {/* Footer */}
+      <Footer isAdmin={isAdmin} />
 
       {/* Scroll to top */}
       <Button

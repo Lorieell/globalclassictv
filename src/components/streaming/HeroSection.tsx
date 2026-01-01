@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Play, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import type { HeroItem, Media } from '@/types/media';
+import type { HeroItem } from '@/types/media';
 
 interface HeroSectionProps {
   heroItems: HeroItem[];
@@ -15,7 +15,7 @@ const HeroSection = ({ heroItems, onPlay }: HeroSectionProps) => {
     if (heroItems.length <= 1) return;
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % heroItems.length);
-    }, 6000);
+    }, 5000);
     return () => clearInterval(interval);
   }, [heroItems.length]);
 
@@ -24,64 +24,67 @@ const HeroSection = ({ heroItems, onPlay }: HeroSectionProps) => {
   const currentItem = heroItems[currentIndex];
 
   return (
-    <div className="relative h-[500px] md:h-[550px] rounded-3xl md:rounded-4xl overflow-hidden mb-12 shadow-card group">
-      {/* Background Image with Ken Burns effect */}
+    <div className="relative h-[450px] md:h-[500px] rounded-[40px] bg-card border border-border/30 overflow-hidden mb-16 shadow-card transition-all duration-700">
+      {/* Background Image */}
       <div 
-        className="absolute inset-0 bg-cover bg-center transition-transform duration-[10s] ease-out group-hover:scale-105"
+        className="absolute inset-0 bg-cover bg-center transition-all duration-1000"
         style={{ backgroundImage: `url(${currentItem.image})` }}
       />
       
       {/* Gradient Overlays */}
-      <div className="absolute inset-0 bg-gradient-to-r from-background via-background/60 to-transparent" />
-      <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-r from-background via-background/50 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent" />
       
       {/* Content */}
-      <div className="relative z-10 h-full flex flex-col justify-end p-8 md:p-12 max-w-2xl animate-slide-in-left">
-        <div className="inline-flex items-center gap-2 bg-primary px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest mb-6 w-fit glow-primary">
-          <span className="w-2 h-2 bg-primary-foreground rounded-full animate-pulse" />
-          Recommandé
+      <div 
+        key={currentIndex}
+        className="relative z-10 h-full flex flex-col justify-center px-8 md:px-12 max-w-2xl animate-slide-in-left"
+      >
+        <div className="bg-primary w-fit px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest mb-6 text-primary-foreground glow-primary flex items-center gap-2">
+          <span className="w-1.5 h-1.5 bg-primary-foreground rounded-full animate-pulse" />
+          RECOMMANDÉ
         </div>
         
-        <h2 className="font-display text-5xl md:text-7xl font-bold uppercase text-foreground mb-4 leading-none tracking-tight">
+        <h2 className="font-display text-5xl md:text-7xl font-black italic uppercase text-foreground mb-6 leading-none tracking-tighter">
           {currentItem.title}
         </h2>
         
-        <p className="text-muted-foreground text-sm md:text-base mb-8 leading-relaxed max-w-lg">
+        <p className="text-muted-foreground text-sm md:text-base mb-8 italic max-w-lg leading-relaxed">
           {currentItem.description}
         </p>
         
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <Button 
             onClick={() => onPlay(currentItem.mediaId)}
-            className="bg-foreground text-background hover:bg-foreground/90 px-8 py-6 rounded-2xl font-bold text-sm uppercase tracking-wider gap-3 glow-primary"
+            className="bg-foreground text-background hover:bg-foreground/90 px-8 md:px-10 py-5 md:py-6 rounded-2xl font-black text-xs uppercase tracking-wider gap-2 hover:scale-105 transition-transform"
           >
-            <Play size={20} fill="currentColor" />
+            <Play size={18} fill="currentColor" />
             Lecture
           </Button>
           
           <Button 
             variant="outline"
-            className="bg-secondary/50 backdrop-blur-sm border-border/50 hover:bg-secondary px-6 py-6 rounded-2xl font-semibold text-sm gap-2"
+            className="bg-secondary/30 backdrop-blur-sm border-border/30 hover:bg-secondary/50 px-6 py-5 md:py-6 rounded-2xl font-semibold text-sm gap-2"
           >
             <Info size={18} />
             Plus d'infos
           </Button>
+          
+          {/* Indicators */}
+          <div className="flex gap-2 items-center ml-auto md:ml-4">
+            {heroItems.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setCurrentIndex(i)}
+                className={`h-1 rounded-full transition-all duration-300 ${
+                  currentIndex === i 
+                    ? 'w-8 bg-primary glow-primary' 
+                    : 'w-4 bg-foreground/20 hover:bg-foreground/40'
+                }`}
+              />
+            ))}
+          </div>
         </div>
-      </div>
-      
-      {/* Indicators */}
-      <div className="absolute bottom-8 right-8 flex gap-2 z-10">
-        {heroItems.map((_, i) => (
-          <button
-            key={i}
-            onClick={() => setCurrentIndex(i)}
-            className={`h-1 rounded-full transition-all duration-500 ${
-              currentIndex === i 
-                ? 'w-10 bg-primary glow-primary' 
-                : 'w-6 bg-muted-foreground/30 hover:bg-muted-foreground/50'
-            }`}
-          />
-        ))}
       </div>
     </div>
   );

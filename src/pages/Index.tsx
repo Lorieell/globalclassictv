@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowUp } from 'lucide-react';
+import { ArrowUp, Sliders } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Header from '@/components/streaming/Header';
 import HeroSection from '@/components/streaming/HeroSection';
@@ -8,9 +8,10 @@ import MediaGrid from '@/components/streaming/MediaGrid';
 import VideoPlayer from '@/components/streaming/VideoPlayer';
 import AdminLoginModal from '@/components/streaming/AdminLoginModal';
 import MediaEditorModal from '@/components/streaming/MediaEditorModal';
+import HeroEditorModal from '@/components/streaming/HeroEditorModal';
 import { useMediaLibrary } from '@/hooks/useMediaLibrary';
 import { useAdmin } from '@/hooks/useAdmin';
-import type { Media } from '@/types/media';
+import type { Media, HeroItem } from '@/types/media';
 
 type ViewType = 'home' | 'films' | 'series' | 'player';
 
@@ -19,6 +20,7 @@ const Index = () => {
   const [selectedMedia, setSelectedMedia] = useState<Media | null>(null);
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [showEditor, setShowEditor] = useState(false);
+  const [showHeroEditor, setShowHeroEditor] = useState(false);
   const [editingMedia, setEditingMedia] = useState<Partial<Media> | null>(null);
 
   const { 
@@ -32,6 +34,7 @@ const Index = () => {
     updateMedia,
     deleteMedia,
     updateProgress,
+    saveHeroItems,
   } = useMediaLibrary();
 
   const { isAdmin, login, logout } = useAdmin();
@@ -71,6 +74,10 @@ const Index = () => {
     setEditingMedia(null);
   };
 
+  const handleSaveHeroItems = (items: HeroItem[]) => {
+    saveHeroItems(items);
+  };
+
   const handleProgress = (mediaId: string, progress: number) => {
     updateProgress(mediaId, progress);
   };
@@ -102,6 +109,20 @@ const Index = () => {
           <div className="p-4 md:p-8 max-w-[1600px] mx-auto">
             {view === 'home' && (
               <>
+                {/* Admin Hero Editor Button */}
+                {isAdmin && (
+                  <div className="flex justify-end mb-4">
+                    <Button
+                      onClick={() => setShowHeroEditor(true)}
+                      variant="outline"
+                      className="rounded-xl border-primary/30 text-primary hover:bg-primary/10 gap-2"
+                    >
+                      <Sliders size={16} />
+                      Gérer les slides
+                    </Button>
+                  </div>
+                )}
+                
                 <HeroSection 
                   heroItems={heroItems} 
                   onPlay={handlePlayHero}
@@ -150,6 +171,14 @@ const Index = () => {
         media={editingMedia}
         onClose={() => { setShowEditor(false); setEditingMedia(null); }}
         onSave={handleSaveMedia}
+      />
+
+      <HeroEditorModal
+        isOpen={showHeroEditor}
+        heroItems={heroItems}
+        mediaOptions={library.map(m => ({ id: m.id, title: m.title }))}
+        onClose={() => setShowHeroEditor(false)}
+        onSave={handleSaveHeroItems}
       />
     </div>
   );

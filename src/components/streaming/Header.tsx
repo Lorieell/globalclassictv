@@ -1,0 +1,198 @@
+import { useState, useRef, useEffect } from 'react';
+import { Search, LayoutGrid, Film, Tv, Settings, LogOut, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import type { Media } from '@/types/media';
+
+type ViewType = 'home' | 'films' | 'series' | 'player';
+
+interface HeaderProps {
+  view: ViewType;
+  setView: (view: ViewType) => void;
+  isAdmin: boolean;
+  onAdminClick: () => void;
+  onLogout: () => void;
+  library: Media[];
+  onSelectMedia: (media: Media) => void;
+}
+
+const Header = ({ 
+  view, 
+  setView, 
+  isAdmin, 
+  onAdminClick, 
+  onLogout,
+  library,
+  onSelectMedia 
+}: HeaderProps) => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setIsSearchOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const searchResults = searchQuery.trim()
+    ? library.filter(item => 
+        item.title.toLowerCase().includes(searchQuery.toLowerCase())
+      ).slice(0, 5)
+    : [];
+
+  const navItems = [
+    { id: 'home' as const, label: 'Accueil', icon: LayoutGrid },
+    { id: 'films' as const, label: 'Films', icon: Film },
+    { id: 'series' as const, label: 'Séries', icon: Tv },
+  ];
+
+  return (
+    <header className="sticky top-0 z-50 px-4 md:px-8 py-4 border-b border-border/30 bg-background/80 backdrop-blur-xl">
+      <div className="flex items-center justify-between gap-4">
+        {/* Logo */}
+        <div 
+          className="flex items-center gap-3 cursor-pointer group"
+          onClick={() => setView('home')}
+        >
+          <div className="w-3 h-3 rounded-full bg-primary glow-primary group-hover:scale-110 transition-transform" />
+          <h1 className="font-display text-xl md:text-2xl font-bold tracking-tight text-foreground">
+            GLOBAL CLASSIC TV
+          </h1>
+        </div>
+
+        {/* Navigation */}
+        <nav className="hidden lg:flex items-center gap-1">
+          {navItems.map(({ id, label, icon: Icon }) => (
+            <Button
+              key={id}
+              variant="ghost"
+              onClick={() => setView(id)}
+              className={`px-4 py-2 rounded-xl font-semibold text-sm gap-2 transition-all ${
+                view === id 
+                  ? 'text-primary bg-primary/10' 
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Icon size={18} />
+              {label}
+            </Button>
+          ))}
+        </nav>
+
+        {/* Search & Actions */}
+        <div className="flex items-center gap-3">
+          {/* Search */}
+          <div className="relative" ref={searchRef}>
+            <div className="relative">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Rechercher..."
+                value={searchQuery}
+                onFocus={() => setIsSearchOpen(true)}
+                onChange={(e) => { setSearchQuery(e.target.value); setIsSearchOpen(true); }}
+                className="w-40 md:w-64 bg-secondary/50 border border-border/50 rounded-xl pl-10 pr-4 py-2.5 outline-none focus:border-primary/50 focus:bg-secondary/80 transition-all text-sm text-foreground placeholder:text-muted-foreground"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => { setSearchQuery(''); setIsSearchOpen(false); }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            {/* Search Results Dropdown */}
+            {isSearchOpen && searchQuery.trim() && (
+              <div className="absolute top-full left-0 right-0 mt-2 rounded-2xl border border-border/50 shadow-card overflow-hidden z-50 bg-card animate-scale-in">
+                {searchResults.length > 0 ? (
+                  <div className="p-2 space-y-1">
+                    {searchResults.map(item => (
+                      <div
+                        key={item.id}
+                        onClick={() => {
+                          onSelectMedia(item);
+                          setSearchQuery('');
+                          setIsSearchOpen(false);
+                        }}
+                        className="flex gap-3 p-2 rounded-xl hover:bg-secondary/50 cursor-pointer transition-colors group"
+                      >
+                        <div className="w-12 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-muted">
+                          <img 
+                            src={item.image} 
+                            alt={item.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform" 
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0 flex flex-col justify-center">
+                          <h4 className="text-sm font-bold truncate text-foreground group-hover:text-primary transition-colors">
+                            {item.title}
+                          </h4>
+                          <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">
+                            {item.type}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-6 text-center text-muted-foreground text-sm">
+                    Aucun résultat pour "{searchQuery}"
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Admin Button */}
+          {isAdmin ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onLogout}
+              className="rounded-xl bg-destructive/10 text-destructive hover:bg-destructive/20"
+            >
+              <LogOut size={18} />
+            </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onAdminClick}
+              className="rounded-xl text-muted-foreground hover:text-foreground"
+            >
+              <Settings size={18} />
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Mobile Navigation */}
+      <nav className="flex lg:hidden items-center justify-center gap-2 mt-4">
+        {navItems.map(({ id, label, icon: Icon }) => (
+          <Button
+            key={id}
+            variant="ghost"
+            size="sm"
+            onClick={() => setView(id)}
+            className={`px-3 py-1.5 rounded-lg font-semibold text-xs gap-1.5 ${
+              view === id 
+                ? 'text-primary bg-primary/10' 
+                : 'text-muted-foreground'
+            }`}
+          >
+            <Icon size={14} />
+            {label}
+          </Button>
+        ))}
+      </nav>
+    </header>
+  );
+};
+
+export default Header;

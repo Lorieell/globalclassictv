@@ -6,9 +6,10 @@ import type { HeroItem } from '@/types/media';
 interface HeroSectionProps {
   heroItems: HeroItem[];
   onPlay: (mediaId: string) => void;
+  onInfo: (mediaId: string) => void;
 }
 
-const HeroSection = ({ heroItems, onPlay }: HeroSectionProps) => {
+const HeroSection = ({ heroItems, onPlay, onInfo }: HeroSectionProps) => {
   const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
@@ -64,6 +65,7 @@ const HeroSection = ({ heroItems, onPlay }: HeroSectionProps) => {
           
           <Button 
             variant="outline"
+            onClick={() => onInfo(currentItem.mediaId)}
             className="bg-secondary/30 backdrop-blur-sm border-border/30 hover:bg-secondary/50 px-6 py-5 md:py-6 rounded-2xl font-semibold text-sm gap-2"
           >
             <Info size={18} />

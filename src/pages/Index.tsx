@@ -32,12 +32,14 @@ const Index = () => {
     series, 
     heroItems, 
     resumeList,
+    watchPosition,
     watchlistMedia,
     loading,
     addMedia,
     updateMedia,
     deleteMedia,
     updateProgress,
+    updatePosition,
     saveHeroItems,
     toggleWatchlist,
     isInWatchlist,
@@ -51,8 +53,26 @@ const Index = () => {
     setView('detail');
   };
 
-  // Play from hero - go to detail page first
+  const getResumeParams = (media: Media) => {
+    if (media.type !== 'Série') return { seasonId: undefined, episodeId: undefined };
+    const pos = watchPosition[media.id];
+    return { seasonId: pos?.seasonId, episodeId: pos?.episodeId };
+  };
+
+  // Play from hero - go directly to player (resume for series)
   const handlePlayHero = (mediaId: string) => {
+    const media = library.find(m => m.id === mediaId);
+    if (media) {
+      const { seasonId, episodeId } = getResumeParams(media);
+      setSelectedMedia(media);
+      setPlayerSeasonId(seasonId);
+      setPlayerEpisodeId(episodeId);
+      setView('player');
+    }
+  };
+
+  // Info from hero - open detail page
+  const handleInfoHero = (mediaId: string) => {
     const media = library.find(m => m.id === mediaId);
     if (media) {
       setSelectedMedia(media);
@@ -68,16 +88,22 @@ const Index = () => {
     setView('player');
   };
 
-  // Resume playing
+  // Resume playing (use saved season/episode for series)
   const handleResumeSelect = (media: Media) => {
+    const { seasonId, episodeId } = getResumeParams(media);
     setSelectedMedia(media);
-    setPlayerSeasonId(undefined);
-    setPlayerEpisodeId(undefined);
+    setPlayerSeasonId(seasonId);
+    setPlayerEpisodeId(episodeId);
     setView('player');
   };
 
   const handleBack = () => {
     if (view === 'player') {
+      // Best-effort progress for films (no real playback tracking with iframe)
+      if (selectedMedia?.type === 'Film') {
+        updateProgress(selectedMedia.id, 100);
+      }
+
       // Go back to detail page
       setView('detail');
       setPlayerSeasonId(undefined);
@@ -116,6 +142,10 @@ const Index = () => {
     updateProgress(mediaId, progress);
   };
 
+  const handlePosition = (mediaId: string, seasonId: string, episodeId: string) => {
+    updatePosition(mediaId, seasonId, episodeId);
+  };
+
   const currentLibrary = view === 'films' ? films : view === 'series' ? series : view === 'watchlist' ? watchlistMedia : library;
   const gridTitle = view === 'films' ? 'Films' : view === 'series' ? 'Séries' : view === 'watchlist' ? 'Ma Watchlist' : 'Tout le catalogue';
   const gridIcon = view === 'films' ? 'film' : view === 'series' ? 'serie' : view === 'watchlist' ? 'watchlist' : 'all';
@@ -140,6 +170,7 @@ const Index = () => {
             initialEpisodeId={playerEpisodeId}
             onBack={handleBack}
             onProgress={handleProgress}
+            onPosition={handlePosition}
           />
         ) : view === 'detail' && selectedMedia ? (
           <MediaDetailPage
@@ -170,6 +201,7 @@ const Index = () => {
                 <HeroSection 
                   heroItems={heroItems} 
                   onPlay={handlePlayHero}
+                  onInfo={handleInfoHero}
                 />
                 
                 {/* Resume Section - between Hero and Catalog */}

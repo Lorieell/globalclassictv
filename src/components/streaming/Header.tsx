@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import logo from '@/assets/logo.png';
 import type { Media } from '@/types/media';
 
-type ViewType = 'home' | 'films' | 'series' | 'watchlist' | 'detail' | 'player';
+type ViewType = 'home' | 'films' | 'series' | 'watchlist' | 'detail' | 'player' | 'settings';
 
 interface HeaderProps {
   view: ViewType;

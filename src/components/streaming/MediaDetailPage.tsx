@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronLeft, Play, Plus, Check, Star, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Media, Season } from '@/types/media';
@@ -11,6 +11,17 @@ interface MediaDetailPageProps {
   onToggleWatchlist: (mediaId: string) => void;
 }
 
+interface AdSettings {
+  leftEnabled: boolean;
+  leftImageUrl: string;
+  leftLinkUrl: string;
+  rightEnabled: boolean;
+  rightImageUrl: string;
+  rightLinkUrl: string;
+}
+
+const ADS_STORAGE_KEY = 'gctv-ads-settings';
+
 const MediaDetailPage = ({ 
   media, 
   onBack, 
@@ -19,13 +30,37 @@ const MediaDetailPage = ({
   onToggleWatchlist 
 }: MediaDetailPageProps) => {
   const isSerie = media.type === 'Série';
+  
+  const [ads, setAds] = useState<AdSettings | null>(null);
+  
+  useEffect(() => {
+    const stored = localStorage.getItem(ADS_STORAGE_KEY);
+    if (stored) {
+      setAds(JSON.parse(stored));
+    }
+  }, []);
 
   return (
     <div className="min-h-screen bg-background animate-fade-in">
       {/* Main layout with ad spaces on sides */}
       <div className="flex">
         {/* Left ad space */}
-        <div className="hidden xl:block w-[120px] flex-shrink-0" />
+        <div className="hidden xl:block w-[120px] flex-shrink-0 p-2">
+          {ads?.leftEnabled && ads.leftImageUrl && (
+            <a 
+              href={ads.leftLinkUrl || '#'} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="block sticky top-24"
+            >
+              <img 
+                src={ads.leftImageUrl} 
+                alt="Publicité" 
+                className="w-full rounded-lg hover:opacity-90 transition-opacity"
+              />
+            </a>
+          )}
+        </div>
 
         {/* Main content */}
         <div className="flex-1 p-4 md:p-8 max-w-[1200px] mx-auto">
@@ -196,7 +231,22 @@ const MediaDetailPage = ({
         </div>
 
         {/* Right ad space */}
-        <div className="hidden xl:block w-[120px] flex-shrink-0" />
+        <div className="hidden xl:block w-[120px] flex-shrink-0 p-2">
+          {ads?.rightEnabled && ads.rightImageUrl && (
+            <a 
+              href={ads.rightLinkUrl || '#'} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="block sticky top-24"
+            >
+              <img 
+                src={ads.rightImageUrl} 
+                alt="Publicité" 
+                className="w-full rounded-lg hover:opacity-90 transition-opacity"
+              />
+            </a>
+          )}
+        </div>
       </div>
     </div>
   );

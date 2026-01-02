@@ -3,5 +3,8 @@ project_id = "tcqcjwsizupbbfuzuesb"
 [functions.tmdb-import]
 verify_jwt = false
 
+[functions.tmdb-search]
+verify_jwt = false
+
 [functions.daily-maintenance]
 verify_jwt = false

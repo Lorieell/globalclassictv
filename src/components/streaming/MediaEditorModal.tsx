@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Plus, Save, Trash2, Upload, ListPlus } from 'lucide-react';
+import { X, Plus, Save, Trash2, Upload, ListPlus, Search, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -16,6 +16,30 @@ interface MediaEditorModalProps {
   media: Partial<Media> | null;
   onClose: () => void;
   onSave: (media: Media) => void;
+}
+
+interface TMDBSearchResult {
+  tmdbId: number;
+  title: string;
+  year: string;
+  type: 'Film' | 'Série';
+  mediaType: 'movie' | 'tv';
+  image: string;
+}
+
+interface TMDBDetails {
+  tmdbId: number;
+  title: string;
+  image: string;
+  type: 'Film' | 'Série';
+  description: string;
+  synopsis: string;
+  genres: string;
+  quality: string;
+  language: string;
+  imdbId: string;
+  year: string;
+  numberOfSeasons?: number;
 }
 
 // Helper to convert file to base64
@@ -47,6 +71,18 @@ const MediaEditorModal = ({ isOpen, media, onClose, onSave }: MediaEditorModalPr
   const [bulkAddOpen, setBulkAddOpen] = useState(false);
   const [bulkSeasonIndex, setBulkSeasonIndex] = useState<number>(0);
   const [bulkCount, setBulkCount] = useState<number>(10);
+  
+  // TMDB search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<TMDBSearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  // Track which fields have been manually edited
+  const [manualEdits, setManualEdits] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (media) {
@@ -58,8 +94,152 @@ const MediaEditorModal = ({ isOpen, media, onClose, onSave }: MediaEditorModalPr
         language: media.language || '',
         seasons: media.seasons || [],
       });
+      // Reset manual edits when opening with existing media
+      setManualEdits(new Set());
+      setSearchQuery('');
+      setSearchResults([]);
+    } else {
+      // Reset form for new media
+      setFormData({
+        title: '',
+        image: '',
+        type: 'Film',
+        description: '',
+        synopsis: '',
+        genres: '',
+        quality: '',
+        language: '',
+        videoUrls: '',
+        seasons: [],
+      });
+      setManualEdits(new Set());
+      setSearchQuery('');
+      setSearchResults([]);
     }
-  }, [media]);
+  }, [media, isOpen]);
+
+  // Close search results when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        setShowSearchResults(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // TMDB search with debounce
+  const searchTMDB = useCallback(async (query: string) => {
+    if (query.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tmdb-search`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query }),
+        }
+      );
+      
+      const data = await response.json();
+      if (data.success && data.data) {
+        setSearchResults(data.data);
+        setShowSearchResults(true);
+      }
+    } catch (error) {
+      console.error('TMDB search error:', error);
+    } finally {
+      setIsSearching(false);
+    }
+  }, []);
+
+  // Debounced search
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    if (searchQuery.length >= 2) {
+      searchTimeoutRef.current = setTimeout(() => {
+        searchTMDB(searchQuery);
+      }, 300);
+    } else {
+      setSearchResults([]);
+    }
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchQuery, searchTMDB]);
+
+  // Select a TMDB result and fetch full details
+  const selectTMDBResult = async (result: TMDBSearchResult) => {
+    setShowSearchResults(false);
+    setIsLoadingDetails(true);
+    
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tmdb-search`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            tmdbId: result.tmdbId, 
+            mediaType: result.mediaType 
+          }),
+        }
+      );
+      
+      const data = await response.json();
+      if (data.success && data.data) {
+        const details: TMDBDetails = data.data;
+        
+        // Only fill in fields that haven't been manually edited
+        setFormData(prev => ({
+          ...prev,
+          title: manualEdits.has('title') ? prev.title : details.title,
+          image: manualEdits.has('image') ? prev.image : details.image,
+          type: details.type,
+          description: manualEdits.has('description') ? prev.description : details.description,
+          synopsis: manualEdits.has('synopsis') ? prev.synopsis : details.synopsis,
+          genres: manualEdits.has('genres') ? prev.genres : details.genres,
+          quality: manualEdits.has('quality') ? prev.quality : details.quality,
+          language: manualEdits.has('language') ? prev.language : details.language,
+          tmdbId: details.tmdbId,
+          imdbId: details.imdbId,
+        }));
+        
+        setSearchQuery('');
+        toast({
+          title: "Contenu trouvé",
+          description: `${details.title} importé depuis TMDB`,
+        });
+      }
+    } catch (error) {
+      console.error('TMDB details error:', error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de récupérer les détails",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingDetails(false);
+    }
+  };
+
+  // Mark field as manually edited
+  const handleManualEdit = (field: string, value: string) => {
+    setManualEdits(prev => new Set(prev).add(field));
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
 
   const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
@@ -69,6 +249,7 @@ const MediaEditorModal = ({ isOpen, media, onClose, onSave }: MediaEditorModalPr
     if (file && file.type.startsWith('image/')) {
       try {
         const base64 = await fileToBase64(file);
+        setManualEdits(prev => new Set(prev).add('image'));
         setFormData(prev => ({ ...prev, image: base64 }));
         toast({ title: "Image ajoutée", description: "L'image a été chargée avec succès" });
       } catch {
@@ -82,6 +263,7 @@ const MediaEditorModal = ({ isOpen, media, onClose, onSave }: MediaEditorModalPr
     if (file && file.type.startsWith('image/')) {
       try {
         const base64 = await fileToBase64(file);
+        setManualEdits(prev => new Set(prev).add('image'));
         setFormData(prev => ({ ...prev, image: base64 }));
         toast({ title: "Image ajoutée", description: "L'image a été chargée avec succès" });
       } catch {
@@ -114,6 +296,8 @@ const MediaEditorModal = ({ isOpen, media, onClose, onSave }: MediaEditorModalPr
       language: formData.language,
       videoUrls: formData.videoUrls,
       seasons: formData.seasons,
+      tmdbId: formData.tmdbId,
+      imdbId: formData.imdbId,
       isManual: true, // Mark as manually added
     });
 
@@ -197,6 +381,58 @@ const MediaEditorModal = ({ isOpen, media, onClose, onSave }: MediaEditorModalPr
           </Button>
         </div>
 
+        {/* TMDB Search */}
+        <div ref={searchContainerRef} className="relative mb-6">
+          <label className="text-sm font-medium text-primary mb-2 block flex items-center gap-2">
+            <Search size={16} />
+            Rechercher sur TMDB (auto-remplissage)
+          </label>
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Tapez le nom d'un film ou d'une série..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onFocus={() => searchResults.length > 0 && setShowSearchResults(true)}
+              className="w-full bg-primary/10 border border-primary/30 rounded-xl px-4 py-3 outline-none focus:border-primary text-foreground placeholder:text-muted-foreground"
+            />
+            {(isSearching || isLoadingDetails) && (
+              <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-primary" size={20} />
+            )}
+          </div>
+          
+          {/* Search Results Dropdown */}
+          {showSearchResults && searchResults.length > 0 && (
+            <div className="absolute z-50 w-full mt-2 bg-card border border-border rounded-xl shadow-lg max-h-[300px] overflow-y-auto">
+              {searchResults.map((result) => (
+                <button
+                  key={`${result.mediaType}-${result.tmdbId}`}
+                  onClick={() => selectTMDBResult(result)}
+                  className="w-full flex items-center gap-3 p-3 hover:bg-secondary/50 transition-colors text-left border-b border-border/30 last:border-b-0"
+                >
+                  {result.image ? (
+                    <img 
+                      src={result.image} 
+                      alt={result.title} 
+                      className="w-12 h-16 object-cover rounded-lg shrink-0"
+                    />
+                  ) : (
+                    <div className="w-12 h-16 bg-secondary rounded-lg shrink-0 flex items-center justify-center">
+                      <Search size={16} className="text-muted-foreground" />
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-foreground truncate">{result.title}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {result.type} • {result.year || 'N/A'}
+                    </p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           {/* Form Fields */}
           <div className="space-y-4">
@@ -206,7 +442,7 @@ const MediaEditorModal = ({ isOpen, media, onClose, onSave }: MediaEditorModalPr
                 type="text"
                 placeholder="Titre du média"
                 value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                onChange={(e) => handleManualEdit('title', e.target.value)}
                 className="w-full bg-secondary/50 border border-border/50 rounded-xl px-4 py-3 outline-none focus:border-primary/50 text-foreground"
               />
             </div>
@@ -217,7 +453,7 @@ const MediaEditorModal = ({ isOpen, media, onClose, onSave }: MediaEditorModalPr
                 type="text"
                 placeholder="https://... ou glissez une image ci-dessous"
                 value={formData.image?.startsWith('data:') ? '' : formData.image}
-                onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+                onChange={(e) => handleManualEdit('image', e.target.value)}
                 className="w-full bg-secondary/50 border border-border/50 rounded-xl px-4 py-3 outline-none focus:border-primary/50 text-foreground"
               />
             </div>
@@ -239,7 +475,7 @@ const MediaEditorModal = ({ isOpen, media, onClose, onSave }: MediaEditorModalPr
               <textarea
                 placeholder="Description courte..."
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                onChange={(e) => handleManualEdit('description', e.target.value)}
                 className="w-full bg-secondary/50 border border-border/50 rounded-xl px-4 py-3 outline-none focus:border-primary/50 h-20 resize-none text-foreground"
               />
             </div>
@@ -249,7 +485,7 @@ const MediaEditorModal = ({ isOpen, media, onClose, onSave }: MediaEditorModalPr
               <textarea
                 placeholder="Synopsis détaillé..."
                 value={formData.synopsis || ''}
-                onChange={(e) => setFormData({ ...formData, synopsis: e.target.value })}
+                onChange={(e) => handleManualEdit('synopsis', e.target.value)}
                 className="w-full bg-secondary/50 border border-border/50 rounded-xl px-4 py-3 outline-none focus:border-primary/50 h-28 resize-none text-foreground"
               />
             </div>
@@ -260,7 +496,7 @@ const MediaEditorModal = ({ isOpen, media, onClose, onSave }: MediaEditorModalPr
                 type="text"
                 placeholder="Action, Drame, Science-Fiction..."
                 value={formData.genres || ''}
-                onChange={(e) => setFormData({ ...formData, genres: e.target.value })}
+                onChange={(e) => handleManualEdit('genres', e.target.value)}
                 className="w-full bg-secondary/50 border border-border/50 rounded-xl px-4 py-3 outline-none focus:border-primary/50 text-foreground"
               />
             </div>
@@ -272,17 +508,22 @@ const MediaEditorModal = ({ isOpen, media, onClose, onSave }: MediaEditorModalPr
                   type="text"
                   placeholder="HD, FHD, 4K..."
                   value={formData.quality || ''}
-                  onChange={(e) => setFormData({ ...formData, quality: e.target.value })}
+                  onChange={(e) => handleManualEdit('quality', e.target.value)}
                   className="w-full bg-secondary/50 border border-border/50 rounded-xl px-4 py-3 outline-none focus:border-primary/50 text-foreground"
                 />
               </div>
               <div>
-                <label className="text-sm font-medium text-muted-foreground mb-1 block">Langue</label>
+                <label className="text-sm font-medium text-muted-foreground mb-1 block">
+                  Langue
+                  {manualEdits.has('language') && (
+                    <span className="text-xs text-primary ml-1">(modifié)</span>
+                  )}
+                </label>
                 <input
                   type="text"
                   placeholder="VF, VOSTFR..."
                   value={formData.language || ''}
-                  onChange={(e) => setFormData({ ...formData, language: e.target.value })}
+                  onChange={(e) => handleManualEdit('language', e.target.value)}
                   className="w-full bg-secondary/50 border border-border/50 rounded-xl px-4 py-3 outline-none focus:border-primary/50 text-foreground"
                 />
               </div>
@@ -362,7 +603,7 @@ const MediaEditorModal = ({ isOpen, media, onClose, onSave }: MediaEditorModalPr
                 <div key={season.id} className="bg-secondary/30 rounded-2xl p-4 border border-border/30">
                   <div className="flex justify-between items-center mb-4">
                     <h4 className="font-bold text-foreground">Saison {season.number}</h4>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
                       <Button
                         size="sm"
                         variant="outline"

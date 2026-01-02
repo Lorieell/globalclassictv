@@ -51,7 +51,7 @@ const Header = ({
     { id: 'films' as const, label: 'Films', icon: Film },
     { id: 'series' as const, label: 'Séries', icon: Tv },
     { id: 'watchlist' as const, label: 'Watchlist', icon: Bookmark },
-    { id: 'favorites' as const, label: 'Favoris', icon: Heart, className: 'text-red-500' },
+    { id: 'favorites' as const, label: '', icon: Heart, iconOnly: true },
   ];
 
   return (
@@ -79,18 +79,18 @@ const Header = ({
 
         {/* Navigation */}
         <nav className="hidden lg:flex items-center gap-1">
-          {navItems.map(({ id, label, icon: Icon, className: iconClass }) => (
+          {navItems.map(({ id, label, icon: Icon, iconOnly }) => (
             <Button
               key={id}
               variant="ghost"
               onClick={() => setView(id)}
-              className={`px-4 py-2 rounded-xl font-semibold text-sm gap-2 transition-all ${
+              className={`${iconOnly ? 'px-2' : 'px-4'} py-2 rounded-xl font-semibold text-sm gap-2 transition-all ${
                 view === id 
-                  ? 'text-primary bg-primary/10' 
-                  : 'text-muted-foreground hover:text-foreground'
+                  ? id === 'favorites' ? 'text-red-500 bg-red-500/10' : 'text-primary bg-primary/10'
+                  : id === 'favorites' ? 'text-red-500 hover:bg-red-500/10' : 'text-muted-foreground hover:text-foreground'
               }`}
             >
-              <Icon size={18} className={id === 'favorites' ? 'text-red-500' : ''} />
+              <Icon size={18} className={id === 'favorites' ? (view === id ? 'fill-red-500' : '') : ''} />
               {label}
             </Button>
           ))}
@@ -187,19 +187,19 @@ const Header = ({
 
       {/* Mobile Navigation */}
       <nav className="flex lg:hidden items-center justify-center gap-2 mt-3 flex-wrap">
-        {navItems.map(({ id, label, icon: Icon }) => (
+        {navItems.map(({ id, label, icon: Icon, iconOnly }) => (
           <Button
             key={id}
             variant="ghost"
             size="sm"
             onClick={() => setView(id)}
-            className={`px-3 py-1.5 rounded-lg font-semibold text-xs gap-1.5 ${
+            className={`${iconOnly ? 'px-2' : 'px-3'} py-1.5 rounded-lg font-semibold text-xs gap-1.5 ${
               view === id 
-                ? 'text-primary bg-primary/10' 
-                : 'text-muted-foreground'
+                ? id === 'favorites' ? 'text-red-500 bg-red-500/10' : 'text-primary bg-primary/10'
+                : id === 'favorites' ? 'text-red-500' : 'text-muted-foreground'
             }`}
           >
-            <Icon size={14} className={id === 'favorites' ? 'text-red-500' : ''} />
+            <Icon size={14} className={id === 'favorites' ? (view === id ? 'fill-red-500' : '') : ''} />
             {label}
           </Button>
         ))}

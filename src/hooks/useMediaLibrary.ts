@@ -5,6 +5,8 @@ const STORAGE_KEY = 'gctv-library';
 const HERO_STORAGE_KEY = 'gctv-hero';
 const PROGRESS_KEY = 'gctv-progress';
 const WATCHLIST_KEY = 'gctv-watchlist';
+const FAVORITES_KEY = 'gctv-favorites';
+const SEEN_KEY = 'gctv-seen';
 const POSITION_KEY = 'gctv-position';
 // Demo data
 const initialLibrary: Media[] = [
@@ -130,6 +132,8 @@ export const useMediaLibrary = () => {
   const [watchProgress, setWatchProgress] = useState<Record<string, number>>({});
   const [watchPosition, setWatchPosition] = useState<Record<string, { seasonId?: string; episodeId?: string }>>({});
   const [watchlist, setWatchlist] = useState<string[]>([]);
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [seen, setSeen] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   // Load from localStorage
   useEffect(() => {
@@ -138,6 +142,8 @@ export const useMediaLibrary = () => {
     const storedProgress = localStorage.getItem(PROGRESS_KEY);
     const storedPosition = localStorage.getItem(POSITION_KEY);
     const storedWatchlist = localStorage.getItem(WATCHLIST_KEY);
+    const storedFavorites = localStorage.getItem(FAVORITES_KEY);
+    const storedSeen = localStorage.getItem(SEEN_KEY);
     if (stored) {
       setLibrary(JSON.parse(stored));
     } else {
@@ -162,6 +168,14 @@ export const useMediaLibrary = () => {
 
     if (storedWatchlist) {
       setWatchlist(JSON.parse(storedWatchlist));
+    }
+
+    if (storedFavorites) {
+      setFavorites(JSON.parse(storedFavorites));
+    }
+
+    if (storedSeen) {
+      setSeen(JSON.parse(storedSeen));
     }
     setLoading(false);
   }, []);
@@ -199,6 +213,26 @@ export const useMediaLibrary = () => {
   };
 
   const isInWatchlist = (mediaId: string) => watchlist.includes(mediaId);
+
+  const toggleFavorite = (mediaId: string) => {
+    const newFavorites = favorites.includes(mediaId)
+      ? favorites.filter(id => id !== mediaId)
+      : [...favorites, mediaId];
+    setFavorites(newFavorites);
+    localStorage.setItem(FAVORITES_KEY, JSON.stringify(newFavorites));
+  };
+
+  const isInFavorites = (mediaId: string) => favorites.includes(mediaId);
+
+  const toggleSeen = (mediaId: string) => {
+    const newSeen = seen.includes(mediaId)
+      ? seen.filter(id => id !== mediaId)
+      : [...seen, mediaId];
+    setSeen(newSeen);
+    localStorage.setItem(SEEN_KEY, JSON.stringify(newSeen));
+  };
+
+  const isSeen = (mediaId: string) => seen.includes(mediaId);
 
   const addMedia = (media: Omit<Media, 'id'>) => {
     const newMedia = { ...media, id: crypto.randomUUID(), updatedAt: Date.now() };
@@ -240,6 +274,14 @@ export const useMediaLibrary = () => {
     return library.filter(m => watchlist.includes(m.id));
   }, [library, watchlist]);
 
+  const favoritesMedia = useMemo(() => {
+    return library.filter(m => favorites.includes(m.id));
+  }, [library, favorites]);
+
+  const seenMedia = useMemo(() => {
+    return library.filter(m => seen.includes(m.id));
+  }, [library, seen]);
+
   return {
     library,
     films,
@@ -250,6 +292,10 @@ export const useMediaLibrary = () => {
     watchPosition,
     watchlist,
     watchlistMedia,
+    favorites,
+    favoritesMedia,
+    seen,
+    seenMedia,
     loading,
     addMedia,
     updateMedia,
@@ -262,5 +308,9 @@ export const useMediaLibrary = () => {
     saveHeroItems,
     toggleWatchlist,
     isInWatchlist,
+    toggleFavorite,
+    isInFavorites,
+    toggleSeen,
+    isSeen,
   };
 };

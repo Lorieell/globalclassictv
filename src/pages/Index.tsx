@@ -73,6 +73,10 @@ const Index = () => {
     saveHeroItems,
     toggleWatchlist,
     isInWatchlist,
+    toggleFavorite,
+    isInFavorites,
+    toggleSeen,
+    isSeen,
   } = useMediaLibrary();
 
   const { isAdmin, login, logout } = useAdmin();
@@ -256,6 +260,10 @@ const Index = () => {
             onPlay={handlePlayFromDetail}
             isInWatchlist={isInWatchlist(selectedMedia.id)}
             onToggleWatchlist={toggleWatchlist}
+            isInFavorites={isInFavorites(selectedMedia.id)}
+            onToggleFavorite={toggleFavorite}
+            isSeen={isSeen(selectedMedia.id)}
+            onToggleSeen={toggleSeen}
           />
         ) : view === 'category' && categoryView ? (
           <CategoryPage

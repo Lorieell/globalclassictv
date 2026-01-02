@@ -64,6 +64,7 @@ const Index = () => {
     resumeList,
     watchPosition,
     watchlistMedia,
+    favoritesMedia,
     loading,
     addMedia,
     updateMedia,
@@ -391,6 +392,19 @@ const Index = () => {
                       media={watchlistMedia.slice(0, 10)}
                       onSelect={handleSelectMedia}
                       onSeeMore={() => openCategoryPage('Ma liste', m => isInWatchlist(m.id))}
+                      isAdmin={isAdmin}
+                      onEdit={handleEditMedia}
+                      onDelete={deleteMedia}
+                    />
+                  )}
+
+                  {/* Favoris with heart icon */}
+                  {favoritesMedia.length > 0 && (
+                    <MediaRow
+                      title="❤️ Favoris"
+                      media={favoritesMedia.slice(0, 10)}
+                      onSelect={handleSelectMedia}
+                      onSeeMore={() => openCategoryPage('Favoris', m => isInFavorites(m.id))}
                       isAdmin={isAdmin}
                       onEdit={handleEditMedia}
                       onDelete={deleteMedia}

@@ -19,13 +19,14 @@ import { useMediaLibrary } from '@/hooks/useMediaLibrary';
 import { useAdmin } from '@/hooks/useAdmin';
 import type { Media, HeroItem } from '@/types/media';
 
-// Génère les hero items automatiquement à partir des médias populaires (change tous les 2 jours)
+// Génère les hero items automatiquement à partir des médias populaires (change toutes les heures)
 const generateAutoHeroItems = (library: Media[]): HeroItem[] => {
   if (library.length === 0) return [];
   
-  const today = new Date();
-  const daysSinceEpoch = Math.floor(today.getTime() / (1000 * 60 * 60 * 24));
-  const rotationPeriod = Math.floor(daysSinceEpoch / 2); // Change tous les 2 jours
+  const now = new Date();
+  // Rotation toutes les heures
+  const hoursSinceEpoch = Math.floor(now.getTime() / (1000 * 60 * 60));
+  const rotationPeriod = hoursSinceEpoch;
   
   // Filtrer les médias avec backdrop et bonne note
   const eligibleMedia = library.filter(m => 
@@ -36,25 +37,25 @@ const generateAutoHeroItems = (library: Media[]): HeroItem[] => {
     // Fallback: prendre les premiers médias avec image
     const fallback = library.filter(m => m.image).slice(0, 6);
     return fallback.map(m => ({
-      id: `hero-${m.id}`,
-      title: m.title,
+      id: `hero-auto-${m.id}-${rotationPeriod}`,
+      title: m.title.toUpperCase(),
       description: m.description || m.synopsis || '',
       image: (m as any).backdrop || m.image,
       mediaId: m.id,
     }));
   }
   
-  // Mélanger de façon déterministe basée sur la rotation
+  // Mélanger de façon déterministe basée sur l'heure de rotation
   const shuffled = [...eligibleMedia].sort((a, b) => {
-    const hashA = (a.title.charCodeAt(0) * rotationPeriod + a.title.length) % 1000;
-    const hashB = (b.title.charCodeAt(0) * rotationPeriod + b.title.length) % 1000;
+    const hashA = ((a.title.charCodeAt(0) || 0) * rotationPeriod + (a.title.length || 0) + ((a as any).rating || 0) * 100) % 10000;
+    const hashB = ((b.title.charCodeAt(0) || 0) * rotationPeriod + (b.title.length || 0) + ((b as any).rating || 0) * 100) % 10000;
     return hashA - hashB;
   });
   
   // Prendre 6 items
   return shuffled.slice(0, 6).map(m => ({
-    id: `hero-${m.id}`,
-    title: m.title,
+    id: `hero-auto-${m.id}-${rotationPeriod}`,
+    title: m.title.toUpperCase(),
     description: m.description || m.synopsis || '',
     image: (m as any).backdrop || m.image,
     mediaId: m.id,

@@ -25,6 +25,10 @@ export interface Media {
   seasons?: Season[];
   progress?: number;
   updatedAt?: number;
+  director?: string;
+  actors?: string;
+  awards?: string;
+  imdbId?: string;
 }
 
 export interface HeroItem {

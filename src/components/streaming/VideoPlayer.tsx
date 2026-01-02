@@ -7,7 +7,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import type { Media, Season, Episode } from '@/types/media';
 
 interface VideoPlayerProps {
@@ -184,22 +183,20 @@ const VideoPlayer = ({ media, initialSeasonId, initialEpisodeId, onBack, onProgr
                   <ChevronDown size={16} />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="bg-card border-border z-50">
-                <ScrollArea className="max-h-[300px]">
-                  {media.seasons.map((season) => (
-                    <DropdownMenuItem
-                      key={season.id}
-                      onClick={() => {
-                        setSelectedSeason(season);
-                        setSourceIndex(0);
-                      }}
-                      className="flex items-center justify-between gap-3 cursor-pointer"
-                    >
-                      <span>Saison {season.number}</span>
-                      {selectedSeason?.id === season.id && <Check size={16} className="text-primary" />}
-                    </DropdownMenuItem>
-                  ))}
-                </ScrollArea>
+              <DropdownMenuContent className="bg-card border-border z-50 max-h-[300px] overflow-y-auto">
+                {media.seasons.map((season) => (
+                  <DropdownMenuItem
+                    key={season.id}
+                    onClick={() => {
+                      setSelectedSeason(season);
+                      setSourceIndex(0);
+                    }}
+                    className="flex items-center justify-between gap-3 cursor-pointer"
+                  >
+                    <span>Saison {season.number}</span>
+                    {selectedSeason?.id === season.id && <Check size={16} className="text-primary" />}
+                  </DropdownMenuItem>
+                ))}
               </DropdownMenuContent>
             </DropdownMenu>
           )}
@@ -207,36 +204,35 @@ const VideoPlayer = ({ media, initialSeasonId, initialEpisodeId, onBack, onProgr
           {isSerie && selectedSeason && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="gap-2 bg-card border-border hover:bg-secondary min-w-[140px] justify-between">
+                <Button variant="outline" className="gap-2 bg-card border-border hover:bg-secondary min-w-[140px] max-w-[200px] justify-between">
                   <span className="truncate">
-                    Ep. {selectedEpisode?.number} - {selectedEpisode?.title?.slice(0, 15)}{(selectedEpisode?.title?.length || 0) > 15 ? '...' : ''}
+                    Ep. {selectedEpisode?.number} - {selectedEpisode?.title?.slice(0, 12)}{(selectedEpisode?.title?.length || 0) > 12 ? '...' : ''}
                   </span>
                   <ChevronDown size={16} className="shrink-0" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="bg-card border-border z-50 w-[280px]" align="start">
-                <ScrollArea className="max-h-[300px]">
-                  {selectedSeason.episodes?.map(ep => (
-                    <DropdownMenuItem
-                      key={ep.id}
-                      onClick={() => {
-                        setSelectedEpisode(ep);
-                        setSourceIndex(0);
-                      }}
-                      className={`flex items-center justify-between gap-3 cursor-pointer py-3 ${
-                        selectedEpisode?.id === ep.id ? 'bg-primary/10' : ''
-                      }`}
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span className="bg-secondary text-foreground text-xs font-bold px-2 py-1 rounded shrink-0">
-                          {ep.number}
-                        </span>
-                        <span className="truncate text-sm">{ep.title}</span>
-                      </div>
-                      {selectedEpisode?.id === ep.id && <Check size={16} className="text-primary shrink-0" />}
-                    </DropdownMenuItem>
-                  ))}
-                </ScrollArea>
+              <DropdownMenuContent 
+                className="bg-card border-border z-50 min-w-[140px] max-w-[200px] max-h-[300px] overflow-y-auto" 
+                align="start"
+              >
+                {selectedSeason.episodes?.map(ep => (
+                  <DropdownMenuItem
+                    key={ep.id}
+                    onClick={() => {
+                      setSelectedEpisode(ep);
+                      setSourceIndex(0);
+                    }}
+                    className={`flex items-center gap-2 cursor-pointer py-2 px-3 ${
+                      selectedEpisode?.id === ep.id ? 'bg-primary/10' : ''
+                    }`}
+                  >
+                    <span className="bg-secondary text-foreground text-xs font-bold px-2 py-0.5 rounded shrink-0">
+                      {ep.number}
+                    </span>
+                    <span className="truncate text-sm flex-1">{ep.title}</span>
+                    {selectedEpisode?.id === ep.id && <Check size={14} className="text-primary shrink-0" />}
+                  </DropdownMenuItem>
+                ))}
               </DropdownMenuContent>
             </DropdownMenu>
           )}

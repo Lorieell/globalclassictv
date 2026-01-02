@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import Header from '@/components/streaming/Header';
 import HeroSection from '@/components/streaming/HeroSection';
 import ResumeSection from '@/components/streaming/ResumeSection';
-import MediaRow, { RowLayoutType } from '@/components/streaming/MediaRow';
+import MediaRow from '@/components/streaming/MediaRow';
 import CategoryPage from '@/components/streaming/CategoryPage';
 import MediaDetailPage from '@/components/streaming/MediaDetailPage';
 import VideoPlayer from '@/components/streaming/VideoPlayer';
@@ -19,30 +19,46 @@ import { useMediaLibrary } from '@/hooks/useMediaLibrary';
 import { useAdmin } from '@/hooks/useAdmin';
 import type { Media, HeroItem } from '@/types/media';
 
-// Fonction pour obtenir les genres rotatifs basés sur la date
-const getRotatingGenres = (allGenres: string[], type: 'films' | 'series') => {
+// Génère les hero items automatiquement à partir des médias populaires (change tous les 2 jours)
+const generateAutoHeroItems = (library: Media[]): HeroItem[] => {
+  if (library.length === 0) return [];
+  
   const today = new Date();
-  const dayOfYear = Math.floor((today.getTime() - new Date(today.getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24));
-  const weekOfYear = Math.floor(dayOfYear / 7);
+  const daysSinceEpoch = Math.floor(today.getTime() / (1000 * 60 * 60 * 24));
+  const rotationPeriod = Math.floor(daysSinceEpoch / 2); // Change tous les 2 jours
   
-  // Utiliser différents seeds pour films et séries
-  const seed = type === 'films' ? weekOfYear : weekOfYear + 100;
+  // Filtrer les médias avec backdrop et bonne note
+  const eligibleMedia = library.filter(m => 
+    (m as any).backdrop && (m as any).rating >= 6
+  );
   
-  // Mélanger les genres de façon déterministe basée sur le seed
-  const shuffled = [...allGenres].sort((a, b) => {
-    const hashA = (a.charCodeAt(0) * seed) % 100;
-    const hashB = (b.charCodeAt(0) * seed) % 100;
+  if (eligibleMedia.length === 0) {
+    // Fallback: prendre les premiers médias avec image
+    const fallback = library.filter(m => m.image).slice(0, 6);
+    return fallback.map(m => ({
+      id: `hero-${m.id}`,
+      title: m.title,
+      description: m.description || m.synopsis || '',
+      image: (m as any).backdrop || m.image,
+      mediaId: m.id,
+    }));
+  }
+  
+  // Mélanger de façon déterministe basée sur la rotation
+  const shuffled = [...eligibleMedia].sort((a, b) => {
+    const hashA = (a.title.charCodeAt(0) * rotationPeriod + a.title.length) % 1000;
+    const hashB = (b.title.charCodeAt(0) * rotationPeriod + b.title.length) % 1000;
     return hashA - hashB;
   });
   
-  // Retourner tous les genres disponibles
-  return shuffled;
-};
-
-// Fonction pour assigner un layout varié basé sur l'index
-const getLayoutForIndex = (index: number): RowLayoutType => {
-  const layouts: RowLayoutType[] = ['scroll', 'grid', 'compact', 'featured', 'scroll', 'scroll'];
-  return layouts[index % layouts.length];
+  // Prendre 6 items
+  return shuffled.slice(0, 6).map(m => ({
+    id: `hero-${m.id}`,
+    title: m.title,
+    description: m.description || m.synopsis || '',
+    image: (m as any).backdrop || m.image,
+    mediaId: m.id,
+  }));
 };
 
 type ViewType = 'home' | 'films' | 'series' | 'watchlist' | 'detail' | 'player' | 'settings' | 'category';
@@ -308,13 +324,22 @@ const Index = () => {
     }
   };
 
-  // Define sections for Prime Video style layout avec rotation automatique
-  const genresWithFilms = allGenres.filter(g => getFilmsByGenre(g).length > 0);
-  const genresWithSeries = allGenres.filter(g => getSeriesByGenre(g).length > 0);
+  // Générer les hero items automatiquement
+  const autoHeroItems = useMemo(() => generateAutoHeroItems(library), [library]);
+  const displayHeroItems = heroItems.length > 0 ? heroItems : autoHeroItems;
   
-  // Genres rotatifs qui changent chaque semaine
-  const rotatingFilmGenres = useMemo(() => getRotatingGenres(genresWithFilms, 'films'), [genresWithFilms]);
-  const rotatingSeriesGenres = useMemo(() => getRotatingGenres(genresWithSeries, 'series'), [genresWithSeries]);
+  // Sélectionner les 4 genres principaux pour films et séries (pas de répétition)
+  const topFilmGenres = useMemo(() => {
+    return allGenres
+      .filter(g => getFilmsByGenre(g).length >= 3)
+      .slice(0, 4);
+  }, [allGenres, films]);
+  
+  const topSeriesGenres = useMemo(() => {
+    return allGenres
+      .filter(g => getSeriesByGenre(g).length >= 3 && !topFilmGenres.includes(g))
+      .slice(0, 3);
+  }, [allGenres, series, topFilmGenres]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -416,7 +441,7 @@ const Index = () => {
                 
                 <div className="px-4 md:px-8 max-w-[1600px] mx-auto">
                   <HeroSection 
-                    heroItems={heroItems} 
+                    heroItems={displayHeroItems} 
                     onPlay={handlePlayHero}
                     onInfo={handleInfoHero}
                   />
@@ -430,86 +455,68 @@ const Index = () => {
                   />
                 </div>
 
-                {/* Prime Video Style Rows */}
+                {/* Content Rows - Max 13 lignes */}
                 <div className="px-4 md:px-8 max-w-[1600px] mx-auto space-y-2">
-                  {/* Films populaires */}
+                  {/* 1. Films populaires */}
                   {films.length > 0 && (
                     <MediaRow
-                      title="Films populaires"
-                      media={films.slice(0, 15)}
+                      title="🎬 Films populaires"
+                      media={films.slice(0, 20)}
                       onSelect={handleSelectMedia}
                       onSeeMore={() => openCategoryPage('Films populaires', m => m.type === 'Film')}
                       isAdmin={isAdmin}
                       onEdit={handleEditMedia}
                       onDelete={deleteMedia}
-                      layout="featured"
                     />
                   )}
 
-                  {/* Séries populaires */}
+                  {/* 2. Séries populaires */}
                   {series.length > 0 && (
                     <MediaRow
-                      title="Séries populaires"
-                      media={series.slice(0, 15)}
+                      title="📺 Séries populaires"
+                      media={series.slice(0, 20)}
                       onSelect={handleSelectMedia}
                       onSeeMore={() => openCategoryPage('Séries populaires', m => m.type === 'Série')}
                       isAdmin={isAdmin}
                       onEdit={handleEditMedia}
                       onDelete={deleteMedia}
-                      layout="grid"
                     />
                   )}
                   
-                  {/* Sections spéciales */}
+                  {/* 3. Films en 4K */}
                   {films.filter(f => f.quality === '4K').length > 0 && (
                     <MediaRow
-                      title="🎬 Films en 4K"
-                      media={films.filter(f => f.quality === '4K').slice(0, 15)}
+                      title="✨ Films en 4K"
+                      media={films.filter(f => f.quality === '4K').slice(0, 20)}
                       onSelect={handleSelectMedia}
                       onSeeMore={() => openCategoryPage('Films en 4K', m => m.type === 'Film' && m.quality === '4K')}
                       isAdmin={isAdmin}
                       onEdit={handleEditMedia}
                       onDelete={deleteMedia}
-                      layout="scroll"
                     />
                   )}
                   
+                  {/* 4. Disponible en VF */}
                   {library.filter(m => m.language === 'VF').length > 0 && (
                     <MediaRow
                       title="🇫🇷 Disponible en VF"
-                      media={library.filter(m => m.language === 'VF').slice(0, 15)}
+                      media={library.filter(m => m.language === 'VF').slice(0, 20)}
                       onSelect={handleSelectMedia}
                       onSeeMore={() => openCategoryPage('Disponible en VF', m => m.language === 'VF')}
                       isAdmin={isAdmin}
                       onEdit={handleEditMedia}
                       onDelete={deleteMedia}
-                      layout="compact"
-                    />
-                  )}
-                  
-                  {/* Séries que vous aimerez */}
-                  {series.length > 10 && (
-                    <MediaRow
-                      title="📺 Séries que vous aimerez"
-                      media={series.slice(10, 25)}
-                      onSelect={handleSelectMedia}
-                      onSeeMore={() => openCategoryPage('Séries recommandées', m => m.type === 'Série')}
-                      isAdmin={isAdmin}
-                      onEdit={handleEditMedia}
-                      onDelete={deleteMedia}
-                      layout="featured"
                     />
                   )}
 
-                  {/* Dynamic rotating genre rows for films - all genres */}
-                  {rotatingFilmGenres.map((genre, index) => {
+                  {/* 5-8. Top 4 genres Films */}
+                  {topFilmGenres.map((genre) => {
                     const genreFilms = getFilmsByGenre(genre);
-                    if (genreFilms.length < 1) return null;
                     return (
                       <MediaRow
                         key={`film-${genre}`}
                         title={`${genre} – Films`}
-                        media={genreFilms.slice(0, 15)}
+                        media={genreFilms.slice(0, 20)}
                         onSelect={handleSelectMedia}
                         onSeeMore={() => openCategoryPage(`${genre} – Films`, m => 
                           m.type === 'Film' && (m.genres?.toLowerCase().includes(genre.toLowerCase()) || false)
@@ -517,20 +524,18 @@ const Index = () => {
                         isAdmin={isAdmin}
                         onEdit={handleEditMedia}
                         onDelete={deleteMedia}
-                        layout={getLayoutForIndex(index)}
                       />
                     );
                   })}
 
-                  {/* Dynamic rotating genre rows for series - all genres */}
-                  {rotatingSeriesGenres.map((genre, index) => {
+                  {/* 9-11. Top 3 genres Séries */}
+                  {topSeriesGenres.map((genre) => {
                     const genreSeries = getSeriesByGenre(genre);
-                    if (genreSeries.length < 1) return null;
                     return (
                       <MediaRow
                         key={`serie-${genre}`}
                         title={`${genre} – Séries`}
-                        media={genreSeries.slice(0, 15)}
+                        media={genreSeries.slice(0, 20)}
                         onSelect={handleSelectMedia}
                         onSeeMore={() => openCategoryPage(`${genre} – Séries`, m => 
                           m.type === 'Série' && (m.genres?.toLowerCase().includes(genre.toLowerCase()) || false)
@@ -538,16 +543,15 @@ const Index = () => {
                         isAdmin={isAdmin}
                         onEdit={handleEditMedia}
                         onDelete={deleteMedia}
-                        layout={getLayoutForIndex(index + 3)}
                       />
                     );
                   })}
 
-                  {/* Watchlist if has items */}
+                  {/* 12. Ma liste */}
                   {watchlistMedia.length > 0 && (
                     <MediaRow
-                      title="Ma liste"
-                      media={watchlistMedia.slice(0, 10)}
+                      title="📌 Ma liste"
+                      media={watchlistMedia.slice(0, 20)}
                       onSelect={handleSelectMedia}
                       onSeeMore={() => openCategoryPage('Ma liste', m => isInWatchlist(m.id))}
                       isAdmin={isAdmin}
@@ -556,11 +560,11 @@ const Index = () => {
                     />
                   )}
 
-                  {/* Favoris with heart icon */}
+                  {/* 13. Favoris */}
                   {favoritesMedia.length > 0 && (
                     <MediaRow
                       title="❤️ Favoris"
-                      media={favoritesMedia.slice(0, 10)}
+                      media={favoritesMedia.slice(0, 20)}
                       onSelect={handleSelectMedia}
                       onSeeMore={() => openCategoryPage('Favoris', m => isInFavorites(m.id))}
                       isAdmin={isAdmin}
@@ -584,14 +588,13 @@ const Index = () => {
                   onEdit={handleEditMedia}
                   onDelete={deleteMedia}
                 />
-                {genresWithFilms.map(genre => {
+                {allGenres.filter(g => getFilmsByGenre(g).length >= 2).map(genre => {
                   const genreFilms = getFilmsByGenre(genre);
-                  if (genreFilms.length < 2) return null;
                   return (
                     <MediaRow
                       key={genre}
                       title={`${genre} – Films`}
-                      media={genreFilms.slice(0, 10)}
+                      media={genreFilms.slice(0, 20)}
                       onSelect={handleSelectMedia}
                       onSeeMore={() => openCategoryPage(`${genre} – Films`, m => 
                         m.type === 'Film' && (m.genres?.toLowerCase().includes(genre.toLowerCase()) || false)
@@ -616,14 +619,13 @@ const Index = () => {
                   onEdit={handleEditMedia}
                   onDelete={deleteMedia}
                 />
-                {genresWithSeries.map(genre => {
+                {allGenres.filter(g => getSeriesByGenre(g).length >= 2).map(genre => {
                   const genreSeries = getSeriesByGenre(genre);
-                  if (genreSeries.length < 2) return null;
                   return (
                     <MediaRow
                       key={genre}
                       title={`${genre} – Séries`}
-                      media={genreSeries.slice(0, 10)}
+                      media={genreSeries.slice(0, 20)}
                       onSelect={handleSelectMedia}
                       onSeeMore={() => openCategoryPage(`${genre} – Séries`, m => 
                         m.type === 'Série' && (m.genres?.toLowerCase().includes(genre.toLowerCase()) || false)

@@ -67,11 +67,14 @@ const Header = ({
             alt="Global Classic TV" 
             className="w-10 h-10 md:w-12 md:h-12 object-contain group-hover:scale-105 transition-transform"
           />
-          <div className="hidden sm:block">
+          <div>
             <h1 className="font-display text-lg md:text-xl font-bold tracking-tight text-foreground leading-none">
-              GLOBAL CLASSIC TV
+              <span className="hidden xl:inline">GLOBAL CLASSIC TV</span>
+              <span className="hidden lg:inline xl:hidden">GLOBAL TV</span>
+              <span className="hidden sm:inline lg:hidden">GC TV</span>
+              <span className="inline sm:hidden">GCTV</span>
             </h1>
-            <p className="text-[8px] text-muted-foreground uppercase tracking-widest">
+            <p className="text-[8px] text-muted-foreground uppercase tracking-widest hidden sm:block">
               Streaming Premium
             </p>
           </div>

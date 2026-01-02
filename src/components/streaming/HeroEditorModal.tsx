@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { X, Plus, Save, Trash2, Image, Type, FileText, Link, Wand2 } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { X, Plus, Save, Trash2, Image, Type, FileText, Wand2, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import type { HeroItem, Media } from '@/types/media';
@@ -15,6 +15,7 @@ interface HeroEditorModalProps {
 const HeroEditorModal = ({ isOpen, heroItems, mediaOptions, onClose, onSave }: HeroEditorModalProps) => {
   const { toast } = useToast();
   const [items, setItems] = useState<HeroItem[]>([]);
+  const [searchQueries, setSearchQueries] = useState<Record<string, string>>({});
 
   useEffect(() => {
     setItems(heroItems);
@@ -52,6 +53,8 @@ const HeroEditorModal = ({ isOpen, heroItems, mediaOptions, onClose, onSave }: H
           image: (selectedMedia as any).backdrop || selectedMedia.image || '',
         } : item
       ));
+      // Clear search after selection
+      setSearchQueries(prev => ({ ...prev, [itemId]: '' }));
       toast({
         title: "Champs remplis automatiquement",
         description: `Données de "${selectedMedia.title}" appliquées`,
@@ -59,6 +62,14 @@ const HeroEditorModal = ({ isOpen, heroItems, mediaOptions, onClose, onSave }: H
     } else {
       updateItem(itemId, 'mediaId', mediaId);
     }
+  };
+
+  const getFilteredMedia = (itemId: string) => {
+    const query = searchQueries[itemId]?.toLowerCase() || '';
+    if (!query) return mediaOptions.slice(0, 50); // Show first 50 if no search
+    return mediaOptions.filter(m => 
+      m.title.toLowerCase().includes(query)
+    ).slice(0, 50);
   };
 
   const removeItem = (id: string) => {
@@ -86,9 +97,16 @@ const HeroEditorModal = ({ isOpen, heroItems, mediaOptions, onClose, onSave }: H
           </Button>
         </div>
 
-        <p className="text-muted-foreground text-sm mb-6">
-          Configurez les slides qui apparaissent en haut de la page d'accueil. <span className="text-primary">Sélectionnez un média pour remplir automatiquement les champs.</span>
-        </p>
+        <div className="bg-primary/10 border border-primary/30 rounded-xl p-4 mb-6">
+          <p className="text-sm text-foreground">
+            <Wand2 size={16} className="inline mr-2 text-primary" />
+            <strong>Auto-rotation activée :</strong> Les slides changent automatiquement toutes les heures avec de nouveaux médias populaires.
+            <br />
+            <span className="text-muted-foreground text-xs mt-1 block">
+              Sélectionnez un média pour remplir automatiquement les champs.
+            </span>
+          </p>
+        </div>
 
         <div className="space-y-4 mb-6">
           {items.map((item, index) => (
@@ -112,23 +130,42 @@ const HeroEditorModal = ({ isOpen, heroItems, mediaOptions, onClose, onSave }: H
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-3">
-                  {/* Media Selection - First for auto-fill */}
+                  {/* Media Selection with Search */}
                   <div>
                     <label className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-2">
                       <Wand2 size={12} className="text-primary" /> Média associé <span className="text-primary">(auto-remplissage)</span>
                     </label>
+                    
+                    {/* Search Input */}
+                    <div className="relative mb-2">
+                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                      <input
+                        type="text"
+                        value={searchQueries[item.id] || ''}
+                        onChange={(e) => setSearchQueries(prev => ({ ...prev, [item.id]: e.target.value }))}
+                        placeholder="Rechercher un média..."
+                        className="w-full bg-background/50 border border-border/50 rounded-lg pl-9 pr-4 py-2 outline-none focus:border-primary/50 text-sm text-foreground"
+                      />
+                    </div>
+                    
+                    {/* Media Select */}
                     <select
                       value={item.mediaId}
                       onChange={(e) => handleMediaSelect(item.id, e.target.value)}
                       className="w-full bg-background/50 border border-primary/30 rounded-xl px-4 py-2.5 outline-none focus:border-primary/50 text-sm text-foreground"
                     >
                       <option value="">-- Sélectionner un média --</option>
-                      {mediaOptions.map(media => (
+                      {getFilteredMedia(item.id).map(media => (
                         <option key={media.id} value={media.id}>
                           {media.title} ({media.type})
                         </option>
                       ))}
                     </select>
+                    {searchQueries[item.id] && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {getFilteredMedia(item.id).length} résultat(s)
+                      </p>
+                    )}
                   </div>
 
                   <div>

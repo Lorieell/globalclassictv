@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ArrowLeft, Link2, Megaphone, Palette, FolderOpen, Instagram, Youtube, Twitter, Sun, Moon, Monitor, Plus, X, Upload, Film, Tv, BookOpen, Music, Gamepad2, Mic, Globe, Sparkles, Heart, Skull, Laugh, Zap, Sword, Ghost, Rocket, Theater, Baby, Search, Mountain, Users, type LucideIcon } from 'lucide-react';
+import { ArrowLeft, Link2, Megaphone, Palette, FolderOpen, Instagram, Youtube, Twitter, Sun, Moon, Monitor, Plus, X, Upload, Film, Tv, BookOpen, Music, Gamepad2, Mic, Globe, Sparkles, Heart, Skull, Laugh, Zap, Sword, Ghost, Rocket, Theater, Baby, Search, Mountain, Users, List, Check, Pencil, Play, RefreshCw, Loader2, type LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
+import type { Media } from '@/types/media';
 
 // Reddit icon
 const RedditIcon = ({ size = 20 }: { size?: number }) => (
@@ -94,6 +95,8 @@ interface ContentSettings {
 
 interface SettingsPageProps {
   onBack: () => void;
+  library?: Media[];
+  onEditMedia?: (media: Media) => void;
 }
 
 const SOCIAL_STORAGE_KEY = 'gctv-social-links';
@@ -129,7 +132,7 @@ const defaultContent: ContentSettings = {
   genres: ['Action', 'Comédie', 'Drame', 'Horreur', 'Romance', 'Sci-Fi', 'Thriller'],
 };
 
-type SettingsTab = 'links' | 'ads' | 'appearance' | 'content';
+type SettingsTab = 'links' | 'ads' | 'appearance' | 'content' | 'liste';
 
 // Helper to convert file to base64
 const fileToBase64 = (file: File): Promise<string> => {
@@ -184,7 +187,7 @@ const applyAccentColor = (hexColor: string) => {
   document.documentElement.style.setProperty('--ring', `${hue} ${saturation}% ${lightness}%`);
 };
 
-const SettingsPage = ({ onBack }: SettingsPageProps) => {
+const SettingsPage = ({ onBack, library = [], onEditMedia }: SettingsPageProps) => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('links');
   
   // Links state
@@ -315,7 +318,57 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
     { key: 'ads', icon: Megaphone, label: 'Pubs' },
     { key: 'appearance', icon: Palette, label: 'Apparence' },
     { key: 'content', icon: FolderOpen, label: 'Contenu' },
+    { key: 'liste', icon: List, label: 'Liste' },
   ];
+
+  // Liste tab state
+  const [listeFilter, setListeFilter] = useState<'all' | 'with-video' | 'without-video'>('all');
+  const [listeSearch, setListeSearch] = useState('');
+  const [isRunningMaintenance, setIsRunningMaintenance] = useState(false);
+
+  const filteredLibrary = library.filter(media => {
+    const matchesSearch = listeSearch.trim() === '' || 
+      media.title.toLowerCase().includes(listeSearch.toLowerCase());
+    
+    const hasVideo = media.type === 'Série' 
+      ? media.seasons?.some(s => s.episodes.some(e => e.videoUrls && e.videoUrls.trim() !== ''))
+      : media.videoUrls && media.videoUrls.trim() !== '';
+    
+    if (listeFilter === 'with-video') return matchesSearch && hasVideo;
+    if (listeFilter === 'without-video') return matchesSearch && !hasVideo;
+    return matchesSearch;
+  });
+
+  const runDailyMaintenance = async () => {
+    setIsRunningMaintenance(true);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/daily-maintenance`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'full', library }),
+        }
+      );
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        // Update localStorage with updated library
+        localStorage.setItem('gctv-library', JSON.stringify(result.library));
+        toast.success(result.message);
+        // Reload to refresh state
+        window.location.reload();
+      } else {
+        toast.error(result.error || 'Erreur lors de la maintenance');
+      }
+    } catch (error) {
+      console.error('Maintenance error:', error);
+      toast.error('Erreur de connexion au service de maintenance');
+    } finally {
+      setIsRunningMaintenance(false);
+    }
+  };
 
   const themeOptions = [
     { value: 'dark', label: 'Sombre', icon: Moon },
@@ -716,6 +769,170 @@ const SettingsPage = ({ onBack }: SettingsPageProps) => {
                 <Button onClick={saveContent} className="bg-primary text-primary-foreground">
                   Enregistrer le contenu
                 </Button>
+              </div>
+            )}
+
+            {/* LISTE */}
+            {activeTab === 'liste' && (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-xl font-semibold text-foreground mb-2">Liste des contenus</h2>
+                  <p className="text-muted-foreground text-sm">
+                    Gérez tous les contenus et vérifiez ceux qui ont une vidéo uploadée.
+                  </p>
+                </div>
+
+                {/* Maintenance Button */}
+                <div className="bg-card/50 border border-border/50 rounded-xl p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-semibold text-foreground">Maintenance quotidienne</h3>
+                      <p className="text-sm text-muted-foreground">Vérifie les langues, qualités et ajoute les nouvelles séries</p>
+                    </div>
+                    <Button
+                      onClick={runDailyMaintenance}
+                      disabled={isRunningMaintenance}
+                      variant="outline"
+                      className="gap-2"
+                    >
+                      {isRunningMaintenance ? (
+                        <Loader2 size={16} className="animate-spin" />
+                      ) : (
+                        <RefreshCw size={16} />
+                      )}
+                      {isRunningMaintenance ? 'En cours...' : 'Lancer'}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Filters */}
+                <div className="bg-card/50 border border-border/50 rounded-xl p-4 space-y-4">
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <div className="flex-1">
+                      <Input
+                        value={listeSearch}
+                        onChange={(e) => setListeSearch(e.target.value)}
+                        placeholder="Rechercher un contenu..."
+                        className="bg-muted/50 border-border"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant={listeFilter === 'all' ? 'default' : 'outline'}
+                        onClick={() => setListeFilter('all')}
+                        size="sm"
+                      >
+                        Tous ({library.length})
+                      </Button>
+                      <Button
+                        variant={listeFilter === 'with-video' ? 'default' : 'outline'}
+                        onClick={() => setListeFilter('with-video')}
+                        size="sm"
+                        className="gap-1"
+                      >
+                        <Check size={14} />
+                        Avec vidéo
+                      </Button>
+                      <Button
+                        variant={listeFilter === 'without-video' ? 'default' : 'outline'}
+                        onClick={() => setListeFilter('without-video')}
+                        size="sm"
+                        className="gap-1"
+                      >
+                        <X size={14} />
+                        Sans vidéo
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Content List */}
+                <div className="bg-card/50 border border-border/50 rounded-xl overflow-hidden">
+                  <div className="max-h-[500px] overflow-y-auto">
+                    <table className="w-full">
+                      <thead className="bg-muted/50 sticky top-0">
+                        <tr>
+                          <th className="text-left p-3 text-sm font-medium text-muted-foreground">Contenu</th>
+                          <th className="text-left p-3 text-sm font-medium text-muted-foreground w-20">Type</th>
+                          <th className="text-center p-3 text-sm font-medium text-muted-foreground w-20">Vidéo</th>
+                          <th className="text-center p-3 text-sm font-medium text-muted-foreground w-20">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/30">
+                        {filteredLibrary.map(media => {
+                          const hasVideo = media.type === 'Série' 
+                            ? media.seasons?.some(s => s.episodes.some(e => e.videoUrls && e.videoUrls.trim() !== ''))
+                            : media.videoUrls && media.videoUrls.trim() !== '';
+                          
+                          return (
+                            <tr key={media.id} className="hover:bg-muted/20 transition-colors">
+                              <td className="p-3">
+                                <div className="flex items-center gap-3">
+                                  <img 
+                                    src={media.image} 
+                                    alt={media.title}
+                                    className="w-10 h-14 object-cover rounded"
+                                  />
+                                  <div>
+                                    <p className="font-medium text-foreground text-sm">{media.title}</p>
+                                    <p className="text-xs text-muted-foreground">{media.language} • {media.quality}</p>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="p-3">
+                                <span className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full ${
+                                  media.type === 'Film' 
+                                    ? 'bg-blue-500/20 text-blue-400'
+                                    : 'bg-purple-500/20 text-purple-400'
+                                }`}>
+                                  {media.type === 'Film' ? <Film size={12} /> : <Tv size={12} />}
+                                  {media.type}
+                                </span>
+                              </td>
+                              <td className="p-3 text-center">
+                                {hasVideo ? (
+                                  <div className="flex justify-center">
+                                    <div className="w-6 h-6 rounded-full bg-green-500/20 flex items-center justify-center">
+                                      <Check size={14} className="text-green-400" />
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="flex justify-center">
+                                    <div className="w-6 h-6 rounded-full bg-red-500/20 flex items-center justify-center">
+                                      <X size={14} className="text-red-400" />
+                                    </div>
+                                  </div>
+                                )}
+                              </td>
+                              <td className="p-3 text-center">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => onEditMedia?.(media)}
+                                  className="text-muted-foreground hover:text-foreground"
+                                >
+                                  <Pencil size={14} />
+                                </Button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {filteredLibrary.length === 0 && (
+                          <tr>
+                            <td colSpan={4} className="p-8 text-center text-muted-foreground">
+                              Aucun contenu trouvé
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="p-3 border-t border-border/30 bg-muted/30">
+                    <p className="text-sm text-muted-foreground text-center">
+                      {filteredLibrary.length} contenu{filteredLibrary.length > 1 ? 's' : ''} affiché{filteredLibrary.length > 1 ? 's' : ''}
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
           </div>

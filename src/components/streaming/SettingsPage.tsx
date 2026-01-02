@@ -76,11 +76,15 @@ interface SocialLinks {
 
 interface AdSettings {
   leftEnabled: boolean;
+  leftType: 'image' | 'adsense';
   leftImageUrl: string;
   leftLinkUrl: string;
+  leftAdsenseCode: string;
   rightEnabled: boolean;
+  rightType: 'image' | 'adsense';
   rightImageUrl: string;
   rightLinkUrl: string;
+  rightAdsenseCode: string;
 }
 
 interface AppearanceSettings {
@@ -116,11 +120,15 @@ const defaultLinks: SocialLinks = {
 
 const defaultAds: AdSettings = {
   leftEnabled: false,
+  leftType: 'image',
   leftImageUrl: '',
   leftLinkUrl: '',
+  leftAdsenseCode: '',
   rightEnabled: false,
+  rightType: 'image',
   rightImageUrl: '',
   rightLinkUrl: '',
+  rightAdsenseCode: '',
 };
 
 const defaultAppearance: AppearanceSettings = {
@@ -607,17 +615,17 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia }: Setting
                 <div>
                   <h2 className="text-xl font-semibold text-foreground mb-2">Publicités</h2>
                   <p className="text-muted-foreground text-sm">
-                    Configurez les publicités affichées sur les côtés de la page détails.
+                    Configurez les publicités affichées sur les côtés du site.
                   </p>
                 </div>
 
                 {/* Explanation */}
                 <div className="bg-muted/30 border border-border/30 rounded-lg p-4 text-sm text-muted-foreground">
                   <p className="mb-2"><strong>Comment ça marche ?</strong></p>
-                  <p>Les pubs s'affichent sur les côtés de la page de détails des films/séries. Vous pouvez :</p>
+                  <p>Les pubs s'affichent sur les côtés du site (écrans larges). Vous pouvez choisir :</p>
                   <ul className="list-disc list-inside mt-2 space-y-1">
-                    <li>Glisser-déposer une image ou entrer une URL</li>
-                    <li>Ajouter un lien de redirection (quand on clique sur la pub)</li>
+                    <li><strong>Image simple</strong> : Uploadez une image + lien de redirection</li>
+                    <li><strong>Google AdSense</strong> : Collez votre code AdSense</li>
                   </ul>
                 </div>
 
@@ -626,7 +634,7 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia }: Setting
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="font-semibold text-foreground">Publicité gauche</h3>
-                      <p className="text-sm text-muted-foreground">Affichée à gauche de la page détails</p>
+                      <p className="text-sm text-muted-foreground">Affichée à gauche du contenu</p>
                     </div>
                     <Switch
                       checked={ads.leftEnabled}
@@ -636,56 +644,97 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia }: Setting
 
                   {ads.leftEnabled && (
                     <div className="space-y-4 pt-4 border-t border-border/50">
-                      {/* Drag and drop zone */}
-                      <div
-                        onDragOver={(e) => { e.preventDefault(); setLeftDragging(true); }}
-                        onDragLeave={() => setLeftDragging(false)}
-                        onDrop={(e) => handleDrop(e, 'left')}
-                        onClick={() => leftInputRef.current?.click()}
-                        className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-all ${
-                          leftDragging 
-                            ? 'border-primary bg-primary/10' 
-                            : 'border-border hover:border-muted-foreground'
-                        }`}
-                      >
-                        {ads.leftImageUrl ? (
+                      {/* Type selector */}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setAds(prev => ({ ...prev, leftType: 'image' }))}
+                          className={`flex-1 py-2 px-4 rounded-lg border-2 transition-all ${
+                            ads.leftType === 'image'
+                              ? 'border-primary bg-primary/10 text-primary'
+                              : 'border-border text-muted-foreground hover:border-muted-foreground'
+                          }`}
+                        >
+                          Image simple
+                        </button>
+                        <button
+                          onClick={() => setAds(prev => ({ ...prev, leftType: 'adsense' }))}
+                          className={`flex-1 py-2 px-4 rounded-lg border-2 transition-all ${
+                            ads.leftType === 'adsense'
+                              ? 'border-primary bg-primary/10 text-primary'
+                              : 'border-border text-muted-foreground hover:border-muted-foreground'
+                          }`}
+                        >
+                          Google AdSense
+                        </button>
+                      </div>
+
+                      {ads.leftType === 'image' ? (
+                        <>
+                          {/* Drag and drop zone */}
+                          <div
+                            onDragOver={(e) => { e.preventDefault(); setLeftDragging(true); }}
+                            onDragLeave={() => setLeftDragging(false)}
+                            onDrop={(e) => handleDrop(e, 'left')}
+                            onClick={() => leftInputRef.current?.click()}
+                            className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-all ${
+                              leftDragging 
+                                ? 'border-primary bg-primary/10' 
+                                : 'border-border hover:border-muted-foreground'
+                            }`}
+                          >
+                            {ads.leftImageUrl ? (
+                              <div className="space-y-2">
+                                <img src={ads.leftImageUrl} alt="Pub gauche" className="max-h-32 mx-auto rounded" />
+                                <p className="text-sm text-muted-foreground">Cliquez ou glissez pour remplacer</p>
+                              </div>
+                            ) : (
+                              <div className="space-y-2 text-muted-foreground">
+                                <Upload className="mx-auto" size={32} />
+                                <p>Glissez une image ici ou cliquez pour parcourir</p>
+                              </div>
+                            )}
+                            <input
+                              ref={leftInputRef}
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => handleFileSelect(e, 'left')}
+                            />
+                          </div>
+                          
                           <div className="space-y-2">
-                            <img src={ads.leftImageUrl} alt="Pub gauche" className="max-h-32 mx-auto rounded" />
-                            <p className="text-sm text-muted-foreground">Cliquez ou glissez pour remplacer</p>
+                            <Label className="text-foreground">Ou URL de l'image</Label>
+                            <Input
+                              value={ads.leftImageUrl.startsWith('data:') ? '' : ads.leftImageUrl}
+                              onChange={(e) => setAds(prev => ({ ...prev, leftImageUrl: e.target.value }))}
+                              placeholder="https://example.com/pub.png"
+                              className="bg-muted/50 border-border"
+                            />
                           </div>
-                        ) : (
-                          <div className="space-y-2 text-muted-foreground">
-                            <Upload className="mx-auto" size={32} />
-                            <p>Glissez une image ici ou cliquez pour parcourir</p>
+                          <div className="space-y-2">
+                            <Label className="text-foreground">URL de redirection</Label>
+                            <Input
+                              value={ads.leftLinkUrl}
+                              onChange={(e) => setAds(prev => ({ ...prev, leftLinkUrl: e.target.value }))}
+                              placeholder="https://example.com"
+                              className="bg-muted/50 border-border"
+                            />
                           </div>
-                        )}
-                        <input
-                          ref={leftInputRef}
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => handleFileSelect(e, 'left')}
-                        />
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label className="text-foreground">Ou URL de l'image</Label>
-                        <Input
-                          value={ads.leftImageUrl.startsWith('data:') ? '' : ads.leftImageUrl}
-                          onChange={(e) => setAds(prev => ({ ...prev, leftImageUrl: e.target.value }))}
-                          placeholder="https://example.com/pub.png"
-                          className="bg-muted/50 border-border"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-foreground">URL de redirection</Label>
-                        <Input
-                          value={ads.leftLinkUrl}
-                          onChange={(e) => setAds(prev => ({ ...prev, leftLinkUrl: e.target.value }))}
-                          placeholder="https://example.com"
-                          className="bg-muted/50 border-border"
-                        />
-                      </div>
+                        </>
+                      ) : (
+                        <div className="space-y-2">
+                          <Label className="text-foreground">Code Google AdSense</Label>
+                          <textarea
+                            value={ads.leftAdsenseCode || ''}
+                            onChange={(e) => setAds(prev => ({ ...prev, leftAdsenseCode: e.target.value }))}
+                            placeholder={'<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXX" crossorigin="anonymous"></script>\n<ins class="adsbygoogle"...></ins>\n<script>(adsbygoogle = window.adsbygoogle || []).push({});</script>'}
+                            className="w-full h-40 bg-muted/50 border border-border rounded-lg p-3 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Collez le code complet de votre bloc publicitaire AdSense
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -695,7 +744,7 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia }: Setting
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="font-semibold text-foreground">Publicité droite</h3>
-                      <p className="text-sm text-muted-foreground">Affichée à droite de la page détails</p>
+                      <p className="text-sm text-muted-foreground">Affichée à droite du contenu</p>
                     </div>
                     <Switch
                       checked={ads.rightEnabled}
@@ -705,56 +754,97 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia }: Setting
 
                   {ads.rightEnabled && (
                     <div className="space-y-4 pt-4 border-t border-border/50">
-                      {/* Drag and drop zone */}
-                      <div
-                        onDragOver={(e) => { e.preventDefault(); setRightDragging(true); }}
-                        onDragLeave={() => setRightDragging(false)}
-                        onDrop={(e) => handleDrop(e, 'right')}
-                        onClick={() => rightInputRef.current?.click()}
-                        className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-all ${
-                          rightDragging 
-                            ? 'border-primary bg-primary/10' 
-                            : 'border-border hover:border-muted-foreground'
-                        }`}
-                      >
-                        {ads.rightImageUrl ? (
+                      {/* Type selector */}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setAds(prev => ({ ...prev, rightType: 'image' }))}
+                          className={`flex-1 py-2 px-4 rounded-lg border-2 transition-all ${
+                            ads.rightType === 'image'
+                              ? 'border-primary bg-primary/10 text-primary'
+                              : 'border-border text-muted-foreground hover:border-muted-foreground'
+                          }`}
+                        >
+                          Image simple
+                        </button>
+                        <button
+                          onClick={() => setAds(prev => ({ ...prev, rightType: 'adsense' }))}
+                          className={`flex-1 py-2 px-4 rounded-lg border-2 transition-all ${
+                            ads.rightType === 'adsense'
+                              ? 'border-primary bg-primary/10 text-primary'
+                              : 'border-border text-muted-foreground hover:border-muted-foreground'
+                          }`}
+                        >
+                          Google AdSense
+                        </button>
+                      </div>
+
+                      {ads.rightType === 'image' ? (
+                        <>
+                          {/* Drag and drop zone */}
+                          <div
+                            onDragOver={(e) => { e.preventDefault(); setRightDragging(true); }}
+                            onDragLeave={() => setRightDragging(false)}
+                            onDrop={(e) => handleDrop(e, 'right')}
+                            onClick={() => rightInputRef.current?.click()}
+                            className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-all ${
+                              rightDragging 
+                                ? 'border-primary bg-primary/10' 
+                                : 'border-border hover:border-muted-foreground'
+                            }`}
+                          >
+                            {ads.rightImageUrl ? (
+                              <div className="space-y-2">
+                                <img src={ads.rightImageUrl} alt="Pub droite" className="max-h-32 mx-auto rounded" />
+                                <p className="text-sm text-muted-foreground">Cliquez ou glissez pour remplacer</p>
+                              </div>
+                            ) : (
+                              <div className="space-y-2 text-muted-foreground">
+                                <Upload className="mx-auto" size={32} />
+                                <p>Glissez une image ici ou cliquez pour parcourir</p>
+                              </div>
+                            )}
+                            <input
+                              ref={rightInputRef}
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => handleFileSelect(e, 'right')}
+                            />
+                          </div>
+                          
                           <div className="space-y-2">
-                            <img src={ads.rightImageUrl} alt="Pub droite" className="max-h-32 mx-auto rounded" />
-                            <p className="text-sm text-muted-foreground">Cliquez ou glissez pour remplacer</p>
+                            <Label className="text-foreground">Ou URL de l'image</Label>
+                            <Input
+                              value={ads.rightImageUrl.startsWith('data:') ? '' : ads.rightImageUrl}
+                              onChange={(e) => setAds(prev => ({ ...prev, rightImageUrl: e.target.value }))}
+                              placeholder="https://example.com/pub.png"
+                              className="bg-muted/50 border-border"
+                            />
                           </div>
-                        ) : (
-                          <div className="space-y-2 text-muted-foreground">
-                            <Upload className="mx-auto" size={32} />
-                            <p>Glissez une image ici ou cliquez pour parcourir</p>
+                          <div className="space-y-2">
+                            <Label className="text-foreground">URL de redirection</Label>
+                            <Input
+                              value={ads.rightLinkUrl}
+                              onChange={(e) => setAds(prev => ({ ...prev, rightLinkUrl: e.target.value }))}
+                              placeholder="https://example.com"
+                              className="bg-muted/50 border-border"
+                            />
                           </div>
-                        )}
-                        <input
-                          ref={rightInputRef}
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => handleFileSelect(e, 'right')}
-                        />
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label className="text-foreground">Ou URL de l'image</Label>
-                        <Input
-                          value={ads.rightImageUrl.startsWith('data:') ? '' : ads.rightImageUrl}
-                          onChange={(e) => setAds(prev => ({ ...prev, rightImageUrl: e.target.value }))}
-                          placeholder="https://example.com/pub.png"
-                          className="bg-muted/50 border-border"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-foreground">URL de redirection</Label>
-                        <Input
-                          value={ads.rightLinkUrl}
-                          onChange={(e) => setAds(prev => ({ ...prev, rightLinkUrl: e.target.value }))}
-                          placeholder="https://example.com"
-                          className="bg-muted/50 border-border"
-                        />
-                      </div>
+                        </>
+                      ) : (
+                        <div className="space-y-2">
+                          <Label className="text-foreground">Code Google AdSense</Label>
+                          <textarea
+                            value={ads.rightAdsenseCode || ''}
+                            onChange={(e) => setAds(prev => ({ ...prev, rightAdsenseCode: e.target.value }))}
+                            placeholder={'<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXX" crossorigin="anonymous"></script>\n<ins class="adsbygoogle"...></ins>\n<script>(adsbygoogle = window.adsbygoogle || []).push({});</script>'}
+                            className="w-full h-40 bg-muted/50 border border-border rounded-lg p-3 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Collez le code complet de votre bloc publicitaire AdSense
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -764,8 +854,6 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia }: Setting
                 </Button>
               </div>
             )}
-
-            {/* APPARENCE */}
             {activeTab === 'appearance' && (
               <div className="space-y-6">
                 <div>

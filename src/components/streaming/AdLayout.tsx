@@ -1,12 +1,16 @@
-import { useState, useEffect, ReactNode } from 'react';
+import { useState, useEffect, ReactNode, useRef } from 'react';
 
 interface AdSettings {
   leftEnabled: boolean;
+  leftType: 'image' | 'adsense';
   leftImageUrl: string;
   leftLinkUrl: string;
+  leftAdsenseCode: string;
   rightEnabled: boolean;
+  rightType: 'image' | 'adsense';
   rightImageUrl: string;
   rightLinkUrl: string;
+  rightAdsenseCode: string;
 }
 
 const ADS_STORAGE_KEY = 'gctv-ads-settings';
@@ -15,6 +19,46 @@ interface AdLayoutProps {
   children: ReactNode;
   showAds?: boolean;
 }
+
+// Component to render AdSense code safely
+const AdSenseSlot = ({ code }: { code: string }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!containerRef.current || !code) return;
+    
+    // Clear previous content
+    containerRef.current.innerHTML = '';
+    
+    // Create a container for the ad
+    const adContainer = document.createElement('div');
+    adContainer.innerHTML = code;
+    
+    // Find and execute scripts
+    const scripts = adContainer.querySelectorAll('script');
+    scripts.forEach(oldScript => {
+      const newScript = document.createElement('script');
+      Array.from(oldScript.attributes).forEach(attr => {
+        newScript.setAttribute(attr.name, attr.value);
+      });
+      newScript.textContent = oldScript.textContent;
+      oldScript.parentNode?.replaceChild(newScript, oldScript);
+    });
+    
+    containerRef.current.appendChild(adContainer);
+    
+    // Try to push AdSense
+    try {
+      if ((window as any).adsbygoogle) {
+        (window as any).adsbygoogle.push({});
+      }
+    } catch (e) {
+      console.log('AdSense push error:', e);
+    }
+  }, [code]);
+
+  return <div ref={containerRef} className="adsense-container" />;
+};
 
 const AdLayout = ({ children, showAds = true }: AdLayoutProps) => {
   const [ads, setAds] = useState<AdSettings | null>(null);
@@ -26,12 +70,9 @@ const AdLayout = ({ children, showAds = true }: AdLayoutProps) => {
         try {
           const parsed = JSON.parse(stored);
           setAds(parsed);
-          console.log('Ads loaded:', parsed);
         } catch (e) {
           console.error('Failed to parse ads settings:', e);
         }
-      } else {
-        console.log('No ads settings found in localStorage');
       }
     };
 
@@ -44,14 +85,17 @@ const AdLayout = ({ children, showAds = true }: AdLayoutProps) => {
     };
   }, []);
 
-  const showLeft = showAds && ads?.leftEnabled && ads.leftImageUrl && ads.leftImageUrl.trim() !== '';
-  const showRight = showAds && ads?.rightEnabled && ads.rightImageUrl && ads.rightImageUrl.trim() !== '';
+  const showLeft = showAds && ads?.leftEnabled && (
+    (ads.leftType === 'image' && ads.leftImageUrl && ads.leftImageUrl.trim() !== '') ||
+    (ads.leftType === 'adsense' && ads.leftAdsenseCode && ads.leftAdsenseCode.trim() !== '')
+  );
+  
+  const showRight = showAds && ads?.rightEnabled && (
+    (ads.rightType === 'image' && ads.rightImageUrl && ads.rightImageUrl.trim() !== '') ||
+    (ads.rightType === 'adsense' && ads.rightAdsenseCode && ads.rightAdsenseCode.trim() !== '')
+  );
+  
   const hasAnyAd = showLeft || showRight;
-
-  // Debug log
-  useEffect(() => {
-    console.log('AdLayout state:', { showAds, showLeft, showRight, hasAnyAd, ads });
-  }, [showAds, showLeft, showRight, hasAnyAd, ads]);
 
   if (!showAds || !hasAnyAd) {
     return <>{children}</>;
@@ -62,18 +106,24 @@ const AdLayout = ({ children, showAds = true }: AdLayoutProps) => {
       {/* Left ad space */}
       <div className="hidden lg:flex w-[160px] flex-shrink-0 p-3 justify-center">
         {showLeft && (
-          <a 
-            href={ads?.leftLinkUrl || '#'} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="block sticky top-24"
-          >
-            <img 
-              src={ads?.leftImageUrl} 
-              alt="Publicité" 
-              className="w-full max-h-[600px] object-contain rounded-lg hover:opacity-90 transition-opacity shadow-lg"
-            />
-          </a>
+          <div className="sticky top-24">
+            {ads?.leftType === 'adsense' && ads.leftAdsenseCode ? (
+              <AdSenseSlot code={ads.leftAdsenseCode} />
+            ) : (
+              <a 
+                href={ads?.leftLinkUrl || '#'} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="block"
+              >
+                <img 
+                  src={ads?.leftImageUrl} 
+                  alt="Publicité" 
+                  className="w-full max-h-[600px] object-contain rounded-lg hover:opacity-90 transition-opacity shadow-lg"
+                />
+              </a>
+            )}
+          </div>
         )}
       </div>
 
@@ -85,18 +135,24 @@ const AdLayout = ({ children, showAds = true }: AdLayoutProps) => {
       {/* Right ad space */}
       <div className="hidden lg:flex w-[160px] flex-shrink-0 p-3 justify-center">
         {showRight && (
-          <a 
-            href={ads?.rightLinkUrl || '#'} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="block sticky top-24"
-          >
-            <img 
-              src={ads?.rightImageUrl} 
-              alt="Publicité" 
-              className="w-full max-h-[600px] object-contain rounded-lg hover:opacity-90 transition-opacity shadow-lg"
-            />
-          </a>
+          <div className="sticky top-24">
+            {ads?.rightType === 'adsense' && ads.rightAdsenseCode ? (
+              <AdSenseSlot code={ads.rightAdsenseCode} />
+            ) : (
+              <a 
+                href={ads?.rightLinkUrl || '#'} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="block"
+              >
+                <img 
+                  src={ads?.rightImageUrl} 
+                  alt="Publicité" 
+                  className="w-full max-h-[600px] object-contain rounded-lg hover:opacity-90 transition-opacity shadow-lg"
+                />
+              </a>
+            )}
+          </div>
         )}
       </div>
     </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Sliders, Plus, ArrowUp, Download, Loader2, Trash2 } from 'lucide-react';
+import { Sliders, Plus, ArrowUp, Film, Tv, Sparkles, Globe, Bookmark, Heart } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import Header from '@/components/streaming/Header';
@@ -78,9 +78,8 @@ const Index = () => {
   const [showEditor, setShowEditor] = useState(false);
   const [showHeroEditor, setShowHeroEditor] = useState(false);
   const [editingMedia, setEditingMedia] = useState<Partial<Media> | null>(null);
-  const [isImporting, setIsImporting] = useState(false);
 
-  const { 
+  const {
     library, 
     films, 
     series, 
@@ -245,85 +244,6 @@ const Index = () => {
     updatePosition(mediaId, seasonId, episodeId);
   };
 
-  // Reset library and reimport from TMDB
-  const handleResetAndImport = async () => {
-    if (!confirm('Êtes-vous sûr de vouloir vider la bibliothèque et réimporter tout depuis TMDB ?')) {
-      return;
-    }
-    
-    setIsImporting(true);
-    try {
-      // Clear localStorage
-      localStorage.removeItem('gctv-library');
-      localStorage.removeItem('gctv-hero');
-      
-      toast.info('Bibliothèque vidée, import en cours...');
-      
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tmdb-import`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'all', pages: 5 }),
-        }
-      );
-      
-      const result = await response.json();
-      
-      if (result.success && result.data) {
-        // Save directly to localStorage and reload
-        localStorage.setItem('gctv-library', JSON.stringify(result.data));
-        toast.success(`${result.data.length} contenus importés depuis TMDB`);
-        // Reload to refresh the state
-        window.location.reload();
-      } else {
-        toast.error(result.error || 'Erreur lors de l\'import');
-      }
-    } catch (error) {
-      console.error('TMDB import error:', error);
-      toast.error('Erreur de connexion au service d\'import');
-    } finally {
-      setIsImporting(false);
-    }
-  };
-
-  // Import TMDB content (add to existing)
-  const handleImportTMDB = async () => {
-    setIsImporting(true);
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tmdb-import`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'all', pages: 5 }),
-        }
-      );
-      
-      const result = await response.json();
-      
-      if (result.success && result.data) {
-        let addedCount = 0;
-        for (const media of result.data) {
-          // Check if media already exists
-          const exists = library.some(m => m.id === media.id || m.title === media.title);
-          if (!exists) {
-            addMedia(media);
-            addedCount++;
-          }
-        }
-        toast.success(`${addedCount} nouveaux contenus importés depuis TMDB`);
-      } else {
-        toast.error(result.error || 'Erreur lors de l\'import');
-      }
-    } catch (error) {
-      console.error('TMDB import error:', error);
-      toast.error('Erreur de connexion au service d\'import');
-    } finally {
-      setIsImporting(false);
-    }
-  };
-
   // Générer les hero items automatiquement
   const autoHeroItems = useMemo(() => generateAutoHeroItems(library), [library]);
   const displayHeroItems = heroItems.length > 0 ? heroItems : autoHeroItems;
@@ -360,6 +280,7 @@ const Index = () => {
               onBack={() => setView('home')} 
               library={library}
               onEditMedia={handleEditMedia}
+              onAddMedia={addMedia}
             />
         ) : view === 'player' && selectedMedia ? (
           <VideoPlayer 
@@ -400,32 +321,6 @@ const Index = () => {
                 {isAdmin && (
                   <div className="flex justify-end gap-3 mb-4 px-4 md:px-8 max-w-[1600px] mx-auto flex-wrap">
                     <Button
-                      onClick={handleResetAndImport}
-                      disabled={isImporting}
-                      variant="outline"
-                      className="rounded-xl border-red-500/30 text-red-500 hover:bg-red-500/10 gap-2"
-                    >
-                      {isImporting ? (
-                        <Loader2 size={16} className="animate-spin" />
-                      ) : (
-                        <Trash2 size={16} />
-                      )}
-                      Réinitialiser + Import
-                    </Button>
-                    <Button
-                      onClick={handleImportTMDB}
-                      disabled={isImporting}
-                      variant="outline"
-                      className="rounded-xl border-green-500/30 text-green-500 hover:bg-green-500/10 gap-2"
-                    >
-                      {isImporting ? (
-                        <Loader2 size={16} className="animate-spin" />
-                      ) : (
-                        <Download size={16} />
-                      )}
-                      {isImporting ? 'Import en cours...' : 'Ajouter TMDB'}
-                    </Button>
-                    <Button
                       onClick={() => setShowHeroEditor(true)}
                       variant="outline"
                       className="rounded-xl border-primary/30 text-primary hover:bg-primary/10 gap-2"
@@ -464,7 +359,8 @@ const Index = () => {
                   {/* 1. Films populaires */}
                   {films.length > 0 && (
                     <MediaRow
-                      title="🎬 Films populaires"
+                      title="Films populaires"
+                      titleIcon={<Film size={20} className="text-primary" />}
                       media={films.slice(0, 20)}
                       onSelect={handleSelectMedia}
                       onSeeMore={() => openCategoryPage('Films populaires', m => m.type === 'Film')}
@@ -477,7 +373,8 @@ const Index = () => {
                   {/* 2. Séries populaires */}
                   {series.length > 0 && (
                     <MediaRow
-                      title="📺 Séries populaires"
+                      title="Séries populaires"
+                      titleIcon={<Tv size={20} className="text-primary" />}
                       media={series.slice(0, 20)}
                       onSelect={handleSelectMedia}
                       onSeeMore={() => openCategoryPage('Séries populaires', m => m.type === 'Série')}
@@ -490,7 +387,8 @@ const Index = () => {
                   {/* 3. Films en 4K */}
                   {films.filter(f => f.quality === '4K').length > 0 && (
                     <MediaRow
-                      title="✨ Films en 4K"
+                      title="Films en 4K"
+                      titleIcon={<Sparkles size={20} className="text-primary" />}
                       media={films.filter(f => f.quality === '4K').slice(0, 20)}
                       onSelect={handleSelectMedia}
                       onSeeMore={() => openCategoryPage('Films en 4K', m => m.type === 'Film' && m.quality === '4K')}
@@ -503,7 +401,8 @@ const Index = () => {
                   {/* 4. Disponible en VF */}
                   {library.filter(m => m.language === 'VF').length > 0 && (
                     <MediaRow
-                      title="🇫🇷 Disponible en VF"
+                      title="Disponible en VF"
+                      titleIcon={<Globe size={20} className="text-primary" />}
                       media={library.filter(m => m.language === 'VF').slice(0, 20)}
                       onSelect={handleSelectMedia}
                       onSeeMore={() => openCategoryPage('Disponible en VF', m => m.language === 'VF')}
@@ -554,7 +453,8 @@ const Index = () => {
                   {/* 12. Ma liste */}
                   {watchlistMedia.length > 0 && (
                     <MediaRow
-                      title="📌 Ma liste"
+                      title="Ma liste"
+                      titleIcon={<Bookmark size={20} className="text-primary" />}
                       media={watchlistMedia.slice(0, 20)}
                       onSelect={handleSelectMedia}
                       onSeeMore={() => openCategoryPage('Ma liste', m => isInWatchlist(m.id))}
@@ -567,7 +467,8 @@ const Index = () => {
                   {/* 13. Favoris */}
                   {favoritesMedia.length > 0 && (
                     <MediaRow
-                      title="❤️ Favoris"
+                      title="Favoris"
+                      titleIcon={<Heart size={20} className="text-primary" />}
                       media={favoritesMedia.slice(0, 20)}
                       onSelect={handleSelectMedia}
                       onSeeMore={() => openCategoryPage('Favoris', m => isInFavorites(m.id))}

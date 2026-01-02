@@ -59,7 +59,7 @@ const Header = ({
       <div className="flex items-center justify-between gap-4">
         {/* Logo */}
         <div 
-          className="flex items-center gap-3 cursor-pointer group"
+          className="flex items-center gap-3 cursor-pointer group shrink-0"
           onClick={() => setView('home')}
         >
           <img 
@@ -69,10 +69,11 @@ const Header = ({
           />
           <div className="min-w-0">
             <h1 className="font-display text-lg md:text-xl font-bold tracking-tight text-foreground leading-none whitespace-nowrap">
-              <span className="hidden md:inline">GLOBAL CLASSIC TV</span>
-              <span className="inline md:hidden">GCTV</span>
+              <span className="hidden xl:inline">GLOBAL CLASSIC TV</span>
+              <span className="hidden lg:inline xl:hidden">GC TV</span>
+              <span className="inline lg:hidden">GCTV</span>
             </h1>
-            <p className="text-[8px] text-muted-foreground uppercase tracking-widest hidden md:block">
+            <p className="text-[8px] text-muted-foreground uppercase tracking-widest hidden xl:block">
               Streaming Premium
             </p>
           </div>

@@ -234,11 +234,11 @@ export const useMediaLibrary = () => {
 
   const isSeen = (mediaId: string) => seen.includes(mediaId);
 
-  const addMedia = (media: Omit<Media, 'id'> | Media) => {
+  const addMedia = (media: Omit<Media, 'id'> | Media, isManual: boolean = false) => {
     // If media already has an ID (from TMDB import), use it
     const newMedia = 'id' in media && media.id 
-      ? { ...media, updatedAt: Date.now() } as Media
-      : { ...media, id: crypto.randomUUID(), updatedAt: Date.now() } as Media;
+      ? { ...media, updatedAt: Date.now(), isManual: isManual || media.isManual } as Media
+      : { ...media, id: crypto.randomUUID(), updatedAt: Date.now(), isManual: true } as Media;
     saveLibrary([...library, newMedia]);
     return newMedia;
   };

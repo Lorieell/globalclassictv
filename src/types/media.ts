@@ -29,6 +29,8 @@ export interface Media {
   actors?: string;
   awards?: string;
   imdbId?: string;
+  tmdbId?: number;
+  isManual?: boolean; // True if added manually by admin (protected from auto-updates)
 }
 
 export interface HeroItem {

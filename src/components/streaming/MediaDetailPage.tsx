@@ -1,6 +1,8 @@
-import { ChevronLeft, Play, Plus, Check, Star, Eye } from 'lucide-react';
+import { useState } from 'react';
+import { ChevronLeft, Play, Plus, Check, Heart, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Media } from '@/types/media';
+import { cn } from '@/lib/utils';
 
 interface MediaDetailPageProps {
   media: Media;
@@ -8,6 +10,10 @@ interface MediaDetailPageProps {
   onPlay: (media: Media, seasonId?: string, episodeId?: string) => void;
   isInWatchlist: boolean;
   onToggleWatchlist: (mediaId: string) => void;
+  isInFavorites: boolean;
+  onToggleFavorite: (mediaId: string) => void;
+  isSeen: boolean;
+  onToggleSeen: (mediaId: string) => void;
 }
 
 const MediaDetailPage = ({ 
@@ -15,9 +21,26 @@ const MediaDetailPage = ({
   onBack, 
   onPlay,
   isInWatchlist,
-  onToggleWatchlist 
+  onToggleWatchlist,
+  isInFavorites,
+  onToggleFavorite,
+  isSeen,
+  onToggleSeen,
 }: MediaDetailPageProps) => {
-  const isSerie = media.type === 'Série';
+  const [seenAnimating, setSeenAnimating] = useState(false);
+  const [favoriteAnimating, setFavoriteAnimating] = useState(false);
+
+  const handleToggleSeen = () => {
+    setSeenAnimating(true);
+    onToggleSeen(media.id);
+    setTimeout(() => setSeenAnimating(false), 300);
+  };
+
+  const handleToggleFavorite = () => {
+    setFavoriteAnimating(true);
+    onToggleFavorite(media.id);
+    setTimeout(() => setFavoriteAnimating(false), 300);
+  };
 
   return (
     <div className="min-h-screen bg-background animate-fade-in p-4 md:p-8 max-w-[1400px] mx-auto">
@@ -78,17 +101,44 @@ const MediaDetailPage = ({
               </Button>
               <Button
                 variant="outline"
-                className="rounded-xl border-yellow-500/30 text-yellow-500 hover:bg-yellow-500/10 gap-2"
+                className={cn(
+                  "rounded-xl gap-2 transition-all duration-300",
+                  isInFavorites 
+                    ? "border-red-500 text-red-500 bg-red-500/10 hover:bg-red-500/20" 
+                    : "border-red-500/30 text-red-500/70 hover:bg-red-500/10 hover:text-red-500",
+                  favoriteAnimating && "scale-110"
+                )}
+                onClick={handleToggleFavorite}
               >
-                <Star size={16} />
-                Favoris
+                <Heart 
+                  size={16} 
+                  className={cn(
+                    "transition-all duration-300",
+                    isInFavorites && "fill-red-500",
+                    favoriteAnimating && "animate-pulse"
+                  )} 
+                />
+                {isInFavorites ? 'Favoris ♥' : 'Favoris'}
               </Button>
               <Button
                 variant="outline"
-                className="rounded-xl border-muted-foreground/30 text-muted-foreground hover:bg-muted/10 gap-2"
+                className={cn(
+                  "rounded-xl gap-2 transition-all duration-300",
+                  isSeen 
+                    ? "border-green-500 text-green-500 bg-green-500/10 hover:bg-green-500/20" 
+                    : "border-muted-foreground/30 text-muted-foreground hover:bg-muted/10",
+                  seenAnimating && "scale-110"
+                )}
+                onClick={handleToggleSeen}
               >
-                <Eye size={16} />
-                Vu
+                <Eye 
+                  size={16} 
+                  className={cn(
+                    "transition-all duration-300",
+                    seenAnimating && "animate-pulse"
+                  )}
+                />
+                {isSeen ? 'Vu ✓' : 'Marquer comme vu'}
               </Button>
             </div>
 

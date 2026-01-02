@@ -258,16 +258,16 @@ function getQualityLabel(rating: number, year: string, omdbData: OMDBData | null
   return 'HD';
 }
 
-async function transformMovieDetails(movie: TMDBMovieDetails): Promise<any> {
-  // Fetch OMDB data for additional info
-  const omdbData = movie.imdb_id ? await fetchFromOMDB(movie.imdb_id) : null;
+async function transformMovieDetails(movie: TMDBMovieDetails, fetchOmdb: boolean = false): Promise<any> {
+  // Only fetch OMDB data when explicitly requested (search mode)
+  const omdbData = fetchOmdb && movie.imdb_id ? await fetchFromOMDB(movie.imdb_id) : null;
   
   const genres = movie.genres.map(g => g.name).join(', ');
   const year = movie.release_date?.split('-')[0] || '';
   const language = getLanguageLabel(movie, omdbData);
   const quality = getQualityLabel(movie.vote_average, year, omdbData);
   
-  // Enrich with OMDB data
+  // Enrich with OMDB data if available
   const director = omdbData?.Director || '';
   const actors = omdbData?.Actors || '';
   const awards = omdbData?.Awards || '';
@@ -296,17 +296,17 @@ async function transformMovieDetails(movie: TMDBMovieDetails): Promise<any> {
   };
 }
 
-async function transformSeriesDetails(series: TMDBSeriesDetails): Promise<any> {
-  // Fetch OMDB data for additional info
+async function transformSeriesDetails(series: TMDBSeriesDetails, fetchOmdb: boolean = false): Promise<any> {
+  // Only fetch OMDB data when explicitly requested (search mode)
   const imdbId = series.external_ids?.imdb_id;
-  const omdbData = imdbId ? await fetchFromOMDB(imdbId) : null;
+  const omdbData = fetchOmdb && imdbId ? await fetchFromOMDB(imdbId) : null;
   
   const genres = series.genres.map(g => g.name).join(', ');
   const year = series.first_air_date?.split('-')[0] || '';
   const language = getLanguageLabel(series, omdbData);
   const quality = getQualityLabel(series.vote_average, year, omdbData);
   
-  // Enrich with OMDB data
+  // Enrich with OMDB data if available
   const director = omdbData?.Director || '';
   const actors = omdbData?.Actors || '';
   const awards = omdbData?.Awards || '';
@@ -366,7 +366,8 @@ serve(async (req) => {
         if (!movie.poster_path) continue;
         const details = await getMovieDetails(movie.id);
         if (details) {
-          const transformed = await transformMovieDetails(details);
+          // Use OMDB enrichment for search results
+          const transformed = await transformMovieDetails(details, true);
           if (!processedIds.has(transformed.id)) {
             processedIds.add(transformed.id);
             results.push(transformed);
@@ -380,7 +381,8 @@ serve(async (req) => {
         if (!series.poster_path) continue;
         const details = await getSeriesDetails(series.id);
         if (details) {
-          const transformed = await transformSeriesDetails(details);
+          // Use OMDB enrichment for search results
+          const transformed = await transformSeriesDetails(details, true);
           if (!processedIds.has(transformed.id)) {
             processedIds.add(transformed.id);
             results.push(transformed);

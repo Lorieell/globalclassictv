@@ -168,6 +168,24 @@ const MediaDetailPage = ({
               </div>
             )}
 
+            {/* Director & Actors */}
+            {(media.director || media.actors) && (
+              <div className="flex flex-wrap gap-6 text-sm">
+                {media.director && (
+                  <div>
+                    <span className="text-muted-foreground">Réalisateur : </span>
+                    <span className="text-foreground">{media.director}</span>
+                  </div>
+                )}
+                {media.actors && (
+                  <div>
+                    <span className="text-muted-foreground">Acteurs : </span>
+                    <span className="text-foreground">{media.actors}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Genres */}
             {media.genres && (
               <div>

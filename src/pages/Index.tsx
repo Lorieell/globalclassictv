@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Sliders, Plus, ArrowUp, Download, Loader2 } from 'lucide-react';
+import { Sliders, Plus, ArrowUp, Download, Loader2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import Header from '@/components/streaming/Header';
@@ -223,7 +223,49 @@ const Index = () => {
     updatePosition(mediaId, seasonId, episodeId);
   };
 
-  // Import TMDB content
+  // Reset library and reimport from TMDB
+  const handleResetAndImport = async () => {
+    if (!confirm('Êtes-vous sûr de vouloir vider la bibliothèque et réimporter tout depuis TMDB ?')) {
+      return;
+    }
+    
+    setIsImporting(true);
+    try {
+      // Clear localStorage
+      localStorage.removeItem('gctv-library');
+      localStorage.removeItem('gctv-hero');
+      
+      toast.info('Bibliothèque vidée, import en cours...');
+      
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tmdb-import`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'all', pages: 3 }),
+        }
+      );
+      
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        // Save directly to localStorage and reload
+        localStorage.setItem('gctv-library', JSON.stringify(result.data));
+        toast.success(`${result.data.length} contenus importés depuis TMDB`);
+        // Reload to refresh the state
+        window.location.reload();
+      } else {
+        toast.error(result.error || 'Erreur lors de l\'import');
+      }
+    } catch (error) {
+      console.error('TMDB import error:', error);
+      toast.error('Erreur de connexion au service d\'import');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  // Import TMDB content (add to existing)
   const handleImportTMDB = async () => {
     setIsImporting(true);
     try {
@@ -232,7 +274,7 @@ const Index = () => {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'all' }),
+          body: JSON.stringify({ type: 'all', pages: 2 }),
         }
       );
       
@@ -323,6 +365,19 @@ const Index = () => {
                 {isAdmin && (
                   <div className="flex justify-end gap-3 mb-4 px-4 md:px-8 max-w-[1600px] mx-auto flex-wrap">
                     <Button
+                      onClick={handleResetAndImport}
+                      disabled={isImporting}
+                      variant="outline"
+                      className="rounded-xl border-red-500/30 text-red-500 hover:bg-red-500/10 gap-2"
+                    >
+                      {isImporting ? (
+                        <Loader2 size={16} className="animate-spin" />
+                      ) : (
+                        <Trash2 size={16} />
+                      )}
+                      Réinitialiser + Import
+                    </Button>
+                    <Button
                       onClick={handleImportTMDB}
                       disabled={isImporting}
                       variant="outline"
@@ -333,7 +388,7 @@ const Index = () => {
                       ) : (
                         <Download size={16} />
                       )}
-                      {isImporting ? 'Import en cours...' : 'Importer TMDB'}
+                      {isImporting ? 'Import en cours...' : 'Ajouter TMDB'}
                     </Button>
                     <Button
                       onClick={() => setShowHeroEditor(true)}

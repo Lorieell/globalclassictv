@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
-import { X, Plus, Save, Trash2, Image, Type, FileText, Link } from 'lucide-react';
+import { X, Plus, Save, Trash2, Image, Type, FileText, Link, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import type { HeroItem } from '@/types/media';
+import type { HeroItem, Media } from '@/types/media';
 
 interface HeroEditorModalProps {
   isOpen: boolean;
   heroItems: HeroItem[];
-  mediaOptions: { id: string; title: string }[];
+  mediaOptions: Media[];
   onClose: () => void;
   onSave: (items: HeroItem[]) => void;
 }
@@ -28,7 +28,7 @@ const HeroEditorModal = ({ isOpen, heroItems, mediaOptions, onClose, onSave }: H
       title: 'Nouveau Slide',
       description: 'Description du slide...',
       image: '',
-      mediaId: mediaOptions[0]?.id || '',
+      mediaId: '',
     };
     setItems([...items, newItem]);
   };
@@ -37,6 +37,28 @@ const HeroEditorModal = ({ isOpen, heroItems, mediaOptions, onClose, onSave }: H
     setItems(items.map(item => 
       item.id === id ? { ...item, [field]: value } : item
     ));
+  };
+
+  // Auto-fill fields when media is selected
+  const handleMediaSelect = (itemId: string, mediaId: string) => {
+    const selectedMedia = mediaOptions.find(m => m.id === mediaId);
+    if (selectedMedia) {
+      setItems(items.map(item => 
+        item.id === itemId ? {
+          ...item,
+          mediaId: mediaId,
+          title: selectedMedia.title.toUpperCase(),
+          description: selectedMedia.description || selectedMedia.synopsis || 'Aucune description disponible.',
+          image: (selectedMedia as any).backdrop || selectedMedia.image || '',
+        } : item
+      ));
+      toast({
+        title: "Champs remplis automatiquement",
+        description: `Données de "${selectedMedia.title}" appliquées`,
+      });
+    } else {
+      updateItem(itemId, 'mediaId', mediaId);
+    }
   };
 
   const removeItem = (id: string) => {
@@ -65,7 +87,7 @@ const HeroEditorModal = ({ isOpen, heroItems, mediaOptions, onClose, onSave }: H
         </div>
 
         <p className="text-muted-foreground text-sm mb-6">
-          Configurez les slides qui apparaissent en haut de la page d'accueil. Chaque slide peut être lié à un média du catalogue.
+          Configurez les slides qui apparaissent en haut de la page d'accueil. <span className="text-primary">Sélectionnez un média pour remplir automatiquement les champs.</span>
         </p>
 
         <div className="space-y-4 mb-6">
@@ -90,6 +112,25 @@ const HeroEditorModal = ({ isOpen, heroItems, mediaOptions, onClose, onSave }: H
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-3">
+                  {/* Media Selection - First for auto-fill */}
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-2">
+                      <Wand2 size={12} className="text-primary" /> Média associé <span className="text-primary">(auto-remplissage)</span>
+                    </label>
+                    <select
+                      value={item.mediaId}
+                      onChange={(e) => handleMediaSelect(item.id, e.target.value)}
+                      className="w-full bg-background/50 border border-primary/30 rounded-xl px-4 py-2.5 outline-none focus:border-primary/50 text-sm text-foreground"
+                    >
+                      <option value="">-- Sélectionner un média --</option>
+                      {mediaOptions.map(media => (
+                        <option key={media.id} value={media.id}>
+                          {media.title} ({media.type})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   <div>
                     <label className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-2">
                       <Type size={12} /> Titre
@@ -126,24 +167,6 @@ const HeroEditorModal = ({ isOpen, heroItems, mediaOptions, onClose, onSave }: H
                       placeholder="https://..."
                       className="w-full bg-background/50 border border-border/50 rounded-xl px-4 py-2.5 outline-none focus:border-primary/50 text-sm text-foreground"
                     />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-2">
-                      <Link size={12} /> Média associé
-                    </label>
-                    <select
-                      value={item.mediaId}
-                      onChange={(e) => updateItem(item.id, 'mediaId', e.target.value)}
-                      className="w-full bg-background/50 border border-border/50 rounded-xl px-4 py-2.5 outline-none focus:border-primary/50 text-sm text-foreground"
-                    >
-                      <option value="">-- Sélectionner --</option>
-                      {mediaOptions.map(media => (
-                        <option key={media.id} value={media.id}>
-                          {media.title}
-                        </option>
-                      ))}
-                    </select>
                   </div>
                 </div>
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronLeft, Play, Plus, Check, Heart, Eye } from 'lucide-react';
+import { ChevronLeft, Play, Plus, Check, Heart, Eye, Film, Clapperboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Media } from '@/types/media';
 import { cn } from '@/lib/utils';
@@ -118,7 +118,7 @@ const MediaDetailPage = ({
                     favoriteAnimating && "animate-pulse"
                   )} 
                 />
-                {isInFavorites ? 'Favoris ♥' : 'Favoris'}
+                Favoris
               </Button>
               <Button
                 variant="outline"
@@ -138,7 +138,7 @@ const MediaDetailPage = ({
                     seenAnimating && "animate-pulse"
                   )}
                 />
-                {isSeen ? 'Vu ✓' : 'Marquer comme vu'}
+                {isSeen ? 'Vu' : 'Marquer comme vu'}
               </Button>
             </div>
 
@@ -172,13 +172,15 @@ const MediaDetailPage = ({
             {(media.director || media.actors) && (
               <div className="flex flex-wrap gap-6 text-sm">
                 {media.director && (
-                  <div>
+                  <div className="flex items-center gap-2">
+                    <Clapperboard size={14} className="text-muted-foreground" />
                     <span className="text-muted-foreground">Réalisateur : </span>
                     <span className="text-foreground">{media.director}</span>
                   </div>
                 )}
                 {media.actors && (
-                  <div>
+                  <div className="flex items-center gap-2">
+                    <Film size={14} className="text-muted-foreground" />
                     <span className="text-muted-foreground">Acteurs : </span>
                     <span className="text-foreground">{media.actors}</span>
                   </div>

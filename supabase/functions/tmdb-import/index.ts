@@ -11,68 +11,31 @@ const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/w500';
 const TMDB_BACKDROP_BASE = 'https://image.tmdb.org/t/p/original';
 
-interface TMDBMovie {
+interface TMDBMovieDetails {
   id: number;
   title: string;
   overview: string;
   poster_path: string | null;
   backdrop_path: string | null;
-  genre_ids: number[];
+  genres: { id: number; name: string }[];
   release_date: string;
   vote_average: number;
+  runtime: number;
+  original_language: string;
 }
 
-interface TMDBSeries {
+interface TMDBSeriesDetails {
   id: number;
   name: string;
   overview: string;
   poster_path: string | null;
   backdrop_path: string | null;
-  genre_ids: number[];
+  genres: { id: number; name: string }[];
   first_air_date: string;
   vote_average: number;
+  number_of_seasons: number;
+  original_language: string;
 }
-
-const MOVIE_GENRES: Record<number, string> = {
-  28: 'Action',
-  12: 'Aventure',
-  16: 'Animation',
-  35: 'Comédie',
-  80: 'Crime',
-  99: 'Documentaire',
-  18: 'Drame',
-  10751: 'Famille',
-  14: 'Fantastique',
-  36: 'Histoire',
-  27: 'Horreur',
-  10402: 'Musique',
-  9648: 'Mystère',
-  10749: 'Romance',
-  878: 'Science-Fiction',
-  10770: 'Téléfilm',
-  53: 'Thriller',
-  10752: 'Guerre',
-  37: 'Western',
-};
-
-const TV_GENRES: Record<number, string> = {
-  10759: 'Action & Aventure',
-  16: 'Animation',
-  35: 'Comédie',
-  80: 'Crime',
-  99: 'Documentaire',
-  18: 'Drame',
-  10751: 'Famille',
-  10762: 'Enfants',
-  9648: 'Mystère',
-  10763: 'News',
-  10764: 'Réalité',
-  10765: 'Sci-Fi & Fantastique',
-  10766: 'Soap',
-  10767: 'Talk',
-  10768: 'Guerre & Politique',
-  37: 'Western',
-};
 
 async function fetchFromTMDB(endpoint: string, params: Record<string, string> = {}) {
   const url = new URL(`${TMDB_BASE_URL}${endpoint}`);
@@ -89,32 +52,29 @@ async function fetchFromTMDB(endpoint: string, params: Record<string, string> = 
   return response.json();
 }
 
-async function checkFrenchAvailability(id: number, type: 'movie' | 'tv'): Promise<{ vf: boolean; vostfr: boolean }> {
+async function getMovieDetails(id: number): Promise<TMDBMovieDetails | null> {
   try {
-    const endpoint = type === 'movie' ? `/movie/${id}` : `/tv/${id}`;
-    const details = await fetchFromTMDB(endpoint, { append_to_response: 'translations' });
-    
-    const translations = details.translations?.translations || [];
-    const hasFrench = translations.some((t: any) => 
-      t.iso_639_1 === 'fr' && (t.data?.title || t.data?.name)
-    );
-    
-    // If it has French translation or is a French production, consider it VF/VOSTFR available
-    const isVF = hasFrench || details.original_language === 'fr';
-    const isVOSTFR = hasFrench && details.original_language !== 'fr';
-    
-    return { vf: isVF, vostfr: isVOSTFR };
+    const details = await fetchFromTMDB(`/movie/${id}`);
+    return details;
   } catch (error) {
-    console.error(`Error checking French availability for ${type} ${id}:`, error);
-    return { vf: false, vostfr: true }; // Default to VOSTFR if we can't check
+    console.error(`Error fetching movie ${id}:`, error);
+    return null;
   }
 }
 
-function transformMovie(movie: TMDBMovie, language: string): any {
-  const genres = movie.genre_ids
-    .map(id => MOVIE_GENRES[id])
-    .filter(Boolean)
-    .join(', ');
+async function getSeriesDetails(id: number): Promise<TMDBSeriesDetails | null> {
+  try {
+    const details = await fetchFromTMDB(`/tv/${id}`);
+    return details;
+  } catch (error) {
+    console.error(`Error fetching series ${id}:`, error);
+    return null;
+  }
+}
+
+function transformMovieDetails(movie: TMDBMovieDetails): any {
+  const genres = movie.genres.map(g => g.name).join(', ');
+  const isVF = movie.original_language === 'fr';
   
   return {
     id: `tmdb-movie-${movie.id}`,
@@ -123,22 +83,20 @@ function transformMovie(movie: TMDBMovie, language: string): any {
     type: 'Film',
     description: movie.overview?.slice(0, 200) || 'Aucune description disponible.',
     synopsis: movie.overview || 'Aucune description disponible.',
-    genres,
+    genres: genres || 'Drame',
     quality: 'HD',
-    language,
+    language: isVF ? 'VF' : 'VOSTFR',
     rating: movie.vote_average,
     year: movie.release_date?.split('-')[0] || '',
     backdrop: movie.backdrop_path ? `${TMDB_BACKDROP_BASE}${movie.backdrop_path}` : '',
     tmdbId: movie.id,
-    videoUrls: '', // Placeholder - needs actual video source
+    videoUrls: '',
   };
 }
 
-function transformSeries(series: TMDBSeries, language: string): any {
-  const genres = series.genre_ids
-    .map(id => TV_GENRES[id] || MOVIE_GENRES[id])
-    .filter(Boolean)
-    .join(', ');
+function transformSeriesDetails(series: TMDBSeriesDetails): any {
+  const genres = series.genres.map(g => g.name).join(', ');
+  const isVF = series.original_language === 'fr';
   
   return {
     id: `tmdb-tv-${series.id}`,
@@ -147,14 +105,14 @@ function transformSeries(series: TMDBSeries, language: string): any {
     type: 'Série',
     description: series.overview?.slice(0, 200) || 'Aucune description disponible.',
     synopsis: series.overview || 'Aucune description disponible.',
-    genres,
+    genres: genres || 'Drame',
     quality: 'HD',
-    language,
+    language: isVF ? 'VF' : 'VOSTFR',
     rating: series.vote_average,
     year: series.first_air_date?.split('-')[0] || '',
     backdrop: series.backdrop_path ? `${TMDB_BACKDROP_BASE}${series.backdrop_path}` : '',
     tmdbId: series.id,
-    seasons: [], // Would need to fetch seasons details
+    seasons: [],
   };
 }
 
@@ -165,79 +123,91 @@ serve(async (req) => {
   }
 
   try {
-    const { type = 'all', category = 'popular', page = 1 } = await req.json().catch(() => ({}));
+    const { type = 'all', pages = 3 } = await req.json().catch(() => ({}));
     
-    console.log(`Importing TMDB content: type=${type}, category=${category}, page=${page}`);
+    console.log(`Importing TMDB content: type=${type}, pages=${pages}`);
     
     const results: any[] = [];
+    const processedIds = new Set<number>();
     
-    // Fetch popular/trending movies
+    // Fetch movies from multiple pages and categories
     if (type === 'all' || type === 'movies') {
       console.log('Fetching movies...');
       
-      // Popular movies
-      const popularMovies = await fetchFromTMDB('/movie/popular', { page: String(page) });
-      // Top rated movies
-      const topRatedMovies = await fetchFromTMDB('/movie/top_rated', { page: String(page) });
-      // Now playing
-      const nowPlayingMovies = await fetchFromTMDB('/movie/now_playing', { page: String(page) });
-      
-      const allMovies = [
-        ...popularMovies.results.slice(0, 10),
-        ...topRatedMovies.results.slice(0, 10),
-        ...nowPlayingMovies.results.slice(0, 10),
+      const movieEndpoints = [
+        '/movie/popular',
+        '/movie/top_rated',
+        '/movie/now_playing',
+        '/movie/upcoming',
       ];
       
-      // Remove duplicates
-      const uniqueMovies = allMovies.filter((movie, index, self) => 
-        index === self.findIndex(m => m.id === movie.id)
-      );
-      
-      for (const movie of uniqueMovies) {
-        if (!movie.poster_path) continue;
-        
-        const { vf, vostfr } = await checkFrenchAvailability(movie.id, 'movie');
-        const language = vf ? 'VF' : 'VOSTFR';
-        
-        results.push(transformMovie(movie, language));
+      for (const endpoint of movieEndpoints) {
+        for (let page = 1; page <= pages; page++) {
+          try {
+            const response = await fetchFromTMDB(endpoint, { page: String(page) });
+            
+            for (const movie of response.results) {
+              if (processedIds.has(movie.id) || !movie.poster_path) continue;
+              processedIds.add(movie.id);
+              
+              // Get full details for complete genres and synopsis
+              const details = await getMovieDetails(movie.id);
+              if (details && details.overview) {
+                results.push(transformMovieDetails(details));
+              }
+              
+              // Small delay to avoid rate limiting
+              await new Promise(resolve => setTimeout(resolve, 50));
+            }
+          } catch (error) {
+            console.error(`Error fetching ${endpoint} page ${page}:`, error);
+          }
+        }
       }
       
-      console.log(`Fetched ${results.length} movies`);
+      console.log(`Fetched ${results.length} movies with full details`);
     }
     
-    // Fetch popular/trending series
+    // Fetch series from multiple pages and categories
     if (type === 'all' || type === 'series') {
       console.log('Fetching series...');
       
-      // Popular series
-      const popularSeries = await fetchFromTMDB('/tv/popular', { page: String(page) });
-      // Top rated series
-      const topRatedSeries = await fetchFromTMDB('/tv/top_rated', { page: String(page) });
-      // On the air
-      const onAirSeries = await fetchFromTMDB('/tv/on_the_air', { page: String(page) });
-      
-      const allSeries = [
-        ...popularSeries.results.slice(0, 10),
-        ...topRatedSeries.results.slice(0, 10),
-        ...onAirSeries.results.slice(0, 10),
+      const seriesEndpoints = [
+        '/tv/popular',
+        '/tv/top_rated',
+        '/tv/on_the_air',
+        '/tv/airing_today',
       ];
       
-      // Remove duplicates
-      const uniqueSeries = allSeries.filter((series, index, self) => 
-        index === self.findIndex(s => s.id === series.id)
-      );
+      const seriesStartCount = results.length;
       
-      const seriesStartIndex = results.length;
-      for (const series of uniqueSeries) {
-        if (!series.poster_path) continue;
-        
-        const { vf, vostfr } = await checkFrenchAvailability(series.id, 'tv');
-        const language = vf ? 'VF' : 'VOSTFR';
-        
-        results.push(transformSeries(series, language));
+      for (const endpoint of seriesEndpoints) {
+        for (let page = 1; page <= pages; page++) {
+          try {
+            const response = await fetchFromTMDB(endpoint, { page: String(page) });
+            
+            for (const series of response.results) {
+              // Use negative offset to avoid ID collision with movies
+              const uniqueId = series.id + 1000000;
+              if (processedIds.has(uniqueId) || !series.poster_path) continue;
+              processedIds.add(uniqueId);
+              
+              // Get full details for complete genres and synopsis
+              const details = await getSeriesDetails(series.id);
+              if (details && details.overview) {
+                results.push(transformSeriesDetails(details));
+              }
+              
+              // Small delay to avoid rate limiting
+              await new Promise(resolve => setTimeout(resolve, 50));
+            }
+          } catch (error) {
+            console.error(`Error fetching ${endpoint} page ${page}:`, error);
+          }
+        }
       }
       
-      console.log(`Fetched ${results.length - seriesStartIndex} series`);
+      console.log(`Fetched ${results.length - seriesStartCount} series with full details`);
     }
     
     console.log(`Total content fetched: ${results.length} items`);

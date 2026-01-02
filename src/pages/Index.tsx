@@ -400,7 +400,7 @@ const Index = () => {
                   {/* Dynamic rotating genre rows for films - changes weekly */}
                   {rotatingFilmGenres.map(genre => {
                     const genreFilms = getFilmsByGenre(genre);
-                    if (genreFilms.length < 2) return null;
+                    if (genreFilms.length < 1) return null;
                     return (
                       <MediaRow
                         key={`film-${genre}`}
@@ -420,7 +420,7 @@ const Index = () => {
                   {/* Dynamic rotating genre rows for series - changes weekly */}
                   {rotatingSeriesGenres.map(genre => {
                     const genreSeries = getSeriesByGenre(genre);
-                    if (genreSeries.length < 2) return null;
+                    if (genreSeries.length < 1) return null;
                     return (
                       <MediaRow
                         key={`serie-${genre}`}

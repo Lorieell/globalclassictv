@@ -600,7 +600,7 @@ const Index = () => {
       <HeroEditorModal
         isOpen={showHeroEditor}
         heroItems={heroItems}
-        mediaOptions={library.map(m => ({ id: m.id, title: m.title }))}
+        mediaOptions={library}
         onClose={() => setShowHeroEditor(false)}
         onSave={handleSaveHeroItems}
       />

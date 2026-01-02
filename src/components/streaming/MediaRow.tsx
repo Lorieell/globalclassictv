@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, ReactNode } from 'react';
 import { ChevronRight, ChevronLeft } from 'lucide-react';
 import MediaCard from './MediaCard';
 import type { Media } from '@/types/media';
@@ -7,6 +7,7 @@ export type RowLayoutType = 'scroll' | 'grid' | 'compact' | 'featured';
 
 interface MediaRowProps {
   title: string;
+  titleIcon?: ReactNode;
   media: Media[];
   onSelect: (media: Media) => void;
   onSeeMore?: () => void;
@@ -18,6 +19,7 @@ interface MediaRowProps {
 
 const MediaRow = ({ 
   title, 
+  titleIcon,
   media, 
   onSelect, 
   onSeeMore,
@@ -53,7 +55,8 @@ const MediaRow = ({
   if (layout === 'grid') {
     return (
       <section className="mb-8">
-        <div className="flex items-center gap-4 mb-4 px-2">
+        <div className="flex items-center gap-2 mb-4 px-2">
+          {titleIcon}
           <h2 className="text-lg md:text-xl font-bold text-foreground">{title}</h2>
           {onSeeMore && (
             <button 
@@ -85,7 +88,8 @@ const MediaRow = ({
   if (layout === 'compact') {
     return (
       <section className="mb-6">
-        <div className="flex items-center gap-4 mb-3 px-2">
+        <div className="flex items-center gap-2 mb-3 px-2">
+          {titleIcon}
           <h2 className="text-base md:text-lg font-bold text-foreground">{title}</h2>
           {onSeeMore && (
             <button 
@@ -125,7 +129,8 @@ const MediaRow = ({
     const [featured, ...rest] = media;
     return (
       <section className="mb-8">
-        <div className="flex items-center gap-4 mb-4 px-2">
+        <div className="flex items-center gap-2 mb-4 px-2">
+          {titleIcon}
           <h2 className="text-lg md:text-xl font-bold text-foreground">{title}</h2>
           {onSeeMore && (
             <button 
@@ -185,7 +190,8 @@ const MediaRow = ({
   return (
     <section className="mb-8 group/section">
       {/* Header */}
-      <div className="flex items-center gap-4 mb-4 px-2">
+      <div className="flex items-center gap-2 mb-4 px-2">
+        {titleIcon}
         <h2 className="text-lg md:text-xl font-bold text-foreground">
           {title}
         </h2>

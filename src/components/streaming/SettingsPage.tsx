@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ArrowLeft, Link2, Megaphone, Palette, FolderOpen, Instagram, Youtube, Twitter, Sun, Moon, Monitor, Plus, X, Upload, Film, Tv, BookOpen, Music, Gamepad2, Mic, Globe, Sparkles, Heart, Skull, Laugh, Zap, Sword, Ghost, Rocket, Theater, Baby, Search, Mountain, Users, List, Check, Pencil, Play, RefreshCw, Loader2, type LucideIcon } from 'lucide-react';
+import { ArrowLeft, Link2, Megaphone, Palette, FolderOpen, Instagram, Youtube, Twitter, Sun, Moon, Monitor, Plus, X, Upload, Film, Tv, BookOpen, Music, Gamepad2, Mic, Globe, Sparkles, Heart, Skull, Laugh, Zap, Sword, Ghost, Rocket, Theater, Baby, Search, Mountain, Users, List, Check, Pencil, Play, RefreshCw, Loader2, Trash2, Download, Database, type LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -97,6 +97,7 @@ interface SettingsPageProps {
   onBack: () => void;
   library?: Media[];
   onEditMedia?: (media: Media) => void;
+  onAddMedia?: (media: Media) => void;
 }
 
 const SOCIAL_STORAGE_KEY = 'gctv-social-links';
@@ -187,7 +188,7 @@ const applyAccentColor = (hexColor: string) => {
   document.documentElement.style.setProperty('--ring', `${hue} ${saturation}% ${lightness}%`);
 };
 
-const SettingsPage = ({ onBack, library = [], onEditMedia }: SettingsPageProps) => {
+const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia }: SettingsPageProps) => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('links');
   
   // Links state
@@ -325,6 +326,8 @@ const SettingsPage = ({ onBack, library = [], onEditMedia }: SettingsPageProps) 
   const [listeFilter, setListeFilter] = useState<'all' | 'with-video' | 'without-video'>('all');
   const [listeSearch, setListeSearch] = useState('');
   const [isRunningMaintenance, setIsRunningMaintenance] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [isCheckingAPI, setIsCheckingAPI] = useState(false);
 
   const filteredLibrary = library.filter(media => {
     const matchesSearch = listeSearch.trim() === '' || 
@@ -366,7 +369,132 @@ const SettingsPage = ({ onBack, library = [], onEditMedia }: SettingsPageProps) 
       console.error('Maintenance error:', error);
       toast.error('Erreur de connexion au service de maintenance');
     } finally {
-      setIsRunningMaintenance(false);
+    setIsRunningMaintenance(false);
+    }
+  };
+
+  // Reset library and reimport from TMDB
+  const handleResetAndImport = async () => {
+    if (!confirm('Êtes-vous sûr de vouloir vider la bibliothèque et réimporter tout depuis TMDB ?')) {
+      return;
+    }
+    
+    setIsImporting(true);
+    try {
+      localStorage.removeItem('gctv-library');
+      localStorage.removeItem('gctv-hero');
+      
+      toast.info('Bibliothèque vidée, import en cours...');
+      
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tmdb-import`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'all', pages: 5 }),
+        }
+      );
+      
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        localStorage.setItem('gctv-library', JSON.stringify(result.data));
+        toast.success(`${result.data.length} contenus importés depuis TMDB`);
+        window.location.reload();
+      } else {
+        toast.error(result.error || 'Erreur lors de l\'import');
+      }
+    } catch (error) {
+      console.error('TMDB import error:', error);
+      toast.error('Erreur de connexion au service d\'import');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  // Import TMDB content (add to existing)
+  const handleImportTMDB = async () => {
+    setIsImporting(true);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tmdb-import`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'all', pages: 5 }),
+        }
+      );
+      
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        let addedCount = 0;
+        for (const media of result.data) {
+          const exists = library.some(m => m.id === media.id || m.title === media.title);
+          if (!exists && onAddMedia) {
+            onAddMedia(media);
+            addedCount++;
+          }
+        }
+        toast.success(`${addedCount} nouveaux contenus importés depuis TMDB`);
+        if (addedCount > 0) {
+          window.location.reload();
+        }
+      } else {
+        toast.error(result.error || 'Erreur lors de l\'import');
+      }
+    } catch (error) {
+      console.error('TMDB import error:', error);
+      toast.error('Erreur de connexion au service d\'import');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  // Check and add missing TMDB/OMDB content
+  const handleCheckMissingContent = async () => {
+    setIsCheckingAPI(true);
+    try {
+      toast.info('Vérification des contenus manquants en cours...');
+      
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tmdb-import`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'all', pages: 10 }),
+        }
+      );
+      
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        const existingIds = new Set(library.map(m => m.id));
+        const existingTitles = new Set(library.map(m => m.title.toLowerCase()));
+        
+        let addedCount = 0;
+        for (const media of result.data) {
+          const isDuplicate = existingIds.has(media.id) || existingTitles.has(media.title.toLowerCase());
+          if (!isDuplicate && onAddMedia) {
+            onAddMedia(media);
+            addedCount++;
+          }
+        }
+        
+        if (addedCount > 0) {
+          toast.success(`${addedCount} contenus manquants ajoutés depuis TMDB`);
+          window.location.reload();
+        } else {
+          toast.success('Aucun contenu manquant détecté, la bibliothèque est à jour');
+        }
+      } else {
+        toast.error(result.error || 'Erreur lors de la vérification');
+      }
+    } catch (error) {
+      console.error('API check error:', error);
+      toast.error('Erreur de connexion au service de vérification');
+    } finally {
+      setIsCheckingAPI(false);
     }
   };
 
@@ -485,7 +613,7 @@ const SettingsPage = ({ onBack, library = [], onEditMedia }: SettingsPageProps) 
 
                 {/* Explanation */}
                 <div className="bg-muted/30 border border-border/30 rounded-lg p-4 text-sm text-muted-foreground">
-                  <p className="mb-2"><strong>💡 Comment ça marche ?</strong></p>
+                  <p className="mb-2"><strong>Comment ça marche ?</strong></p>
                   <p>Les pubs s'affichent sur les côtés de la page de détails des films/séries. Vous pouvez :</p>
                   <ul className="list-disc list-inside mt-2 space-y-1">
                     <li>Glisser-déposer une image ou entrer une URL</li>
@@ -780,6 +908,52 @@ const SettingsPage = ({ onBack, library = [], onEditMedia }: SettingsPageProps) 
                   <p className="text-muted-foreground text-sm">
                     Gérez tous les contenus et vérifiez ceux qui ont une vidéo uploadée.
                   </p>
+                </div>
+
+                {/* Import Buttons */}
+                <div className="bg-card/50 border border-border/50 rounded-xl p-4 space-y-3">
+                  <h3 className="font-semibold text-foreground mb-3">Gestion des imports</h3>
+                  <div className="flex flex-wrap gap-3">
+                    <Button
+                      onClick={handleResetAndImport}
+                      disabled={isImporting}
+                      variant="outline"
+                      className="gap-2 border-red-500/30 text-red-500 hover:bg-red-500/10"
+                    >
+                      {isImporting ? (
+                        <Loader2 size={16} className="animate-spin" />
+                      ) : (
+                        <Trash2 size={16} />
+                      )}
+                      Réinitialiser + Import
+                    </Button>
+                    <Button
+                      onClick={handleImportTMDB}
+                      disabled={isImporting}
+                      variant="outline"
+                      className="gap-2 border-green-500/30 text-green-500 hover:bg-green-500/10"
+                    >
+                      {isImporting ? (
+                        <Loader2 size={16} className="animate-spin" />
+                      ) : (
+                        <Download size={16} />
+                      )}
+                      Ajouter TMDB
+                    </Button>
+                    <Button
+                      onClick={handleCheckMissingContent}
+                      disabled={isCheckingAPI}
+                      variant="outline"
+                      className="gap-2 border-blue-500/30 text-blue-500 hover:bg-blue-500/10"
+                    >
+                      {isCheckingAPI ? (
+                        <Loader2 size={16} className="animate-spin" />
+                      ) : (
+                        <Database size={16} />
+                      )}
+                      Vérifier contenus manquants
+                    </Button>
+                  </div>
                 </div>
 
                 {/* Maintenance Button */}

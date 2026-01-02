@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
-import { ArrowUp, Sliders } from 'lucide-react';
+import { useEffect, useState, useMemo } from 'react';
+import { ArrowUp, Sliders, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Header from '@/components/streaming/Header';
 import HeroSection from '@/components/streaming/HeroSection';
 import ResumeSection from '@/components/streaming/ResumeSection';
-import MediaGrid from '@/components/streaming/MediaGrid';
+import MediaRow from '@/components/streaming/MediaRow';
+import CategoryPage from '@/components/streaming/CategoryPage';
 import MediaDetailPage from '@/components/streaming/MediaDetailPage';
 import VideoPlayer from '@/components/streaming/VideoPlayer';
 import AdminLoginModal from '@/components/streaming/AdminLoginModal';
@@ -13,17 +14,20 @@ import HeroEditorModal from '@/components/streaming/HeroEditorModal';
 import SettingsPage from '@/components/streaming/SettingsPage';
 import GlobalAds from '@/components/streaming/GlobalAds';
 import Footer from '@/components/streaming/Footer';
-import { type LayoutType } from '@/components/streaming/LayoutToggle';
 import { useMediaLibrary } from '@/hooks/useMediaLibrary';
 import { useAdmin } from '@/hooks/useAdmin';
 import type { Media, HeroItem } from '@/types/media';
 
-type ViewType = 'home' | 'films' | 'series' | 'watchlist' | 'detail' | 'player' | 'settings';
+type ViewType = 'home' | 'films' | 'series' | 'watchlist' | 'detail' | 'player' | 'settings' | 'category';
 
-const LAYOUT_STORAGE_KEY = 'gctv-layout';
+interface CategoryView {
+  title: string;
+  filter: (media: Media) => boolean;
+}
 
 const Index = () => {
   const [view, setView] = useState<ViewType>('home');
+  const [categoryView, setCategoryView] = useState<CategoryView | null>(null);
   const [selectedMedia, setSelectedMedia] = useState<Media | null>(null);
   const [playerSeasonId, setPlayerSeasonId] = useState<string | undefined>();
   const [playerEpisodeId, setPlayerEpisodeId] = useState<string | undefined>();
@@ -31,15 +35,6 @@ const Index = () => {
   const [showEditor, setShowEditor] = useState(false);
   const [showHeroEditor, setShowHeroEditor] = useState(false);
   const [editingMedia, setEditingMedia] = useState<Partial<Media> | null>(null);
-  const [layout, setLayout] = useState<LayoutType>(() => {
-    const stored = localStorage.getItem(LAYOUT_STORAGE_KEY);
-    return (stored as LayoutType) || 'grid';
-  });
-
-  const handleLayoutChange = (newLayout: LayoutType) => {
-    setLayout(newLayout);
-    localStorage.setItem(LAYOUT_STORAGE_KEY, newLayout);
-  };
 
   const { 
     library, 
@@ -68,6 +63,38 @@ const Index = () => {
     window.addEventListener('gctv-open-settings', listener);
     return () => window.removeEventListener('gctv-open-settings', listener);
   }, []);
+
+  // Get unique genres from library
+  const allGenres = useMemo(() => {
+    const genreSet = new Set<string>();
+    library.forEach(m => {
+      if (m.genres) {
+        m.genres.split(',').forEach(g => genreSet.add(g.trim()));
+      }
+    });
+    return Array.from(genreSet).sort();
+  }, [library]);
+
+  // Filter media by genre
+  const getMediaByGenre = (genre: string) => {
+    return library.filter(m => m.genres?.toLowerCase().includes(genre.toLowerCase()));
+  };
+
+  // Filter films by genre
+  const getFilmsByGenre = (genre: string) => {
+    return films.filter(m => m.genres?.toLowerCase().includes(genre.toLowerCase()));
+  };
+
+  // Filter series by genre
+  const getSeriesByGenre = (genre: string) => {
+    return series.filter(m => m.genres?.toLowerCase().includes(genre.toLowerCase()));
+  };
+
+  // Open category page
+  const openCategoryPage = (title: string, filter: (media: Media) => boolean) => {
+    setCategoryView({ title, filter });
+    setView('category');
+  };
 
   // Go to detail page when clicking a media card
   const handleSelectMedia = (media: Media) => {
@@ -125,11 +152,12 @@ const Index = () => {
       if (selectedMedia?.type === 'Film') {
         updateProgress(selectedMedia.id, 100);
       }
-
-      // Go back to detail page
       setView('detail');
       setPlayerSeasonId(undefined);
       setPlayerEpisodeId(undefined);
+    } else if (view === 'category') {
+      setCategoryView(null);
+      setView('home');
     } else {
       setSelectedMedia(null);
       setView('home');
@@ -168,15 +196,15 @@ const Index = () => {
     updatePosition(mediaId, seasonId, episodeId);
   };
 
-  const currentLibrary = view === 'films' ? films : view === 'series' ? series : view === 'watchlist' ? watchlistMedia : library;
-  const gridTitle = view === 'films' ? 'Films' : view === 'series' ? 'Séries' : view === 'watchlist' ? 'Ma Watchlist' : 'Tout le catalogue';
-  const gridIcon = view === 'films' ? 'film' : view === 'series' ? 'serie' : view === 'watchlist' ? 'watchlist' : 'all';
+  // Define sections for Prime Video style layout
+  const genresWithFilms = allGenres.filter(g => getFilmsByGenre(g).length > 0);
+  const genresWithSeries = allGenres.filter(g => getSeriesByGenre(g).length > 0);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Header
-        view={view}
-        setView={setView}
+        view={view === 'category' ? 'home' : view}
+        setView={(v) => { setCategoryView(null); setView(v as ViewType); }}
         isAdmin={isAdmin}
         onAdminClick={() => setShowAdminLogin(true)}
         onLogout={logout}
@@ -204,13 +232,23 @@ const Index = () => {
             isInWatchlist={isInWatchlist(selectedMedia.id)}
             onToggleWatchlist={toggleWatchlist}
           />
+        ) : view === 'category' && categoryView ? (
+          <CategoryPage
+            title={categoryView.title}
+            media={library.filter(categoryView.filter)}
+            onBack={handleBack}
+            onSelect={handleSelectMedia}
+            isAdmin={isAdmin}
+            onEdit={handleEditMedia}
+            onDelete={deleteMedia}
+          />
         ) : (
-          <div className="p-4 md:p-8 max-w-[1600px] mx-auto">
+          <div className="py-4">
             {view === 'home' && (
               <>
-                {/* Admin Hero Editor Button */}
+                {/* Admin Controls */}
                 {isAdmin && (
-                  <div className="flex justify-end mb-4">
+                  <div className="flex justify-end gap-3 mb-4 px-4 md:px-8 max-w-[1600px] mx-auto">
                     <Button
                       onClick={() => setShowHeroEditor(true)}
                       variant="outline"
@@ -219,36 +257,209 @@ const Index = () => {
                       <Sliders size={16} />
                       Gérer les slides
                     </Button>
+                    <Button
+                      onClick={handleAddMedia}
+                      className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl gap-2"
+                    >
+                      <Plus size={16} />
+                      Ajouter un contenu
+                    </Button>
                   </div>
                 )}
                 
-                <HeroSection 
-                  heroItems={heroItems} 
-                  onPlay={handlePlayHero}
-                  onInfo={handleInfoHero}
-                />
+                <div className="px-4 md:px-8 max-w-[1600px] mx-auto">
+                  <HeroSection 
+                    heroItems={heroItems} 
+                    onPlay={handlePlayHero}
+                    onInfo={handleInfoHero}
+                  />
+                </div>
                 
-                {/* Resume Section - between Hero and Catalog */}
-                <ResumeSection 
-                  resumeList={resumeList}
-                  onSelect={handleResumeSelect}
-                />
+                {/* Resume Section */}
+                <div className="px-4 md:px-8 max-w-[1600px] mx-auto">
+                  <ResumeSection 
+                    resumeList={resumeList}
+                    onSelect={handleResumeSelect}
+                  />
+                </div>
+
+                {/* Prime Video Style Rows */}
+                <div className="px-4 md:px-8 max-w-[1600px] mx-auto space-y-2">
+                  {/* Films populaires */}
+                  {films.length > 0 && (
+                    <MediaRow
+                      title="Films populaires"
+                      media={films.slice(0, 10)}
+                      onSelect={handleSelectMedia}
+                      onSeeMore={() => openCategoryPage('Films populaires', m => m.type === 'Film')}
+                      isAdmin={isAdmin}
+                      onEdit={handleEditMedia}
+                      onDelete={deleteMedia}
+                    />
+                  )}
+
+                  {/* Séries populaires */}
+                  {series.length > 0 && (
+                    <MediaRow
+                      title="Séries populaires"
+                      media={series.slice(0, 10)}
+                      onSelect={handleSelectMedia}
+                      onSeeMore={() => openCategoryPage('Séries populaires', m => m.type === 'Série')}
+                      isAdmin={isAdmin}
+                      onEdit={handleEditMedia}
+                      onDelete={deleteMedia}
+                    />
+                  )}
+
+                  {/* Dynamic genre rows for films */}
+                  {genresWithFilms.slice(0, 5).map(genre => {
+                    const genreFilms = getFilmsByGenre(genre);
+                    if (genreFilms.length < 2) return null;
+                    return (
+                      <MediaRow
+                        key={`film-${genre}`}
+                        title={`${genre} – Films`}
+                        media={genreFilms.slice(0, 10)}
+                        onSelect={handleSelectMedia}
+                        onSeeMore={() => openCategoryPage(`${genre} – Films`, m => 
+                          m.type === 'Film' && (m.genres?.toLowerCase().includes(genre.toLowerCase()) || false)
+                        )}
+                        isAdmin={isAdmin}
+                        onEdit={handleEditMedia}
+                        onDelete={deleteMedia}
+                      />
+                    );
+                  })}
+
+                  {/* Dynamic genre rows for series */}
+                  {genresWithSeries.slice(0, 5).map(genre => {
+                    const genreSeries = getSeriesByGenre(genre);
+                    if (genreSeries.length < 2) return null;
+                    return (
+                      <MediaRow
+                        key={`serie-${genre}`}
+                        title={`${genre} – Séries`}
+                        media={genreSeries.slice(0, 10)}
+                        onSelect={handleSelectMedia}
+                        onSeeMore={() => openCategoryPage(`${genre} – Séries`, m => 
+                          m.type === 'Série' && (m.genres?.toLowerCase().includes(genre.toLowerCase()) || false)
+                        )}
+                        isAdmin={isAdmin}
+                        onEdit={handleEditMedia}
+                        onDelete={deleteMedia}
+                      />
+                    );
+                  })}
+
+                  {/* Watchlist if has items */}
+                  {watchlistMedia.length > 0 && (
+                    <MediaRow
+                      title="Ma liste"
+                      media={watchlistMedia.slice(0, 10)}
+                      onSelect={handleSelectMedia}
+                      onSeeMore={() => openCategoryPage('Ma liste', m => isInWatchlist(m.id))}
+                      isAdmin={isAdmin}
+                      onEdit={handleEditMedia}
+                      onDelete={deleteMedia}
+                    />
+                  )}
+                </div>
               </>
             )}
 
-            <MediaGrid
-              title={gridTitle}
-              icon={gridIcon as 'all' | 'film' | 'serie' | 'watchlist'}
-              media={currentLibrary}
-              loading={loading}
-              isAdmin={isAdmin}
-              layout={layout}
-              onLayoutChange={handleLayoutChange}
-              onSelect={handleSelectMedia}
-              onAdd={handleAddMedia}
-              onEdit={handleEditMedia}
-              onDelete={deleteMedia}
-            />
+            {/* Films/Series/Watchlist specific views */}
+            {view === 'films' && (
+              <div className="px-4 md:px-8 max-w-[1600px] mx-auto space-y-2">
+                <MediaRow
+                  title="Tous les films"
+                  media={films.slice(0, 10)}
+                  onSelect={handleSelectMedia}
+                  onSeeMore={() => openCategoryPage('Tous les films', m => m.type === 'Film')}
+                  isAdmin={isAdmin}
+                  onEdit={handleEditMedia}
+                  onDelete={deleteMedia}
+                />
+                {genresWithFilms.map(genre => {
+                  const genreFilms = getFilmsByGenre(genre);
+                  if (genreFilms.length < 2) return null;
+                  return (
+                    <MediaRow
+                      key={genre}
+                      title={`${genre} – Films`}
+                      media={genreFilms.slice(0, 10)}
+                      onSelect={handleSelectMedia}
+                      onSeeMore={() => openCategoryPage(`${genre} – Films`, m => 
+                        m.type === 'Film' && (m.genres?.toLowerCase().includes(genre.toLowerCase()) || false)
+                      )}
+                      isAdmin={isAdmin}
+                      onEdit={handleEditMedia}
+                      onDelete={deleteMedia}
+                    />
+                  );
+                })}
+              </div>
+            )}
+
+            {view === 'series' && (
+              <div className="px-4 md:px-8 max-w-[1600px] mx-auto space-y-2">
+                <MediaRow
+                  title="Toutes les séries"
+                  media={series.slice(0, 10)}
+                  onSelect={handleSelectMedia}
+                  onSeeMore={() => openCategoryPage('Toutes les séries', m => m.type === 'Série')}
+                  isAdmin={isAdmin}
+                  onEdit={handleEditMedia}
+                  onDelete={deleteMedia}
+                />
+                {genresWithSeries.map(genre => {
+                  const genreSeries = getSeriesByGenre(genre);
+                  if (genreSeries.length < 2) return null;
+                  return (
+                    <MediaRow
+                      key={genre}
+                      title={`${genre} – Séries`}
+                      media={genreSeries.slice(0, 10)}
+                      onSelect={handleSelectMedia}
+                      onSeeMore={() => openCategoryPage(`${genre} – Séries`, m => 
+                        m.type === 'Série' && (m.genres?.toLowerCase().includes(genre.toLowerCase()) || false)
+                      )}
+                      isAdmin={isAdmin}
+                      onEdit={handleEditMedia}
+                      onDelete={deleteMedia}
+                    />
+                  );
+                })}
+              </div>
+            )}
+
+            {view === 'watchlist' && (
+              <div className="px-4 md:px-8 max-w-[1600px] mx-auto">
+                {watchlistMedia.length > 0 ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 mt-8">
+                    {watchlistMedia.map(item => (
+                      <div key={item.id}>
+                        <div 
+                          className="group relative rounded-2xl overflow-hidden cursor-pointer bg-card border border-border/30 hover:border-primary/30 transition-all duration-300"
+                          onClick={() => handleSelectMedia(item)}
+                        >
+                          <div className="aspect-[2/3] overflow-hidden">
+                            <img 
+                              src={item.image} 
+                              alt={item.title} 
+                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-20 bg-card/50 rounded-3xl border border-border/50 mt-8">
+                    <p className="text-muted-foreground">Votre liste est vide.</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </main>

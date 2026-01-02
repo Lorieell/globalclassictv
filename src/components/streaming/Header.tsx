@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
-import { Bookmark } from 'lucide-react';
+import { Bookmark, Heart } from 'lucide-react';
 import { Search, LayoutGrid, Film, Tv, Settings, LogOut, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import logo from '@/assets/logo.png';
 import type { Media } from '@/types/media';
 
-type ViewType = 'home' | 'films' | 'series' | 'watchlist' | 'detail' | 'player' | 'settings';
+type ViewType = 'home' | 'films' | 'series' | 'watchlist' | 'favorites' | 'detail' | 'player' | 'settings';
 
 interface HeaderProps {
   view: ViewType;
@@ -51,6 +51,7 @@ const Header = ({
     { id: 'films' as const, label: 'Films', icon: Film },
     { id: 'series' as const, label: 'Séries', icon: Tv },
     { id: 'watchlist' as const, label: 'Watchlist', icon: Bookmark },
+    { id: 'favorites' as const, label: 'Favoris', icon: Heart, className: 'text-red-500' },
   ];
 
   return (
@@ -78,7 +79,7 @@ const Header = ({
 
         {/* Navigation */}
         <nav className="hidden lg:flex items-center gap-1">
-          {navItems.map(({ id, label, icon: Icon }) => (
+          {navItems.map(({ id, label, icon: Icon, className: iconClass }) => (
             <Button
               key={id}
               variant="ghost"
@@ -89,7 +90,7 @@ const Header = ({
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
-              <Icon size={18} />
+              <Icon size={18} className={id === 'favorites' ? 'text-red-500' : ''} />
               {label}
             </Button>
           ))}
@@ -185,7 +186,7 @@ const Header = ({
       </div>
 
       {/* Mobile Navigation */}
-      <nav className="flex lg:hidden items-center justify-center gap-2 mt-3">
+      <nav className="flex lg:hidden items-center justify-center gap-2 mt-3 flex-wrap">
         {navItems.map(({ id, label, icon: Icon }) => (
           <Button
             key={id}
@@ -198,7 +199,7 @@ const Header = ({
                 : 'text-muted-foreground'
             }`}
           >
-            <Icon size={14} />
+            <Icon size={14} className={id === 'favorites' ? 'text-red-500' : ''} />
             {label}
           </Button>
         ))}

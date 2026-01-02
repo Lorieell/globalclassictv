@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import Header from '@/components/streaming/Header';
 import HeroSection from '@/components/streaming/HeroSection';
 import ResumeSection from '@/components/streaming/ResumeSection';
-import MediaRow from '@/components/streaming/MediaRow';
+import MediaRow, { RowLayoutType } from '@/components/streaming/MediaRow';
 import CategoryPage from '@/components/streaming/CategoryPage';
 import MediaDetailPage from '@/components/streaming/MediaDetailPage';
 import VideoPlayer from '@/components/streaming/VideoPlayer';
@@ -35,8 +35,14 @@ const getRotatingGenres = (allGenres: string[], type: 'films' | 'series') => {
     return hashA - hashB;
   });
   
-  // Retourner un sous-ensemble qui change chaque semaine
-  return shuffled.slice(0, Math.min(6, shuffled.length));
+  // Retourner tous les genres disponibles
+  return shuffled;
+};
+
+// Fonction pour assigner un layout varié basé sur l'index
+const getLayoutForIndex = (index: number): RowLayoutType => {
+  const layouts: RowLayoutType[] = ['scroll', 'grid', 'compact', 'featured', 'scroll', 'scroll'];
+  return layouts[index % layouts.length];
 };
 
 type ViewType = 'home' | 'films' | 'series' | 'watchlist' | 'detail' | 'player' | 'settings' | 'category';
@@ -242,7 +248,7 @@ const Index = () => {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'all', pages: 3 }),
+          body: JSON.stringify({ type: 'all', pages: 5 }),
         }
       );
       
@@ -274,7 +280,7 @@ const Index = () => {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'all', pages: 2 }),
+          body: JSON.stringify({ type: 'all', pages: 5 }),
         }
       );
       
@@ -430,12 +436,13 @@ const Index = () => {
                   {films.length > 0 && (
                     <MediaRow
                       title="Films populaires"
-                      media={films.slice(0, 10)}
+                      media={films.slice(0, 15)}
                       onSelect={handleSelectMedia}
                       onSeeMore={() => openCategoryPage('Films populaires', m => m.type === 'Film')}
                       isAdmin={isAdmin}
                       onEdit={handleEditMedia}
                       onDelete={deleteMedia}
+                      layout="featured"
                     />
                   )}
 
@@ -443,24 +450,66 @@ const Index = () => {
                   {series.length > 0 && (
                     <MediaRow
                       title="Séries populaires"
-                      media={series.slice(0, 10)}
+                      media={series.slice(0, 15)}
                       onSelect={handleSelectMedia}
                       onSeeMore={() => openCategoryPage('Séries populaires', m => m.type === 'Série')}
                       isAdmin={isAdmin}
                       onEdit={handleEditMedia}
                       onDelete={deleteMedia}
+                      layout="grid"
+                    />
+                  )}
+                  
+                  {/* Sections spéciales */}
+                  {films.filter(f => f.quality === '4K').length > 0 && (
+                    <MediaRow
+                      title="🎬 Films en 4K"
+                      media={films.filter(f => f.quality === '4K').slice(0, 15)}
+                      onSelect={handleSelectMedia}
+                      onSeeMore={() => openCategoryPage('Films en 4K', m => m.type === 'Film' && m.quality === '4K')}
+                      isAdmin={isAdmin}
+                      onEdit={handleEditMedia}
+                      onDelete={deleteMedia}
+                      layout="scroll"
+                    />
+                  )}
+                  
+                  {library.filter(m => m.language === 'VF').length > 0 && (
+                    <MediaRow
+                      title="🇫🇷 Disponible en VF"
+                      media={library.filter(m => m.language === 'VF').slice(0, 15)}
+                      onSelect={handleSelectMedia}
+                      onSeeMore={() => openCategoryPage('Disponible en VF', m => m.language === 'VF')}
+                      isAdmin={isAdmin}
+                      onEdit={handleEditMedia}
+                      onDelete={deleteMedia}
+                      layout="compact"
+                    />
+                  )}
+                  
+                  {/* Séries que vous aimerez */}
+                  {series.length > 10 && (
+                    <MediaRow
+                      title="📺 Séries que vous aimerez"
+                      media={series.slice(10, 25)}
+                      onSelect={handleSelectMedia}
+                      onSeeMore={() => openCategoryPage('Séries recommandées', m => m.type === 'Série')}
+                      isAdmin={isAdmin}
+                      onEdit={handleEditMedia}
+                      onDelete={deleteMedia}
+                      layout="featured"
                     />
                   )}
 
-                  {/* Dynamic rotating genre rows for films - changes weekly */}
-                  {rotatingFilmGenres.map(genre => {
+                  {/* Dynamic rotating genre rows for films - all genres */}
+                  {rotatingFilmGenres.map((genre, index) => {
                     const genreFilms = getFilmsByGenre(genre);
                     if (genreFilms.length < 1) return null;
                     return (
                       <MediaRow
                         key={`film-${genre}`}
                         title={`${genre} – Films`}
-                        media={genreFilms.slice(0, 10)}
+                        media={genreFilms.slice(0, 15)}
                         onSelect={handleSelectMedia}
                         onSeeMore={() => openCategoryPage(`${genre} – Films`, m => 
                           m.type === 'Film' && (m.genres?.toLowerCase().includes(genre.toLowerCase()) || false)
@@ -468,19 +517,20 @@ const Index = () => {
                         isAdmin={isAdmin}
                         onEdit={handleEditMedia}
                         onDelete={deleteMedia}
+                        layout={getLayoutForIndex(index)}
                       />
                     );
                   })}
 
-                  {/* Dynamic rotating genre rows for series - changes weekly */}
-                  {rotatingSeriesGenres.map(genre => {
+                  {/* Dynamic rotating genre rows for series - all genres */}
+                  {rotatingSeriesGenres.map((genre, index) => {
                     const genreSeries = getSeriesByGenre(genre);
                     if (genreSeries.length < 1) return null;
                     return (
                       <MediaRow
                         key={`serie-${genre}`}
                         title={`${genre} – Séries`}
-                        media={genreSeries.slice(0, 10)}
+                        media={genreSeries.slice(0, 15)}
                         onSelect={handleSelectMedia}
                         onSeeMore={() => openCategoryPage(`${genre} – Séries`, m => 
                           m.type === 'Série' && (m.genres?.toLowerCase().includes(genre.toLowerCase()) || false)
@@ -488,6 +538,7 @@ const Index = () => {
                         isAdmin={isAdmin}
                         onEdit={handleEditMedia}
                         onDelete={deleteMedia}
+                        layout={getLayoutForIndex(index + 3)}
                       />
                     );
                   })}

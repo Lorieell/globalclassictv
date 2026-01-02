@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { ArrowUp, Sliders, Plus } from 'lucide-react';
+import { Sliders, Plus, ArrowUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Header from '@/components/streaming/Header';
 import HeroSection from '@/components/streaming/HeroSection';
@@ -12,11 +12,31 @@ import AdminLoginModal from '@/components/streaming/AdminLoginModal';
 import MediaEditorModal from '@/components/streaming/MediaEditorModal';
 import HeroEditorModal from '@/components/streaming/HeroEditorModal';
 import SettingsPage from '@/components/streaming/SettingsPage';
-import GlobalAds from '@/components/streaming/GlobalAds';
+import AdLayout from '@/components/streaming/AdLayout';
 import Footer from '@/components/streaming/Footer';
 import { useMediaLibrary } from '@/hooks/useMediaLibrary';
 import { useAdmin } from '@/hooks/useAdmin';
 import type { Media, HeroItem } from '@/types/media';
+
+// Fonction pour obtenir les genres rotatifs basés sur la date
+const getRotatingGenres = (allGenres: string[], type: 'films' | 'series') => {
+  const today = new Date();
+  const dayOfYear = Math.floor((today.getTime() - new Date(today.getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24));
+  const weekOfYear = Math.floor(dayOfYear / 7);
+  
+  // Utiliser différents seeds pour films et séries
+  const seed = type === 'films' ? weekOfYear : weekOfYear + 100;
+  
+  // Mélanger les genres de façon déterministe basée sur le seed
+  const shuffled = [...allGenres].sort((a, b) => {
+    const hashA = (a.charCodeAt(0) * seed) % 100;
+    const hashB = (b.charCodeAt(0) * seed) % 100;
+    return hashA - hashB;
+  });
+  
+  // Retourner un sous-ensemble qui change chaque semaine
+  return shuffled.slice(0, Math.min(6, shuffled.length));
+};
 
 type ViewType = 'home' | 'films' | 'series' | 'watchlist' | 'detail' | 'player' | 'settings' | 'category';
 
@@ -196,9 +216,13 @@ const Index = () => {
     updatePosition(mediaId, seasonId, episodeId);
   };
 
-  // Define sections for Prime Video style layout
+  // Define sections for Prime Video style layout avec rotation automatique
   const genresWithFilms = allGenres.filter(g => getFilmsByGenre(g).length > 0);
   const genresWithSeries = allGenres.filter(g => getSeriesByGenre(g).length > 0);
+  
+  // Genres rotatifs qui changent chaque semaine
+  const rotatingFilmGenres = useMemo(() => getRotatingGenres(genresWithFilms, 'films'), [genresWithFilms]);
+  const rotatingSeriesGenres = useMemo(() => getRotatingGenres(genresWithSeries, 'series'), [genresWithSeries]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -213,8 +237,9 @@ const Index = () => {
       />
 
       <main className="min-h-[calc(100vh-140px)]">
-        {view === 'settings' ? (
-          <SettingsPage onBack={() => setView('home')} />
+        <AdLayout showAds={view !== 'settings'}>
+          {view === 'settings' ? (
+            <SettingsPage onBack={() => setView('home')} />
         ) : view === 'player' && selectedMedia ? (
           <VideoPlayer 
             media={selectedMedia}
@@ -311,8 +336,8 @@ const Index = () => {
                     />
                   )}
 
-                  {/* Dynamic genre rows for films */}
-                  {genresWithFilms.slice(0, 5).map(genre => {
+                  {/* Dynamic rotating genre rows for films - changes weekly */}
+                  {rotatingFilmGenres.map(genre => {
                     const genreFilms = getFilmsByGenre(genre);
                     if (genreFilms.length < 2) return null;
                     return (
@@ -331,8 +356,8 @@ const Index = () => {
                     );
                   })}
 
-                  {/* Dynamic genre rows for series */}
-                  {genresWithSeries.slice(0, 5).map(genre => {
+                  {/* Dynamic rotating genre rows for series - changes weekly */}
+                  {rotatingSeriesGenres.map(genre => {
                     const genreSeries = getSeriesByGenre(genre);
                     if (genreSeries.length < 2) return null;
                     return (
@@ -462,10 +487,8 @@ const Index = () => {
             )}
           </div>
         )}
+        </AdLayout>
       </main>
-
-      {/* Global Ads - shown on all pages except settings */}
-      {view !== 'settings' && <GlobalAds />}
 
       {/* Footer */}
       <Footer isAdmin={isAdmin} onSettingsClick={() => setView('settings')} />

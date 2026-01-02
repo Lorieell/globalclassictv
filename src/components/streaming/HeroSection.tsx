@@ -16,7 +16,7 @@ const HeroSection = ({ heroItems, onPlay, onInfo }: HeroSectionProps) => {
     if (heroItems.length <= 1) return;
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % heroItems.length);
-    }, 5000);
+    }, 30000);
     return () => clearInterval(interval);
   }, [heroItems.length]);
 

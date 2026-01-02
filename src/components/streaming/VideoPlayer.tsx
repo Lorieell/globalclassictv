@@ -214,6 +214,9 @@ const VideoPlayer = ({ media, initialSeasonId, initialEpisodeId, onBack, onProgr
               <DropdownMenuContent 
                 className="bg-card border-border z-50 min-w-[140px] max-w-[200px] max-h-[300px] overflow-y-auto" 
                 align="start"
+                side="bottom"
+                sideOffset={4}
+                avoidCollisions={false}
               >
                 {selectedSeason.episodes?.map(ep => (
                   <DropdownMenuItem

@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Sliders, Plus, ArrowUp } from 'lucide-react';
+import { Sliders, Plus, ArrowUp, Download, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import Header from '@/components/streaming/Header';
 import HeroSection from '@/components/streaming/HeroSection';
@@ -55,6 +56,7 @@ const Index = () => {
   const [showEditor, setShowEditor] = useState(false);
   const [showHeroEditor, setShowHeroEditor] = useState(false);
   const [editingMedia, setEditingMedia] = useState<Partial<Media> | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
 
   const { 
     library, 
@@ -221,6 +223,43 @@ const Index = () => {
     updatePosition(mediaId, seasonId, episodeId);
   };
 
+  // Import TMDB content
+  const handleImportTMDB = async () => {
+    setIsImporting(true);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tmdb-import`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'all' }),
+        }
+      );
+      
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        let addedCount = 0;
+        for (const media of result.data) {
+          // Check if media already exists
+          const exists = library.some(m => m.id === media.id || m.title === media.title);
+          if (!exists) {
+            addMedia(media);
+            addedCount++;
+          }
+        }
+        toast.success(`${addedCount} nouveaux contenus importés depuis TMDB`);
+      } else {
+        toast.error(result.error || 'Erreur lors de l\'import');
+      }
+    } catch (error) {
+      console.error('TMDB import error:', error);
+      toast.error('Erreur de connexion au service d\'import');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   // Define sections for Prime Video style layout avec rotation automatique
   const genresWithFilms = allGenres.filter(g => getFilmsByGenre(g).length > 0);
   const genresWithSeries = allGenres.filter(g => getSeriesByGenre(g).length > 0);
@@ -282,7 +321,20 @@ const Index = () => {
               <>
                 {/* Admin Controls */}
                 {isAdmin && (
-                  <div className="flex justify-end gap-3 mb-4 px-4 md:px-8 max-w-[1600px] mx-auto">
+                  <div className="flex justify-end gap-3 mb-4 px-4 md:px-8 max-w-[1600px] mx-auto flex-wrap">
+                    <Button
+                      onClick={handleImportTMDB}
+                      disabled={isImporting}
+                      variant="outline"
+                      className="rounded-xl border-green-500/30 text-green-500 hover:bg-green-500/10 gap-2"
+                    >
+                      {isImporting ? (
+                        <Loader2 size={16} className="animate-spin" />
+                      ) : (
+                        <Download size={16} />
+                      )}
+                      {isImporting ? 'Import en cours...' : 'Importer TMDB'}
+                    </Button>
                     <Button
                       onClick={() => setShowHeroEditor(true)}
                       variant="outline"

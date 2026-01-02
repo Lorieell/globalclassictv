@@ -356,7 +356,11 @@ const Index = () => {
       <main className="min-h-[calc(100vh-140px)]">
         <AdLayout showAds={view !== 'settings'}>
           {view === 'settings' ? (
-            <SettingsPage onBack={() => setView('home')} />
+            <SettingsPage 
+              onBack={() => setView('home')} 
+              library={library}
+              onEditMedia={handleEditMedia}
+            />
         ) : view === 'player' && selectedMedia ? (
           <VideoPlayer 
             media={selectedMedia}

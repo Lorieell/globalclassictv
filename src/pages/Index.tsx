@@ -62,7 +62,7 @@ const generateAutoHeroItems = (library: Media[]): HeroItem[] => {
   }));
 };
 
-type ViewType = 'home' | 'films' | 'series' | 'watchlist' | 'detail' | 'player' | 'settings' | 'category';
+type ViewType = 'home' | 'films' | 'series' | 'watchlist' | 'favorites' | 'detail' | 'player' | 'settings' | 'category';
 
 interface CategoryView {
   title: string;
@@ -541,8 +541,12 @@ const Index = () => {
 
             {view === 'watchlist' && (
               <div className="px-4 md:px-8 max-w-[1600px] mx-auto">
+                <h2 className="text-2xl font-bold text-foreground mt-8 mb-4 flex items-center gap-2">
+                  <Bookmark size={24} className="text-primary" />
+                  Ma Watchlist
+                </h2>
                 {watchlistMedia.length > 0 ? (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 mt-8">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                     {watchlistMedia.map(item => (
                       <div key={item.id}>
                         <div 
@@ -561,8 +565,46 @@ const Index = () => {
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-20 bg-card/50 rounded-3xl border border-border/50 mt-8">
-                    <p className="text-muted-foreground">Votre liste est vide.</p>
+                  <div className="text-center py-20 bg-card/50 rounded-3xl border border-border/50">
+                    <Bookmark size={48} className="mx-auto text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground">Votre watchlist est vide.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {view === 'favorites' && (
+              <div className="px-4 md:px-8 max-w-[1600px] mx-auto">
+                <h2 className="text-2xl font-bold text-foreground mt-8 mb-4 flex items-center gap-2">
+                  <Heart size={24} className="text-red-500" />
+                  Mes Favoris
+                </h2>
+                {favoritesMedia.length > 0 ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                    {favoritesMedia.map(item => (
+                      <div key={item.id}>
+                        <div 
+                          className="group relative rounded-2xl overflow-hidden cursor-pointer bg-card border border-border/30 hover:border-red-500/30 transition-all duration-300"
+                          onClick={() => handleSelectMedia(item)}
+                        >
+                          <div className="aspect-[2/3] overflow-hidden">
+                            <img 
+                              src={item.image} 
+                              alt={item.title} 
+                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
+                            />
+                          </div>
+                          <div className="absolute top-2 right-2">
+                            <Heart size={20} className="text-red-500 fill-red-500" />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-20 bg-card/50 rounded-3xl border border-border/50">
+                    <Heart size={48} className="mx-auto text-red-500/50 mb-4" />
+                    <p className="text-muted-foreground">Vous n'avez pas encore de favoris.</p>
                   </div>
                 )}
               </div>

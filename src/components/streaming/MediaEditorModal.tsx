@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { X, Plus, Save, Trash2 } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { X, Plus, Save, Trash2, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import type { Media, Season, Episode } from '@/types/media';
@@ -10,6 +10,16 @@ interface MediaEditorModalProps {
   onClose: () => void;
   onSave: (media: Media) => void;
 }
+
+// Helper to convert file to base64
+const fileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+  });
+};
 
 const MediaEditorModal = ({ isOpen, media, onClose, onSave }: MediaEditorModalProps) => {
   const { toast } = useToast();
@@ -25,6 +35,8 @@ const MediaEditorModal = ({ isOpen, media, onClose, onSave }: MediaEditorModalPr
     videoUrls: '',
     seasons: [],
   });
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (media) {
@@ -38,6 +50,35 @@ const MediaEditorModal = ({ isOpen, media, onClose, onSave }: MediaEditorModalPr
       });
     }
   }, [media]);
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) {
+      try {
+        const base64 = await fileToBase64(file);
+        setFormData(prev => ({ ...prev, image: base64 }));
+        toast({ title: "Image ajoutée", description: "L'image a été chargée avec succès" });
+      } catch {
+        toast({ title: "Erreur", description: "Impossible de charger l'image", variant: "destructive" });
+      }
+    }
+  }, [toast]);
+
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+      try {
+        const base64 = await fileToBase64(file);
+        setFormData(prev => ({ ...prev, image: base64 }));
+        toast({ title: "Image ajoutée", description: "L'image a été chargée avec succès" });
+      } catch {
+        toast({ title: "Erreur", description: "Impossible de charger l'image", variant: "destructive" });
+      }
+    }
+  }, [toast]);
 
   if (!isOpen) return null;
 
@@ -63,6 +104,7 @@ const MediaEditorModal = ({ isOpen, media, onClose, onSave }: MediaEditorModalPr
       language: formData.language,
       videoUrls: formData.videoUrls,
       seasons: formData.seasons,
+      isManual: true, // Mark as manually added
     });
 
     toast({
@@ -143,8 +185,8 @@ const MediaEditorModal = ({ isOpen, media, onClose, onSave }: MediaEditorModalPr
               <label className="text-sm font-medium text-muted-foreground mb-1 block">URL de l'image</label>
               <input
                 type="text"
-                placeholder="https://..."
-                value={formData.image}
+                placeholder="https://... ou glissez une image ci-dessous"
+                value={formData.image?.startsWith('data:') ? '' : formData.image}
                 onChange={(e) => setFormData({ ...formData, image: e.target.value })}
                 className="w-full bg-secondary/50 border border-border/50 rounded-xl px-4 py-3 outline-none focus:border-primary/50 text-foreground"
               />
@@ -235,13 +277,43 @@ const MediaEditorModal = ({ isOpen, media, onClose, onSave }: MediaEditorModalPr
             </div>
           </div>
 
-          {/* Image Preview */}
-          <div className="flex items-center justify-center border-2 border-dashed border-border/50 rounded-2xl bg-secondary/30 overflow-hidden min-h-[200px]">
+          {/* Image Preview with Drag & Drop */}
+          <div 
+            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+            className={`flex flex-col items-center justify-center border-2 border-dashed rounded-2xl bg-secondary/30 overflow-hidden min-h-[300px] cursor-pointer transition-all ${
+              isDragging 
+                ? 'border-primary bg-primary/10' 
+                : 'border-border/50 hover:border-muted-foreground'
+            }`}
+          >
             {formData.image ? (
-              <img src={formData.image} alt="Preview" className="max-h-64 object-contain" />
+              <div className="relative w-full h-full flex items-center justify-center p-4">
+                <img src={formData.image} alt="Preview" className="max-h-64 object-contain rounded-lg" />
+                <div className="absolute bottom-2 left-0 right-0 text-center">
+                  <p className="text-xs text-muted-foreground bg-background/80 inline-block px-3 py-1 rounded-full">
+                    Cliquez ou glissez pour remplacer
+                  </p>
+                </div>
+              </div>
             ) : (
-              <p className="text-muted-foreground text-sm">Aperçu de l'image</p>
+              <div className="text-center p-6 space-y-3">
+                <Upload className="mx-auto text-muted-foreground" size={48} />
+                <div>
+                  <p className="text-muted-foreground font-medium">Glissez une image ici</p>
+                  <p className="text-xs text-muted-foreground mt-1">ou cliquez pour parcourir</p>
+                </div>
+              </div>
             )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileSelect}
+            />
           </div>
         </div>
 

@@ -281,6 +281,7 @@ const Index = () => {
               library={library}
               onEditMedia={handleEditMedia}
               onAddMedia={addMedia}
+              onAddNewMedia={handleAddMedia}
             />
         ) : view === 'player' && selectedMedia ? (
           <VideoPlayer 
@@ -327,13 +328,6 @@ const Index = () => {
                     >
                       <Sliders size={16} />
                       Gérer les slides
-                    </Button>
-                    <Button
-                      onClick={handleAddMedia}
-                      className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl gap-2"
-                    >
-                      <Plus size={16} />
-                      Ajouter un contenu
                     </Button>
                   </div>
                 )}

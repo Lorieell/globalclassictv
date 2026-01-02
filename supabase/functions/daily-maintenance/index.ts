@@ -28,6 +28,7 @@ interface MaintenanceResult {
   languageUpdates: number;
   qualityUpdates: number;
   newSeriesAdded: number;
+  skippedManual: number;
   errors: string[];
 }
 
@@ -67,16 +68,27 @@ function getQualityLabel(rating: number, year: string): string {
   return 'HD';
 }
 
-async function checkAndUpdateMedia(library: any[]): Promise<{ languageUpdates: number; qualityUpdates: number; errors: string[] }> {
+async function checkAndUpdateMedia(library: any[]): Promise<{ languageUpdates: number; qualityUpdates: number; errors: string[]; skippedManual: number }> {
   let languageUpdates = 0;
   let qualityUpdates = 0;
+  let skippedManual = 0;
   const errors: string[] = [];
   
   for (const media of library) {
     try {
+      // Skip manually added content - never modify it
+      if (media.isManual === true) {
+        skippedManual++;
+        continue;
+      }
+      
       // Extract TMDB ID
       const tmdbIdMatch = media.id?.match(/tmdb-(movie|tv)-(\d+)/);
-      if (!tmdbIdMatch) continue;
+      if (!tmdbIdMatch) {
+        // If no TMDB ID pattern, consider it manual content - skip
+        skippedManual++;
+        continue;
+      }
       
       const [, type, id] = tmdbIdMatch;
       const endpoint = type === 'movie' ? `/movie/${id}` : `/tv/${id}`;
@@ -103,6 +115,9 @@ async function checkAndUpdateMedia(library: any[]): Promise<{ languageUpdates: n
         qualityUpdates++;
       }
       
+      // NEVER remove videoUrls or seasons that user has added
+      // Only update metadata, preserve user-added content
+      
       // Add small delay to avoid rate limiting
       await new Promise(resolve => setTimeout(resolve, 50));
     } catch (error) {
@@ -110,7 +125,7 @@ async function checkAndUpdateMedia(library: any[]): Promise<{ languageUpdates: n
     }
   }
   
-  return { languageUpdates, qualityUpdates, errors };
+  return { languageUpdates, qualityUpdates, errors, skippedManual };
 }
 
 async function fetchNewSeries(): Promise<any[]> {
@@ -168,17 +183,20 @@ serve(async (req) => {
       languageUpdates: 0,
       qualityUpdates: 0,
       newSeriesAdded: 0,
+      skippedManual: 0,
       errors: [],
     };
     
+    // IMPORTANT: Never remove any content - only add or update metadata
     let updatedLibrary = [...library];
     
-    // Check and update language/quality for existing media
+    // Check and update language/quality for existing media (skip manual content)
     if (action === 'full' || action === 'check') {
-      console.log('Checking language and quality...');
+      console.log('Checking language and quality (skipping manual content)...');
       const checkResult = await checkAndUpdateMedia(updatedLibrary);
       result.languageUpdates = checkResult.languageUpdates;
       result.qualityUpdates = checkResult.qualityUpdates;
+      result.skippedManual = checkResult.skippedManual;
       result.errors.push(...checkResult.errors);
     }
     

@@ -381,18 +381,18 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia }: Setting
     }
   };
 
-  // Reset library and reimport from TMDB
+  // Reset library and reimport from TMDB (PRESERVE manual content)
   const handleResetAndImport = async () => {
-    if (!confirm('Êtes-vous sûr de vouloir vider la bibliothèque et réimporter tout depuis TMDB ?')) {
+    if (!confirm('Êtes-vous sûr de vouloir réimporter depuis TMDB ? Vos contenus ajoutés manuellement seront conservés.')) {
       return;
     }
     
     setIsImporting(true);
     try {
-      localStorage.removeItem('gctv-library');
-      localStorage.removeItem('gctv-hero');
+      // Get manually added content to preserve
+      const manualContent = library.filter(m => m.isManual || !m.id.startsWith('tmdb-'));
       
-      toast.info('Bibliothèque vidée, import en cours...');
+      toast.info('Import en cours... Vos contenus manuels sont préservés.');
       
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tmdb-import`,
@@ -406,8 +406,13 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia }: Setting
       const result = await response.json();
       
       if (result.success && result.data) {
-        localStorage.setItem('gctv-library', JSON.stringify(result.data));
-        toast.success(`${result.data.length} contenus importés depuis TMDB`);
+        // Merge: keep manual content + add new TMDB content
+        const tmdbContent = result.data.filter((newMedia: Media) => 
+          !manualContent.some(m => m.id === newMedia.id || m.title.toLowerCase() === newMedia.title.toLowerCase())
+        );
+        const mergedLibrary = [...manualContent, ...tmdbContent];
+        localStorage.setItem('gctv-library', JSON.stringify(mergedLibrary));
+        toast.success(`${tmdbContent.length} contenus TMDB importés, ${manualContent.length} contenus manuels préservés`);
         window.location.reload();
       } else {
         toast.error(result.error || 'Erreur lors de l\'import');

@@ -5,26 +5,40 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// TMDB API configuration - read-only public key
+// API configurations
 const TMDB_API_KEY = 'ac50a108046652cc08e96dc5bf2abb8a';
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/w500';
 const TMDB_BACKDROP_BASE = 'https://image.tmdb.org/t/p/original';
 
+const OMDB_BASE_URL = 'http://www.omdbapi.com';
+
 // Language mapping
 const LANGUAGE_MAP: Record<string, string> = {
   'fr': 'VF',
+  'French': 'VF',
   'en': 'VOSTFR',
+  'English': 'VOSTFR',
   'es': 'VOSTFR',
+  'Spanish': 'VOSTFR',
   'de': 'VOSTFR',
+  'German': 'VOSTFR',
   'it': 'VOSTFR',
+  'Italian': 'VOSTFR',
   'pt': 'VOSTFR',
+  'Portuguese': 'VOSTFR',
   'ja': 'VOSTFR',
+  'Japanese': 'VOSTFR',
   'ko': 'VOSTFR',
+  'Korean': 'VOSTFR',
   'zh': 'VOSTFR',
+  'Chinese': 'VOSTFR',
   'hi': 'VOSTFR',
+  'Hindi': 'VOSTFR',
   'ar': 'VOSTFR',
+  'Arabic': 'VOSTFR',
   'ru': 'VOSTFR',
+  'Russian': 'VOSTFR',
 };
 
 // TMDB genre IDs for fetching by genre
@@ -82,6 +96,7 @@ interface TMDBMovieDetails {
   original_language: string;
   spoken_languages?: { iso_639_1: string; name: string }[];
   production_countries?: { iso_3166_1: string; name: string }[];
+  imdb_id?: string;
 }
 
 interface TMDBSeriesDetails {
@@ -97,6 +112,33 @@ interface TMDBSeriesDetails {
   original_language: string;
   spoken_languages?: { iso_639_1: string; name: string }[];
   origin_country?: string[];
+  external_ids?: { imdb_id?: string };
+}
+
+interface OMDBData {
+  Title?: string;
+  Year?: string;
+  Rated?: string;
+  Runtime?: string;
+  Genre?: string;
+  Director?: string;
+  Writer?: string;
+  Actors?: string;
+  Plot?: string;
+  Language?: string;
+  Country?: string;
+  Awards?: string;
+  Poster?: string;
+  Ratings?: { Source: string; Value: string }[];
+  Metascore?: string;
+  imdbRating?: string;
+  imdbVotes?: string;
+  imdbID?: string;
+  Type?: string;
+  DVD?: string;
+  BoxOffice?: string;
+  Production?: string;
+  Response?: string;
 }
 
 async function fetchFromTMDB(endpoint: string, params: Record<string, string> = {}) {
@@ -105,13 +147,32 @@ async function fetchFromTMDB(endpoint: string, params: Record<string, string> = 
   url.searchParams.set('language', 'fr-FR');
   Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
   
-  console.log(`Fetching: ${url.toString()}`);
+  console.log(`Fetching TMDB: ${url.toString()}`);
   const response = await fetch(url.toString());
   if (!response.ok) {
     console.error(`TMDB API error: ${response.status} ${response.statusText}`);
     throw new Error(`TMDB API error: ${response.status}`);
   }
   return response.json();
+}
+
+async function fetchFromOMDB(imdbId: string): Promise<OMDBData | null> {
+  const OMDB_API_KEY = Deno.env.get('OMDB_API_KEY');
+  if (!OMDB_API_KEY || !imdbId) return null;
+  
+  try {
+    const url = `${OMDB_BASE_URL}/?i=${imdbId}&apikey=${OMDB_API_KEY}&plot=full`;
+    console.log(`Fetching OMDB: ${imdbId}`);
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    
+    const data = await response.json();
+    if (data.Response === 'False') return null;
+    return data;
+  } catch (error) {
+    console.error(`OMDB error for ${imdbId}:`, error);
+    return null;
+  }
 }
 
 async function getMovieDetails(id: number): Promise<TMDBMovieDetails | null> {
@@ -126,7 +187,14 @@ async function getMovieDetails(id: number): Promise<TMDBMovieDetails | null> {
 
 async function getSeriesDetails(id: number): Promise<TMDBSeriesDetails | null> {
   try {
-    const details = await fetchFromTMDB(`/tv/${id}`);
+    // Get series details with external IDs for IMDB
+    const [details, externalIds] = await Promise.all([
+      fetchFromTMDB(`/tv/${id}`),
+      fetchFromTMDB(`/tv/${id}/external_ids`).catch(() => null)
+    ]);
+    if (externalIds) {
+      details.external_ids = externalIds;
+    }
     return details;
   } catch (error) {
     console.error(`Error fetching series ${id}:`, error);
@@ -134,8 +202,27 @@ async function getSeriesDetails(id: number): Promise<TMDBSeriesDetails | null> {
   }
 }
 
-function getLanguageLabel(movie: TMDBMovieDetails | TMDBSeriesDetails): string {
+function getLanguageFromOMDB(omdbData: OMDBData | null, tmdbLang: string): string {
+  if (omdbData?.Language) {
+    const langs = omdbData.Language.split(',').map(l => l.trim());
+    // Check if French is in the languages
+    if (langs.some(l => l.toLowerCase().includes('french') || l.toLowerCase() === 'fr')) {
+      return 'VF';
+    }
+  }
+  
+  // Fall back to TMDB language
+  if (tmdbLang === 'fr') return 'VF';
+  return LANGUAGE_MAP[tmdbLang] || 'VOSTFR';
+}
+
+function getLanguageLabel(movie: TMDBMovieDetails | TMDBSeriesDetails, omdbData: OMDBData | null = null): string {
   const origLang = movie.original_language;
+  
+  // Use OMDB data if available
+  if (omdbData) {
+    return getLanguageFromOMDB(omdbData, origLang);
+  }
   
   // Check if French is in spoken languages
   const hasFrench = movie.spoken_languages?.some(l => l.iso_639_1 === 'fr');
@@ -143,19 +230,26 @@ function getLanguageLabel(movie: TMDBMovieDetails | TMDBSeriesDetails): string {
     return 'VF';
   }
   
-  // Return based on original language
   return LANGUAGE_MAP[origLang] || 'VOSTFR';
 }
 
-function getQualityLabel(rating: number, year: string): string {
-  const currentYear = new Date().getFullYear();
+function getQualityLabel(rating: number, year: string, omdbData: OMDBData | null = null): string {
   const releaseYear = parseInt(year) || 0;
   
+  // Use OMDB rating if available and better
+  let effectiveRating = rating;
+  if (omdbData?.imdbRating) {
+    const imdbRating = parseFloat(omdbData.imdbRating);
+    if (!isNaN(imdbRating)) {
+      effectiveRating = Math.max(rating, imdbRating);
+    }
+  }
+  
   // Newer high-rated content gets 4K label
-  if (releaseYear >= 2020 && rating >= 7) {
+  if (releaseYear >= 2020 && effectiveRating >= 7) {
     return '4K';
   }
-  if (releaseYear >= 2015 && rating >= 6.5) {
+  if (releaseYear >= 2015 && effectiveRating >= 6.5) {
     return 'Full HD';
   }
   if (releaseYear >= 2010) {
@@ -164,11 +258,20 @@ function getQualityLabel(rating: number, year: string): string {
   return 'HD';
 }
 
-function transformMovieDetails(movie: TMDBMovieDetails): any {
+async function transformMovieDetails(movie: TMDBMovieDetails): Promise<any> {
+  // Fetch OMDB data for additional info
+  const omdbData = movie.imdb_id ? await fetchFromOMDB(movie.imdb_id) : null;
+  
   const genres = movie.genres.map(g => g.name).join(', ');
   const year = movie.release_date?.split('-')[0] || '';
-  const language = getLanguageLabel(movie);
-  const quality = getQualityLabel(movie.vote_average, year);
+  const language = getLanguageLabel(movie, omdbData);
+  const quality = getQualityLabel(movie.vote_average, year, omdbData);
+  
+  // Enrich with OMDB data
+  const director = omdbData?.Director || '';
+  const actors = omdbData?.Actors || '';
+  const awards = omdbData?.Awards || '';
+  const boxOffice = omdbData?.BoxOffice || '';
   
   return {
     id: `tmdb-movie-${movie.id}`,
@@ -176,7 +279,7 @@ function transformMovieDetails(movie: TMDBMovieDetails): any {
     image: movie.poster_path ? `${TMDB_IMAGE_BASE}${movie.poster_path}` : '',
     type: 'Film',
     description: movie.overview?.slice(0, 200) || 'Aucune description disponible.',
-    synopsis: movie.overview || 'Aucune description disponible.',
+    synopsis: movie.overview || omdbData?.Plot || 'Aucune description disponible.',
     genres: genres || 'Drame',
     quality,
     language,
@@ -184,15 +287,29 @@ function transformMovieDetails(movie: TMDBMovieDetails): any {
     year,
     backdrop: movie.backdrop_path ? `${TMDB_BACKDROP_BASE}${movie.backdrop_path}` : '',
     tmdbId: movie.id,
+    imdbId: movie.imdb_id || omdbData?.imdbID || '',
+    director,
+    actors,
+    awards,
+    boxOffice,
     videoUrls: '',
   };
 }
 
-function transformSeriesDetails(series: TMDBSeriesDetails): any {
+async function transformSeriesDetails(series: TMDBSeriesDetails): Promise<any> {
+  // Fetch OMDB data for additional info
+  const imdbId = series.external_ids?.imdb_id;
+  const omdbData = imdbId ? await fetchFromOMDB(imdbId) : null;
+  
   const genres = series.genres.map(g => g.name).join(', ');
   const year = series.first_air_date?.split('-')[0] || '';
-  const language = getLanguageLabel(series);
-  const quality = getQualityLabel(series.vote_average, year);
+  const language = getLanguageLabel(series, omdbData);
+  const quality = getQualityLabel(series.vote_average, year, omdbData);
+  
+  // Enrich with OMDB data
+  const director = omdbData?.Director || '';
+  const actors = omdbData?.Actors || '';
+  const awards = omdbData?.Awards || '';
   
   return {
     id: `tmdb-tv-${series.id}`,
@@ -200,7 +317,7 @@ function transformSeriesDetails(series: TMDBSeriesDetails): any {
     image: series.poster_path ? `${TMDB_IMAGE_BASE}${series.poster_path}` : '',
     type: 'Série',
     description: series.overview?.slice(0, 200) || 'Aucune description disponible.',
-    synopsis: series.overview || 'Aucune description disponible.',
+    synopsis: series.overview || omdbData?.Plot || 'Aucune description disponible.',
     genres: genres || 'Drame',
     quality,
     language,
@@ -208,6 +325,10 @@ function transformSeriesDetails(series: TMDBSeriesDetails): any {
     year,
     backdrop: series.backdrop_path ? `${TMDB_BACKDROP_BASE}${series.backdrop_path}` : '',
     tmdbId: series.id,
+    imdbId: imdbId || omdbData?.imdbID || '',
+    director,
+    actors,
+    awards,
     seasons: [],
   };
 }
@@ -245,7 +366,7 @@ serve(async (req) => {
         if (!movie.poster_path) continue;
         const details = await getMovieDetails(movie.id);
         if (details) {
-          const transformed = transformMovieDetails(details);
+          const transformed = await transformMovieDetails(details);
           if (!processedIds.has(transformed.id)) {
             processedIds.add(transformed.id);
             results.push(transformed);
@@ -259,7 +380,7 @@ serve(async (req) => {
         if (!series.poster_path) continue;
         const details = await getSeriesDetails(series.id);
         if (details) {
-          const transformed = transformSeriesDetails(details);
+          const transformed = await transformSeriesDetails(details);
           if (!processedIds.has(transformed.id)) {
             processedIds.add(transformed.id);
             results.push(transformed);
@@ -303,7 +424,7 @@ serve(async (req) => {
               
               const details = await getMovieDetails(movie.id);
               if (details && details.overview) {
-                results.push(transformMovieDetails(details));
+                results.push(await transformMovieDetails(details));
               }
               
               await new Promise(resolve => setTimeout(resolve, 30));
@@ -333,7 +454,7 @@ serve(async (req) => {
               
               const details = await getMovieDetails(movie.id);
               if (details && details.overview) {
-                results.push(transformMovieDetails(details));
+                results.push(await transformMovieDetails(details));
               }
               
               await new Promise(resolve => setTimeout(resolve, 30));
@@ -374,7 +495,7 @@ serve(async (req) => {
               
               const details = await getSeriesDetails(series.id);
               if (details && details.overview) {
-                results.push(transformSeriesDetails(details));
+                results.push(await transformSeriesDetails(details));
               }
               
               await new Promise(resolve => setTimeout(resolve, 30));
@@ -404,7 +525,7 @@ serve(async (req) => {
               
               const details = await getSeriesDetails(series.id);
               if (details && details.overview) {
-                results.push(transformSeriesDetails(details));
+                results.push(await transformSeriesDetails(details));
               }
               
               await new Promise(resolve => setTimeout(resolve, 30));

@@ -1,6 +1,13 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { ChevronLeft, ChevronRight, Play, RotateCcw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Play, RotateCcw, ChevronDown, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import type { Media, Season, Episode } from '@/types/media';
 
 interface VideoPlayerProps {
@@ -167,47 +174,102 @@ const VideoPlayer = ({ media, initialSeasonId, initialEpisodeId, onBack, onProgr
           </div>
         </div>
 
-        {/* Controls row: Episode selector + Player selector */}
+        {/* Controls row: Season + Episode selector + Player selector */}
         <div className="flex flex-wrap gap-3 mb-4">
+          {isSerie && media.seasons && media.seasons.length > 1 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="gap-2 bg-card border-border hover:bg-secondary">
+                  Saison {selectedSeason?.number}
+                  <ChevronDown size={16} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="bg-card border-border z-50">
+                <ScrollArea className="max-h-[300px]">
+                  {media.seasons.map((season) => (
+                    <DropdownMenuItem
+                      key={season.id}
+                      onClick={() => {
+                        setSelectedSeason(season);
+                        setSourceIndex(0);
+                      }}
+                      className="flex items-center justify-between gap-3 cursor-pointer"
+                    >
+                      <span>Saison {season.number}</span>
+                      {selectedSeason?.id === season.id && <Check size={16} className="text-primary" />}
+                    </DropdownMenuItem>
+                  ))}
+                </ScrollArea>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
           {isSerie && selectedSeason && (
-            <>
-              {/* Episode selector */}
-              <select
-                value={selectedEpisode?.id || ''}
-                onChange={(e) => {
-                  const ep = selectedSeason.episodes?.find(ep => ep.id === e.target.value);
-                  if (ep) {
-                    setSelectedEpisode(ep);
-                    setSourceIndex(0);
-                  }
-                }}
-                className="bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
-              >
-                {selectedSeason.episodes?.map(ep => (
-                  <option key={ep.id} value={ep.id}>Épisode {ep.number}</option>
-                ))}
-              </select>
-            </>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="gap-2 bg-card border-border hover:bg-secondary min-w-[140px] justify-between">
+                  <span className="truncate">
+                    Ep. {selectedEpisode?.number} - {selectedEpisode?.title?.slice(0, 15)}{(selectedEpisode?.title?.length || 0) > 15 ? '...' : ''}
+                  </span>
+                  <ChevronDown size={16} className="shrink-0" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="bg-card border-border z-50 w-[280px]" align="start">
+                <ScrollArea className="max-h-[300px]">
+                  {selectedSeason.episodes?.map(ep => (
+                    <DropdownMenuItem
+                      key={ep.id}
+                      onClick={() => {
+                        setSelectedEpisode(ep);
+                        setSourceIndex(0);
+                      }}
+                      className={`flex items-center justify-between gap-3 cursor-pointer py-3 ${
+                        selectedEpisode?.id === ep.id ? 'bg-primary/10' : ''
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="bg-secondary text-foreground text-xs font-bold px-2 py-1 rounded shrink-0">
+                          {ep.number}
+                        </span>
+                        <span className="truncate text-sm">{ep.title}</span>
+                      </div>
+                      {selectedEpisode?.id === ep.id && <Check size={16} className="text-primary shrink-0" />}
+                    </DropdownMenuItem>
+                  ))}
+                </ScrollArea>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
 
           {/* Player selector */}
-          {videoUrls.length > 0 && (
-            <select
-              value={sourceIndex}
-              onChange={(e) => setSourceIndex(parseInt(e.target.value))}
-              className="bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
-            >
-              {videoUrls.map((_, i) => (
-                <option key={i} value={i}>Lecteur {i + 1}</option>
-              ))}
-            </select>
+          {videoUrls.length > 1 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="gap-2 bg-card border-border hover:bg-secondary">
+                  Lecteur {sourceIndex + 1}
+                  <ChevronDown size={16} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="bg-card border-border z-50">
+                {videoUrls.map((_, i) => (
+                  <DropdownMenuItem
+                    key={i}
+                    onClick={() => setSourceIndex(i)}
+                    className="flex items-center justify-between gap-3 cursor-pointer"
+                  >
+                    <span>Lecteur {i + 1}</span>
+                    {sourceIndex === i && <Check size={16} className="text-primary" />}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </div>
 
         {/* Current selection info */}
         {isSerie && selectedEpisode && (
           <p className="text-xs text-muted-foreground mb-4 uppercase tracking-wide">
-            Dernière sélection : <span className="text-foreground">Épisode {selectedEpisode.number} - {selectedEpisode.title}</span>
+            En lecture : <span className="text-foreground font-medium">Épisode {selectedEpisode.number} - {selectedEpisode.title}</span>
           </p>
         )}
 

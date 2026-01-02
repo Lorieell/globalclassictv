@@ -102,6 +102,7 @@ interface SettingsPageProps {
   library?: Media[];
   onEditMedia?: (media: Media) => void;
   onAddMedia?: (media: Media) => void;
+  onAddNewMedia?: () => void; // Opens editor for new media
 }
 
 const SOCIAL_STORAGE_KEY = 'gctv-social-links';
@@ -196,7 +197,7 @@ const applyAccentColor = (hexColor: string) => {
   document.documentElement.style.setProperty('--ring', `${hue} ${saturation}% ${lightness}%`);
 };
 
-const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia }: SettingsPageProps) => {
+const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewMedia }: SettingsPageProps) => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('links');
   
   // Links state
@@ -1001,6 +1002,23 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia }: Setting
                   <p className="text-muted-foreground text-sm">
                     Gérez tous les contenus et vérifiez ceux qui ont une vidéo uploadée.
                   </p>
+                </div>
+
+                {/* Add New Media Button */}
+                <div className="bg-gradient-to-r from-primary/20 to-accent/20 border border-primary/30 rounded-xl p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-semibold text-foreground">Ajouter un contenu</h3>
+                      <p className="text-sm text-muted-foreground">Créer manuellement un film ou une série</p>
+                    </div>
+                    <Button
+                      onClick={onAddNewMedia}
+                      className="bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
+                    >
+                      <Plus size={16} />
+                      Nouveau contenu
+                    </Button>
+                  </div>
                 </div>
 
                 {/* Import Buttons */}

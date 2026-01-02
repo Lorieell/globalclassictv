@@ -1,7 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Plus, Save, Trash2, Upload } from 'lucide-react';
+import { X, Plus, Save, Trash2, Upload, ListPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import type { Media, Season, Episode } from '@/types/media';
 
 interface MediaEditorModalProps {
@@ -37,6 +44,9 @@ const MediaEditorModal = ({ isOpen, media, onClose, onSave }: MediaEditorModalPr
   });
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [bulkAddOpen, setBulkAddOpen] = useState(false);
+  const [bulkSeasonIndex, setBulkSeasonIndex] = useState<number>(0);
+  const [bulkCount, setBulkCount] = useState<number>(10);
 
   useEffect(() => {
     if (media) {
@@ -133,6 +143,26 @@ const MediaEditorModal = ({ isOpen, media, onClose, onSave }: MediaEditorModalPr
     };
     seasons[seasonIndex].episodes = [...(seasons[seasonIndex].episodes || []), newEpisode];
     setFormData({ ...formData, seasons });
+  };
+
+  const addMultipleEpisodes = (seasonIndex: number, count: number) => {
+    const seasons = [...(formData.seasons || [])];
+    const currentCount = seasons[seasonIndex].episodes?.length || 0;
+    const newEpisodes: Episode[] = Array.from({ length: count }, (_, i) => ({
+      id: crypto.randomUUID(),
+      number: currentCount + i + 1,
+      title: `Épisode ${currentCount + i + 1}`,
+      videoUrls: '',
+    }));
+    seasons[seasonIndex].episodes = [...(seasons[seasonIndex].episodes || []), ...newEpisodes];
+    setFormData({ ...formData, seasons });
+    toast({ title: `${count} épisodes ajoutés`, description: `Saison ${seasons[seasonIndex].number}` });
+  };
+
+  const openBulkAdd = (seasonIndex: number) => {
+    setBulkSeasonIndex(seasonIndex);
+    setBulkCount(10);
+    setBulkAddOpen(true);
   };
 
   const updateEpisode = (seasonIndex: number, episodeIndex: number, field: keyof Episode, value: string | number) => {
@@ -343,6 +373,14 @@ const MediaEditorModal = ({ isOpen, media, onClose, onSave }: MediaEditorModalPr
                       </Button>
                       <Button
                         size="sm"
+                        variant="outline"
+                        onClick={() => openBulkAdd(sIdx)}
+                        className="text-xs gap-1 bg-accent/20 border-accent/50 text-accent-foreground hover:bg-accent/30"
+                      >
+                        <ListPlus size={14} /> Ajouter plusieurs
+                      </Button>
+                      <Button
+                        size="sm"
                         variant="ghost"
                         onClick={() => removeSeason(sIdx)}
                         className="text-destructive hover:bg-destructive/10"
@@ -404,6 +442,45 @@ const MediaEditorModal = ({ isOpen, media, onClose, onSave }: MediaEditorModalPr
           </Button>
         </div>
       </div>
+
+      {/* Bulk Add Episodes Dialog */}
+      <Dialog open={bulkAddOpen} onOpenChange={setBulkAddOpen}>
+        <DialogContent className="sm:max-w-md bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Ajouter plusieurs épisodes</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <label className="text-sm font-medium text-muted-foreground mb-2 block">
+              Nombre d'épisodes à ajouter
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={100}
+              value={bulkCount}
+              onChange={(e) => setBulkCount(Math.max(1, Math.min(100, parseInt(e.target.value) || 1)))}
+              className="w-full bg-secondary/50 border border-border/50 rounded-xl px-4 py-3 outline-none focus:border-primary/50 text-foreground text-center text-lg font-bold"
+            />
+            <p className="text-xs text-muted-foreground mt-2 text-center">
+              Les épisodes seront numérotés automatiquement
+            </p>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setBulkAddOpen(false)}>
+              Annuler
+            </Button>
+            <Button
+              onClick={() => {
+                addMultipleEpisodes(bulkSeasonIndex, bulkCount);
+                setBulkAddOpen(false);
+              }}
+              className="bg-primary text-primary-foreground gap-2"
+            >
+              <ListPlus size={16} /> Ajouter {bulkCount} épisodes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

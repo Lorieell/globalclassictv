@@ -24,6 +24,7 @@ const App = () => (
           <Route path="/catalogue" element={<CataloguePage />} />
           <Route path="/catalogue/:slug" element={<MediaDetailPageRoute />} />
           <Route path="/catalogue/:slug/player" element={<PlayerPageRoute />} />
+          <Route path="/catalogue/:slug/source" element={<PlayerPageRoute />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

@@ -260,12 +260,14 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
   ];
 
   // Liste tab state
-  const [listeFilter, setListeFilter] = useState<'all' | 'with-video' | 'without-video'>('all');
+  const [listeFilter, setListeFilter] = useState<'all' | 'with-video' | 'without-video' | 'popular'>('all');
   const [listeSearch, setListeSearch] = useState('');
   const [isRunningMaintenance, setIsRunningMaintenance] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [isCheckingAPI, setIsCheckingAPI] = useState(false);
   const [isRefreshingLayout, setIsRefreshingLayout] = useState(false);
+
+  const popularCount = library.filter(m => (m as any).isFeatured).length;
 
   const filteredLibrary = library.filter(media => {
     const matchesSearch = listeSearch.trim() === '' || 
@@ -275,6 +277,7 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
       ? media.seasons?.some(s => s.episodes.some(e => e.videoUrls && e.videoUrls.trim() !== ''))
       : media.videoUrls && media.videoUrls.trim() !== '';
     
+    if (listeFilter === 'popular') return matchesSearch && (media as any).isFeatured;
     if (listeFilter === 'with-video') return matchesSearch && hasVideo;
     if (listeFilter === 'without-video') return matchesSearch && !hasVideo;
     return matchesSearch;
@@ -765,13 +768,22 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
                         className="bg-muted/50 border-border"
                       />
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
                       <Button
                         variant={listeFilter === 'all' ? 'default' : 'outline'}
                         onClick={() => setListeFilter('all')}
                         size="sm"
                       >
                         Tous ({library.length})
+                      </Button>
+                      <Button
+                        variant={listeFilter === 'popular' ? 'default' : 'outline'}
+                        onClick={() => setListeFilter('popular')}
+                        size="sm"
+                        className="gap-1"
+                      >
+                        <Star size={14} />
+                        Populaires ({popularCount})
                       </Button>
                       <Button
                         variant={listeFilter === 'with-video' ? 'default' : 'outline'}

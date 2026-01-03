@@ -526,6 +526,8 @@ const Index = () => {
                       isAdmin={isAdmin}
                       onEdit={handleEditMedia}
                       onDelete={deleteMedia}
+                      showRemoveButton={true}
+                      onRemove={toggleWatchlist}
                     />
                   )}
 
@@ -540,6 +542,8 @@ const Index = () => {
                       isAdmin={isAdmin}
                       onEdit={handleEditMedia}
                       onDelete={deleteMedia}
+                      showRemoveButton={true}
+                      onRemove={toggleFavorite}
                     />
                   )}
                 </div>

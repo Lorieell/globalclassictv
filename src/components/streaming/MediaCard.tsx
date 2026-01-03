@@ -23,6 +23,7 @@ const MediaCard = ({ media, onSelect, isAdmin, onEdit, onDelete, compact, listMo
           <img 
             src={media.image} 
             alt={media.title} 
+            loading="lazy"
             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
           />
         </div>
@@ -84,6 +85,7 @@ const MediaCard = ({ media, onSelect, isAdmin, onEdit, onDelete, compact, listMo
         <img 
           src={media.image} 
           alt={media.title} 
+          loading="lazy"
           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
         />
       </div>

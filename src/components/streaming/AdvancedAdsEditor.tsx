@@ -395,14 +395,17 @@ const StaticAdEditor = ({ ad, onUpdate, onRemove, onMove, isFirst, isLast, side 
               </div>
             </div>
           ) : (
-            <div className="space-y-1">
-              <Label className="text-xs">Code Google AdSense</Label>
+            <div className="space-y-2">
+              <Label className="text-xs">Code d'unité publicitaire AdSense</Label>
               <textarea
                 value={ad.adsenseCode}
                 onChange={(e) => onUpdate({ adsenseCode: e.target.value })}
-                placeholder={'<script async src="..."></script>\n<ins class="adsbygoogle"...></ins>'}
-                className="w-full h-20 bg-muted/50 border border-border rounded-lg p-2 text-xs font-mono resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder={'<ins class="adsbygoogle"\n     style="display:block"\n     data-ad-client="ca-pub-XXXXXX"\n     data-ad-slot="XXXXXX"\n     data-ad-format="auto"></ins>\n<script>(adsbygoogle = window.adsbygoogle || []).push({});</script>'}
+                className="w-full h-24 bg-muted/50 border border-border rounded-lg p-2 text-xs font-mono resize-none focus:outline-none focus:ring-2 focus:ring-primary"
               />
+              <p className="text-[10px] text-muted-foreground">
+                ⚠️ Le script principal AdSense est déjà dans le site. Collez ici uniquement le code de l'unité publicitaire (balise &lt;ins&gt; + push).
+              </p>
             </div>
           )}
         </div>

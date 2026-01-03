@@ -266,6 +266,10 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
   const [isImporting, setIsImporting] = useState(false);
   const [isCheckingAPI, setIsCheckingAPI] = useState(false);
   const [isRefreshingLayout, setIsRefreshingLayout] = useState(false);
+  
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 50;
 
   const popularCount = library.filter(m => (m as any).isFeatured).length;
 
@@ -282,6 +286,18 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
     if (listeFilter === 'without-video') return matchesSearch && !hasVideo;
     return matchesSearch;
   });
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredLibrary.length / ITEMS_PER_PAGE);
+  const paginatedLibrary = filteredLibrary.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  // Reset page when filter/search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [listeFilter, listeSearch]);
 
   const runDailyMaintenance = async () => {
     setIsRunningMaintenance(true);
@@ -820,7 +836,7 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border/30">
-                        {filteredLibrary.map(media => {
+                        {paginatedLibrary.map(media => {
                           const hasVideo = media.type === 'Série' 
                             ? media.seasons?.some(s => s.episodes.some(e => e.videoUrls && e.videoUrls.trim() !== ''))
                             : media.videoUrls && media.videoUrls.trim() !== '';
@@ -834,6 +850,7 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
                                     <img 
                                       src={media.image} 
                                       alt={media.title}
+                                      loading="lazy"
                                       className="w-10 h-14 object-cover rounded"
                                     />
                                     {isFeatured && (
@@ -915,7 +932,7 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
                             </tr>
                           );
                         })}
-                        {filteredLibrary.length === 0 && (
+                        {paginatedLibrary.length === 0 && (
                           <tr>
                             <td colSpan={4} className="p-8 text-center text-muted-foreground">
                               Aucun contenu trouvé
@@ -925,10 +942,30 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
                       </tbody>
                     </table>
                   </div>
-                  <div className="p-3 border-t border-border/30 bg-muted/30">
-                    <p className="text-sm text-muted-foreground text-center">
-                      {filteredLibrary.length} contenu{filteredLibrary.length > 1 ? 's' : ''} affiché{filteredLibrary.length > 1 ? 's' : ''}
+                  <div className="p-3 border-t border-border/30 bg-muted/30 flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">
+                      {filteredLibrary.length} contenu{filteredLibrary.length > 1 ? 's' : ''} • Page {currentPage}/{totalPages || 1}
                     </p>
+                    {totalPages > 1 && (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                          disabled={currentPage === 1}
+                        >
+                          Précédent
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                          disabled={currentPage === totalPages}
+                        >
+                          Suivant
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

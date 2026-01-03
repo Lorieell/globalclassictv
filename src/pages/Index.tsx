@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Sliders, Plus, ArrowUp, Film, Tv, Sparkles, Globe, Bookmark, Heart } from 'lucide-react';
+import { Sliders, Plus, ArrowUp, Film, Tv, Sparkles, Globe, Bookmark, Heart, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import Header from '@/components/streaming/Header';
@@ -83,7 +83,8 @@ const Index = () => {
   const {
     library, 
     films, 
-    series, 
+    series,
+    comingSoon,
     heroItems, 
     resumeList,
     watchPosition,
@@ -349,8 +350,29 @@ const Index = () => {
                   />
                 </div>
 
-                {/* Content Rows - Max 13 lignes */}
+                {/* Content Rows */}
                 <div className="px-4 md:px-8 max-w-[1600px] mx-auto space-y-2">
+                  {/* À venir - Contenus sans vidéo */}
+                  {comingSoon.length > 0 && (
+                    <MediaRow
+                      title="À venir"
+                      titleIcon={<Clock size={20} className="text-accent" />}
+                      media={comingSoon.slice(0, 20)}
+                      onSelect={handleSelectMedia}
+                      onSeeMore={() => openCategoryPage('À venir', m => {
+                        if (m.type === 'Film') return !m.videoUrls || m.videoUrls.trim() === '';
+                        if (m.type === 'Série') {
+                          const hasAnyVideo = m.seasons?.some(s => s.episodes?.some(e => e.videoUrls && e.videoUrls.trim() !== ''));
+                          return !hasAnyVideo;
+                        }
+                        return false;
+                      })}
+                      isAdmin={isAdmin}
+                      onEdit={handleEditMedia}
+                      onDelete={deleteMedia}
+                    />
+                  )}
+
                   {/* 1. Films populaires */}
                   {films.length > 0 && (
                     <MediaRow

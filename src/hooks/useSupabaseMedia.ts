@@ -367,6 +367,24 @@ export const useSupabaseMedia = () => {
   const films = useMemo(() => library.filter(m => m.type === 'Film'), [library]);
   const series = useMemo(() => library.filter(m => m.type === 'Série'), [library]);
   
+  // "À venir" - Media without video URLs (coming soon)
+  const comingSoon = useMemo(() => {
+    return library.filter(m => {
+      // For films: no videoUrls
+      if (m.type === 'Film') {
+        return !m.videoUrls || m.videoUrls.trim() === '';
+      }
+      // For series: no episodes with video URLs
+      if (m.type === 'Série') {
+        const hasAnyVideo = m.seasons?.some(s => 
+          s.episodes?.some(e => e.videoUrls && e.videoUrls.trim() !== '')
+        );
+        return !hasAnyVideo;
+      }
+      return false;
+    });
+  }, [library]);
+  
   const resumeList = useMemo(() => {
     return library
       .filter(m => watchProgress[m.id] && watchProgress[m.id] > 0 && watchProgress[m.id] < 100)
@@ -389,6 +407,7 @@ export const useSupabaseMedia = () => {
     library,
     films,
     series,
+    comingSoon,
     heroItems,
     resumeList,
     watchProgress,

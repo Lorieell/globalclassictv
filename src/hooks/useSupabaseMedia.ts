@@ -407,14 +407,52 @@ export const useSupabaseMedia = () => {
   const emissions = useMemo(() => library.filter(m => m.type === 'Émission'), [library]);
   const documentaries = useMemo(() => library.filter(m => m.type === 'Documentaire'), [library]);
   
-  // Popular content sorted by TMDB popularity (rating field stores popularity score from TMDB)
-  const popularFilms = useMemo(() => 
-    [...films].sort((a, b) => (b.popularity || 0) - (a.popularity || 0)),
-  [films]);
+  // Current year for filtering recent vs classic content
+  const currentYear = new Date().getFullYear();
+  const recentThreshold = currentYear - 3; // Films from last 3 years are "recent"
+  const classicThreshold = currentYear - 10; // Films older than 10 years are "classics"
   
-  const popularSeries = useMemo(() => 
-    [...series].sort((a, b) => (b.popularity || 0) - (a.popularity || 0)),
-  [series]);
+  // Recent popular films (last 3 years, sorted by popularity)
+  const popularFilms = useMemo(() => {
+    return [...films]
+      .filter(f => {
+        const year = parseInt((f as any).year || '0');
+        return year >= recentThreshold;
+      })
+      .sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+  }, [films, recentThreshold]);
+  
+  // Recent popular series (last 3 years, sorted by popularity)
+  const popularSeries = useMemo(() => {
+    return [...series]
+      .filter(s => {
+        const year = parseInt((s as any).year || '0');
+        return year >= recentThreshold;
+      })
+      .sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+  }, [series, recentThreshold]);
+  
+  // Classic films (older than 10 years, high rating)
+  const classicFilms = useMemo(() => {
+    return [...films]
+      .filter(f => {
+        const year = parseInt((f as any).year || '0');
+        const rating = (f as any).rating || 0;
+        return year > 0 && year <= classicThreshold && rating >= 7;
+      })
+      .sort((a, b) => ((b as any).rating || 0) - ((a as any).rating || 0));
+  }, [films, classicThreshold]);
+  
+  // Classic series (older than 10 years, high rating)
+  const classicSeries = useMemo(() => {
+    return [...series]
+      .filter(s => {
+        const year = parseInt((s as any).year || '0');
+        const rating = (s as any).rating || 0;
+        return year > 0 && year <= classicThreshold && rating >= 7;
+      })
+      .sort((a, b) => ((b as any).rating || 0) - ((a as any).rating || 0));
+  }, [series, classicThreshold]);
   
   // "À venir" - Media without video URLs (coming soon)
   const comingSoon = useMemo(() => {
@@ -461,6 +499,8 @@ export const useSupabaseMedia = () => {
     documentaries,
     popularFilms,
     popularSeries,
+    classicFilms,
+    classicSeries,
     comingSoon,
     heroItems,
     resumeList,

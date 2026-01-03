@@ -17,9 +17,15 @@ const HeroEditorModal = ({ isOpen, heroItems, mediaOptions, onClose, onSave }: H
   const [items, setItems] = useState<HeroItem[]>([]);
   const [searchQueries, setSearchQueries] = useState<Record<string, string>>({});
 
+  // Initialize items when modal opens or heroItems change
   useEffect(() => {
-    setItems(heroItems);
-  }, [heroItems]);
+    if (isOpen) {
+      // Always load the current hero items when modal opens
+      console.log('HeroEditorModal opened with heroItems:', heroItems);
+      setItems(heroItems.length > 0 ? [...heroItems] : []);
+      setSearchQueries({});
+    }
+  }, [isOpen, heroItems]);
 
   if (!isOpen) return null;
 

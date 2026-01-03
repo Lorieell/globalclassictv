@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, ReactNode } from 'react';
-import { ChevronRight, ChevronLeft } from 'lucide-react';
+import { ChevronRight, ChevronLeft, X } from 'lucide-react';
 import MediaCard from './MediaCard';
 import type { Media } from '@/types/media';
 
@@ -15,6 +15,9 @@ interface MediaRowProps {
   onEdit?: (media: Media) => void;
   onDelete?: (id: string) => void;
   layout?: RowLayoutType;
+  // For watchlist/favorites removal
+  onRemove?: (mediaId: string) => void;
+  showRemoveButton?: boolean;
 }
 
 const MediaRow = ({ 
@@ -26,7 +29,9 @@ const MediaRow = ({
   isAdmin,
   onEdit,
   onDelete,
-  layout = 'scroll'
+  layout = 'scroll',
+  onRemove,
+  showRemoveButton = false
 }: MediaRowProps) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -229,8 +234,20 @@ const MediaRow = ({
           {media.map(item => (
             <div 
               key={item.id} 
-              className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[200px]"
+              className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[200px] relative group/card"
             >
+              {/* Remove button for watchlist/favorites */}
+              {showRemoveButton && onRemove && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemove(item.id);
+                  }}
+                  className="absolute top-2 right-2 z-20 w-7 h-7 rounded-full bg-destructive/90 text-destructive-foreground flex items-center justify-center opacity-0 group-hover/card:opacity-100 transition-opacity hover:bg-destructive"
+                >
+                  <X size={14} />
+                </button>
+              )}
               <MediaCard 
                 media={item}
                 onSelect={onSelect}

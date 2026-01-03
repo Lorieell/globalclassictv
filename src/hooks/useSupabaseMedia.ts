@@ -407,13 +407,13 @@ export const useSupabaseMedia = () => {
   const emissions = useMemo(() => library.filter(m => m.type === 'Émission'), [library]);
   const documentaries = useMemo(() => library.filter(m => m.type === 'Documentaire'), [library]);
   
-  // Popular content sorted by rating/popularity
+  // Popular content sorted by TMDB popularity (rating field stores popularity score from TMDB)
   const popularFilms = useMemo(() => 
-    [...films].sort((a, b) => ((b as any).rating || 0) - ((a as any).rating || 0)),
+    [...films].sort((a, b) => (b.popularity || 0) - (a.popularity || 0)),
   [films]);
   
   const popularSeries = useMemo(() => 
-    [...series].sort((a, b) => ((b as any).rating || 0) - ((a as any).rating || 0)),
+    [...series].sort((a, b) => (b.popularity || 0) - (a.popularity || 0)),
   [series]);
   
   // "À venir" - Media without video URLs (coming soon)

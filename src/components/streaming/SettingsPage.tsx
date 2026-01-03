@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, forwardRef } from 'react';
-import { ArrowLeft, Link2, Megaphone, Palette, FolderOpen, Instagram, Youtube, Twitter, Sun, Moon, Monitor, Plus, X, Film, Tv, BookOpen, Music, Gamepad2, Mic, Globe, Sparkles, Heart, Skull, Laugh, Zap, Sword, Ghost, Rocket, Theater, Baby, Search, Mountain, Users, List, Check, Pencil, Play, RefreshCw, Loader2, Trash2, Download, Database, type LucideIcon } from 'lucide-react';
+import { ArrowLeft, Link2, Megaphone, Palette, FolderOpen, Instagram, Youtube, Twitter, Sun, Moon, Monitor, Plus, X, Film, Tv, BookOpen, Music, Gamepad2, Mic, Globe, Sparkles, Heart, Skull, Laugh, Zap, Sword, Ghost, Rocket, Theater, Baby, Search, Mountain, Users, List, Check, Pencil, Play, RefreshCw, Loader2, Trash2, Download, Database, Star, type LucideIcon } from 'lucide-react';
 import AdvancedAdsEditor from '@/components/streaming/AdvancedAdsEditor';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -95,6 +95,8 @@ interface SettingsPageProps {
   onEditMedia?: (media: Media) => void;
   onAddMedia?: (media: Media) => void;
   onAddNewMedia?: () => void; // Opens editor for new media
+  onDeleteMedia?: (id: string) => void;
+  onToggleFeatured?: (id: string, isFeatured: boolean) => void;
 }
 
 const SOCIAL_STORAGE_KEY = 'gctv-social-links';
@@ -166,7 +168,7 @@ const applyAccentColor = (hexColor: string) => {
   document.documentElement.style.setProperty('--ring', `${hue} ${saturation}% ${lightness}%`);
 };
 
-const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewMedia }: SettingsPageProps) => {
+const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewMedia, onDeleteMedia, onToggleFeatured }: SettingsPageProps) => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('links');
   
   // Links state
@@ -802,7 +804,7 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
                           <th className="text-left p-3 text-sm font-medium text-muted-foreground">Contenu</th>
                           <th className="text-left p-3 text-sm font-medium text-muted-foreground w-20">Type</th>
                           <th className="text-center p-3 text-sm font-medium text-muted-foreground w-20">Vidéo</th>
-                          <th className="text-center p-3 text-sm font-medium text-muted-foreground w-20">Action</th>
+                          <th className="text-center p-3 text-sm font-medium text-muted-foreground w-32">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border/30">
@@ -810,16 +812,24 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
                           const hasVideo = media.type === 'Série' 
                             ? media.seasons?.some(s => s.episodes.some(e => e.videoUrls && e.videoUrls.trim() !== ''))
                             : media.videoUrls && media.videoUrls.trim() !== '';
+                          const isFeatured = (media as any).isFeatured || false;
                           
                           return (
                             <tr key={media.id} className="hover:bg-muted/20 transition-colors">
                               <td className="p-3">
                                 <div className="flex items-center gap-3">
-                                  <img 
-                                    src={media.image} 
-                                    alt={media.title}
-                                    className="w-10 h-14 object-cover rounded"
-                                  />
+                                  <div className="relative">
+                                    <img 
+                                      src={media.image} 
+                                      alt={media.title}
+                                      className="w-10 h-14 object-cover rounded"
+                                    />
+                                    {isFeatured && (
+                                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-500 rounded-full flex items-center justify-center">
+                                        <Star size={10} className="text-black fill-black" />
+                                      </div>
+                                    )}
+                                  </div>
                                   <div>
                                     <p className="font-medium text-foreground text-sm">{media.title}</p>
                                     <p className="text-xs text-muted-foreground">{media.language} • {media.quality}</p>
@@ -851,15 +861,44 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
                                   </div>
                                 )}
                               </td>
-                              <td className="p-3 text-center">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => onEditMedia?.(media)}
-                                  className="text-muted-foreground hover:text-foreground"
-                                >
-                                  <Pencil size={14} />
-                                </Button>
+                              <td className="p-3">
+                                <div className="flex items-center justify-center gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => onEditMedia?.(media)}
+                                    className="text-muted-foreground hover:text-foreground h-8 w-8 p-0"
+                                    title="Modifier"
+                                  >
+                                    <Pencil size={14} />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      if (confirm(`Supprimer "${media.title}" ?`)) {
+                                        onDeleteMedia?.(media.id);
+                                      }
+                                    }}
+                                    className="text-red-400 hover:text-red-500 hover:bg-red-500/10 h-8 w-8 p-0"
+                                    title="Supprimer"
+                                  >
+                                    <Trash2 size={14} />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => onToggleFeatured?.(media.id, !isFeatured)}
+                                    className={`h-8 w-8 p-0 ${
+                                      isFeatured 
+                                        ? 'text-yellow-500 hover:text-yellow-400 bg-yellow-500/10' 
+                                        : 'text-muted-foreground hover:text-yellow-500 hover:bg-yellow-500/10'
+                                    }`}
+                                    title={isFeatured ? "Retirer des populaires" : "Marquer comme populaire"}
+                                  >
+                                    <Star size={14} className={isFeatured ? 'fill-yellow-500' : ''} />
+                                  </Button>
+                                </div>
                               </td>
                             </tr>
                           );

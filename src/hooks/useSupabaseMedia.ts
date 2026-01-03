@@ -67,6 +67,7 @@ const transformDbMedia = (dbMedia: any): Media => {
   (media as any).backdrop = dbMedia.backdrop_url;
   (media as any).rating = dbMedia.rating;
   (media as any).year = dbMedia.year;
+  (media as any).isFeatured = dbMedia.is_featured || false;
   return media;
 };
 
@@ -267,6 +268,21 @@ export const useSupabaseMedia = () => {
     }
 
     setLibrary(prev => prev.filter(m => m.id !== id));
+  }, []);
+
+  // Toggle featured status
+  const toggleFeatured = useCallback(async (id: string, isFeatured: boolean) => {
+    const { error } = await supabase
+      .from('media')
+      .update({ is_featured: isFeatured })
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error toggling featured:', error);
+      throw error;
+    }
+
+    setLibrary(prev => prev.map(m => m.id === id ? { ...m, isFeatured } as any : m));
   }, []);
 
   // Save hero items
@@ -568,11 +584,18 @@ export const useSupabaseMedia = () => {
     });
   }, [library]);
   
+  // Resume list - include content with progress > 0 (including 100% to show completed)
   const resumeList = useMemo(() => {
     return library
-      .filter(m => watchProgress[m.id] && watchProgress[m.id] > 0 && watchProgress[m.id] < 100)
-      .map(m => ({ ...m, progress: watchProgress[m.id] }));
+      .filter(m => watchProgress[m.id] && watchProgress[m.id] > 0)
+      .map(m => ({ ...m, progress: watchProgress[m.id] }))
+      .sort((a, b) => (b.progress === 100 ? 0 : b.progress) - (a.progress === 100 ? 0 : a.progress)); // Keep in progress first
   }, [library, watchProgress]);
+
+  // Featured media (marked as popular by admin)
+  const featuredMedia = useMemo(() => {
+    return library.filter(m => (m as any).isFeatured === true);
+  }, [library]);
 
   const watchlistMedia = useMemo(() => {
     return library.filter(m => watchlist.includes(m.id));
@@ -604,6 +627,7 @@ export const useSupabaseMedia = () => {
     bollywood,
     heroItems,
     resumeList,
+    featuredMedia,
     watchProgress,
     watchPosition,
     watchlist,
@@ -616,6 +640,7 @@ export const useSupabaseMedia = () => {
     addMedia,
     updateMedia,
     deleteMedia,
+    toggleFeatured,
     saveHeroItems,
     updateProgress,
     updatePosition,

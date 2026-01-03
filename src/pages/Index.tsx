@@ -20,8 +20,17 @@ import { useSupabaseMedia } from '@/hooks/useSupabaseMedia';
 import { useAdmin } from '@/hooks/useAdmin';
 import type { Media, HeroItem } from '@/types/media';
 
+// Helper: Check if media has video uploaded
+const hasVideoUploaded = (m: Media): boolean => {
+  if (m.type === 'Série' || m.type === 'Émission') {
+    return m.seasons?.some(s => s.episodes?.some(e => e.videoUrls && e.videoUrls.trim() !== '')) || false;
+  }
+  return !!(m.videoUrls && m.videoUrls.trim() !== '');
+};
+
 // Génère les hero items automatiquement à partir des médias populaires récents (1 an max)
-const generateAutoHeroItems = (library: Media[]): HeroItem[] => {
+// Moitié featured (marqués populaire par admin), moitié random
+const generateAutoHeroItems = (library: Media[], featuredMedia: Media[] = []): HeroItem[] => {
   if (library.length === 0) return [];
   
   const now = new Date();
@@ -38,7 +47,12 @@ const generateAutoHeroItems = (library: Media[]): HeroItem[] => {
     return !cjkPattern.test(title);
   };
   
-  // Filtrer les médias récents (1 an), mainstream, avec backdrop et bonne note, triés par popularité
+  // Get featured media with video and backdrop (for hero display)
+  const eligibleFeatured = featuredMedia
+    .filter(m => hasVideoUploaded(m) && (m as any).backdrop)
+    .sort(() => (Math.random() - 0.5) * rotationPeriod % 10); // Randomize based on hour
+  
+  // Filtrer les médias récents (1 an), mainstream, avec backdrop, bonne note, ET avec vidéo uploadée
   const eligibleMedia = library
     .filter(m => {
       const year = parseInt((m as any).year || '0');
@@ -46,14 +60,36 @@ const generateAutoHeroItems = (library: Media[]): HeroItem[] => {
       const hasGoodRating = ((m as any).rating || 0) >= 6;
       const isRecent = year >= heroThreshold;
       const isMainstream = isMainstreamTitle(m.title);
-      return hasBackdrop && hasGoodRating && isRecent && isMainstream;
+      const hasVideo = hasVideoUploaded(m);
+      const isNotFeatured = !(m as any).isFeatured; // Exclude featured to avoid duplicates
+      return hasBackdrop && hasGoodRating && isRecent && isMainstream && hasVideo && isNotFeatured;
     })
     .sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
   
-  if (eligibleMedia.length === 0) {
-    // Fallback: prendre les médias les plus populaires avec image (sans filtre d'année)
+  // Calculate how many featured vs random (aim for 3 featured, 3 random = 6 total)
+  const numFeatured = Math.min(3, eligibleFeatured.length);
+  const numRandom = 6 - numFeatured;
+  
+  const selectedFeatured = eligibleFeatured.slice(0, numFeatured);
+  
+  // Shuffle random selection based on rotation period
+  const shuffledRandom = [...eligibleMedia.slice(0, 20)].sort((a, b) => {
+    const hashA = ((a.title.charCodeAt(0) || 0) * rotationPeriod) % 100;
+    const hashB = ((b.title.charCodeAt(0) || 0) * rotationPeriod) % 100;
+    return hashB - hashA;
+  }).slice(0, numRandom);
+  
+  // Combine and interleave: featured, random, featured, random...
+  const combined: Media[] = [];
+  for (let i = 0; i < Math.max(selectedFeatured.length, shuffledRandom.length); i++) {
+    if (i < selectedFeatured.length) combined.push(selectedFeatured[i]);
+    if (i < shuffledRandom.length) combined.push(shuffledRandom[i]);
+  }
+  
+  if (combined.length === 0) {
+    // Fallback: prendre les médias les plus populaires avec image et vidéo
     const fallback = library
-      .filter(m => m.image && (m as any).backdrop)
+      .filter(m => m.image && (m as any).backdrop && hasVideoUploaded(m))
       .sort((a, b) => (b.popularity || 0) - (a.popularity || 0))
       .slice(0, 6);
     return fallback.map(m => ({
@@ -65,19 +101,7 @@ const generateAutoHeroItems = (library: Media[]): HeroItem[] => {
     }));
   }
   
-  // Mélanger légèrement les top 20 pour variété, mais garder les plus populaires en priorité
-  const top20 = eligibleMedia.slice(0, 20);
-  const shuffled = [...top20].sort((a, b) => {
-    const popA = a.popularity || 0;
-    const popB = b.popularity || 0;
-    // Ajouter un peu de randomisation basée sur l'heure
-    const hashA = ((a.title.charCodeAt(0) || 0) * rotationPeriod) % 100;
-    const hashB = ((b.title.charCodeAt(0) || 0) * rotationPeriod) % 100;
-    return (popB + hashB) - (popA + hashA);
-  });
-  
-  // Prendre 6 items
-  return shuffled.slice(0, 6).map(m => ({
+  return combined.slice(0, 6).map(m => ({
     id: `hero-auto-${m.id}-${rotationPeriod}`,
     title: m.title.toUpperCase(),
     description: m.description || m.synopsis || '',
@@ -122,6 +146,7 @@ const Index = () => {
     bollywood,
     heroItems, 
     resumeList,
+    featuredMedia,
     watchPosition,
     watchlistMedia,
     favoritesMedia,
@@ -129,6 +154,7 @@ const Index = () => {
     addMedia,
     updateMedia,
     deleteMedia,
+    toggleFeatured,
     updateProgress,
     updatePosition,
     saveHeroItems,
@@ -281,9 +307,29 @@ const Index = () => {
     updatePosition(mediaId, seasonId, episodeId);
   };
 
-  // Générer les hero items automatiquement
-  const autoHeroItems = useMemo(() => generateAutoHeroItems(library), [library]);
+  // Générer les hero items automatiquement avec featured media
+  const autoHeroItems = useMemo(() => generateAutoHeroItems(library, featuredMedia), [library, featuredMedia]);
   const displayHeroItems = heroItems.length > 0 ? heroItems : autoHeroItems;
+  
+  // Inverser les contenus populaires (les plus en bas deviennent premiers) pour Featured
+  const invertedPopularFilms = useMemo(() => {
+    // Prioritize featured items first, then rest reversed
+    const featured = popularFilms.filter(m => (m as any).isFeatured);
+    const nonFeatured = popularFilms.filter(m => !(m as any).isFeatured);
+    // Shuffle featured randomly to avoid always showing same order
+    const shuffledFeatured = [...featured].sort(() => Math.random() - 0.5);
+    // Reverse non-featured (bottom items first)
+    const reversedNonFeatured = [...nonFeatured].reverse();
+    return [...shuffledFeatured, ...reversedNonFeatured];
+  }, [popularFilms]);
+  
+  const invertedPopularSeries = useMemo(() => {
+    const featured = popularSeries.filter(m => (m as any).isFeatured);
+    const nonFeatured = popularSeries.filter(m => !(m as any).isFeatured);
+    const shuffledFeatured = [...featured].sort(() => Math.random() - 0.5);
+    const reversedNonFeatured = [...nonFeatured].reverse();
+    return [...shuffledFeatured, ...reversedNonFeatured];
+  }, [popularSeries]);
   
   // Sélectionner les 4 genres principaux pour films et séries (pas de répétition)
   const topFilmGenres = useMemo(() => {
@@ -319,6 +365,8 @@ const Index = () => {
               onEditMedia={handleEditMedia}
               onAddMedia={addMedia}
               onAddNewMedia={handleAddMedia}
+              onDeleteMedia={deleteMedia}
+              onToggleFeatured={toggleFeatured}
             />
         ) : view === 'player' && selectedMedia ? (
           <VideoPlayer 
@@ -409,11 +457,11 @@ const Index = () => {
                   )}
 
                   {/* 1. Films populaires - Toggle Slide Row */}
-                  {popularFilms.length > 0 && (
+                  {invertedPopularFilms.length > 0 && (
                     <ToggleSlideRow
                       title="Films populaires"
                       titleIcon={<Film size={20} className="text-primary" />}
-                      media={popularFilms.slice(0, 20)}
+                      media={invertedPopularFilms.slice(0, 20)}
                       onSelect={handleSelectMedia}
                       onPlay={(media) => handlePlayFromDetail(media)}
                       onAddToWatchlist={toggleWatchlist}
@@ -423,11 +471,11 @@ const Index = () => {
                   )}
 
                   {/* 2. Séries populaires */}
-                  {popularSeries.length > 0 && (
+                  {invertedPopularSeries.length > 0 && (
                     <MediaRow
                       title="Séries populaires"
                       titleIcon={<Tv size={20} className="text-primary" />}
-                      media={popularSeries.slice(0, 20)}
+                      media={invertedPopularSeries.slice(0, 20)}
                       onSelect={handleSelectMedia}
                       onSeeMore={() => openCategoryPage('Séries populaires', m => m.type === 'Série')}
                       isAdmin={isAdmin}

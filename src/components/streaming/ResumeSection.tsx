@@ -114,8 +114,12 @@ const ResumeSection = ({ resumeList, onSelect }: ResumeSectionProps) => {
 
                 {/* Progress Percentage */}
                 <div className="absolute top-3 left-4">
-                  <div className="text-[8px] font-black text-foreground/60 uppercase tracking-widest bg-background/60 backdrop-blur-sm px-2 py-1 rounded-lg">
-                    {media.progress}% Terminé
+                  <div className={`text-[8px] font-black uppercase tracking-widest backdrop-blur-sm px-2 py-1 rounded-lg ${
+                    media.progress === 100 
+                      ? 'bg-green-500/80 text-white' 
+                      : 'bg-background/60 text-foreground/60'
+                  }`}>
+                    {media.progress === 100 ? '✓ Terminé' : `${media.progress}% Terminé`}
                   </div>
                 </div>
               </div>
@@ -125,7 +129,7 @@ const ResumeSection = ({ resumeList, onSelect }: ResumeSectionProps) => {
                   {media.title}
                 </div>
                 <div className="text-[8px] font-bold text-muted-foreground uppercase mt-0.5 tracking-widest italic">
-                  Continuer la lecture
+                  {media.progress === 100 ? 'Revoir' : 'Continuer la lecture'}
                 </div>
               </div>
             </div>

@@ -130,6 +130,7 @@ export type Database = {
           duration: string | null
           genres: string[] | null
           id: string
+          is_featured: boolean | null
           is_new: boolean | null
           language: string | null
           original_title: string | null
@@ -153,6 +154,7 @@ export type Database = {
           duration?: string | null
           genres?: string[] | null
           id?: string
+          is_featured?: boolean | null
           is_new?: boolean | null
           language?: string | null
           original_title?: string | null
@@ -176,6 +178,7 @@ export type Database = {
           duration?: string | null
           genres?: string[] | null
           id?: string
+          is_featured?: boolean | null
           is_new?: boolean | null
           language?: string | null
           original_title?: string | null

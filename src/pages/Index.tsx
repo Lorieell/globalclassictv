@@ -13,7 +13,7 @@ import AdminLoginModal from '@/components/streaming/AdminLoginModal';
 import MediaEditorModal from '@/components/streaming/MediaEditorModal';
 import HeroEditorModal from '@/components/streaming/HeroEditorModal';
 import SettingsPage from '@/components/streaming/SettingsPage';
-import AdLayout from '@/components/streaming/AdLayout';
+import AdvancedAdLayout from '@/components/streaming/AdvancedAdLayout';
 import Footer from '@/components/streaming/Footer';
 import { useSupabaseMedia } from '@/hooks/useSupabaseMedia';
 import { useAdmin } from '@/hooks/useAdmin';
@@ -275,7 +275,7 @@ const Index = () => {
       />
 
       <main className="min-h-[calc(100vh-140px)]">
-        <AdLayout showAds={view !== 'settings'}>
+        <AdvancedAdLayout showAds={view !== 'settings'}>
           {view === 'settings' ? (
             <SettingsPage 
               onBack={() => setView('home')} 
@@ -611,7 +611,7 @@ const Index = () => {
             )}
           </div>
         )}
-        </AdLayout>
+        </AdvancedAdLayout>
       </main>
 
       {/* Footer */}

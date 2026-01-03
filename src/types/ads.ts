@@ -7,58 +7,68 @@ export interface SlideImage {
 }
 
 export interface SlideAd {
+  id: string;
+  type: 'slide';
   enabled: boolean;
   images: SlideImage[]; // Max 3 images
-  interval: number; // Interval in seconds (synced with hero slider by default)
+  interval: number; // Interval in seconds
+  order: number; // Position order
 }
 
 export interface StaticAd {
+  id: string;
+  type: 'static';
   enabled: boolean;
-  type: 'image' | 'adsense';
+  adType: 'image' | 'adsense';
   imageUrl: string;
   linkUrl: string;
   adsenseCode: string;
+  order: number; // Position order
 }
 
-export interface SideAdSettings {
-  slideAd: SlideAd;
-  staticAd: StaticAd;
+export type Ad = SlideAd | StaticAd;
+
+export interface SideAds {
+  ads: Ad[];
 }
 
 export interface AdvancedAdSettings {
-  left: SideAdSettings;
-  right: SideAdSettings;
+  left: SideAds;
+  right: SideAds;
   heroSyncEnabled: boolean; // Sync slide ads with hero slider
 }
 
+// Helper to generate unique ID
+export const generateAdId = () => Math.random().toString(36).substring(2, 9);
+
+// Create new slide ad
+export const createSlideAd = (order: number): SlideAd => ({
+  id: generateAdId(),
+  type: 'slide',
+  enabled: true,
+  images: [],
+  interval: 30,
+  order,
+});
+
+// Create new static ad
+export const createStaticAd = (order: number): StaticAd => ({
+  id: generateAdId(),
+  type: 'static',
+  enabled: true,
+  adType: 'image',
+  imageUrl: '',
+  linkUrl: '',
+  adsenseCode: '',
+  order,
+});
+
 export const DEFAULT_AD_SETTINGS: AdvancedAdSettings = {
   left: {
-    slideAd: {
-      enabled: false,
-      images: [],
-      interval: 30, // Same as hero slider (30 seconds)
-    },
-    staticAd: {
-      enabled: false,
-      type: 'image',
-      imageUrl: '',
-      linkUrl: '',
-      adsenseCode: '',
-    },
+    ads: [],
   },
   right: {
-    slideAd: {
-      enabled: false,
-      images: [],
-      interval: 30,
-    },
-    staticAd: {
-      enabled: false,
-      type: 'image',
-      imageUrl: '',
-      linkUrl: '',
-      adsenseCode: '',
-    },
+    ads: [],
   },
   heroSyncEnabled: true,
 };

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, ReactNode } from 'react';
 import { useAdSettings } from '@/hooks/useAdSettings';
-import type { SideAdSettings, SlideImage } from '@/types/ads';
+import type { SlideAd, StaticAd, Ad, SlideImage } from '@/types/ads';
 
 interface AdvancedAdLayoutProps {
   children: ReactNode;
@@ -46,12 +46,10 @@ const AdSenseSlot = ({ code }: { code: string }) => {
 
 // Slide Ad Component with auto-rotation
 const SlideAdBanner = ({ 
-  images, 
-  interval, 
+  ad,
   syncIndex 
 }: { 
-  images: SlideImage[]; 
-  interval: number;
+  ad: SlideAd;
   syncIndex?: number;
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -59,23 +57,23 @@ const SlideAdBanner = ({
   useEffect(() => {
     // If synced with hero, use hero's index
     if (syncIndex !== undefined) {
-      setCurrentIndex(syncIndex % images.length);
+      setCurrentIndex(syncIndex % ad.images.length);
       return;
     }
 
     // Otherwise, auto-rotate
-    if (images.length <= 1) return;
+    if (ad.images.length <= 1) return;
     
     const timer = setInterval(() => {
-      setCurrentIndex(prev => (prev + 1) % images.length);
-    }, interval * 1000);
+      setCurrentIndex(prev => (prev + 1) % ad.images.length);
+    }, ad.interval * 1000);
 
     return () => clearInterval(timer);
-  }, [images.length, interval, syncIndex]);
+  }, [ad.images.length, ad.interval, syncIndex]);
 
-  if (images.length === 0) return null;
+  if (ad.images.length === 0) return null;
 
-  const currentImage = images[currentIndex];
+  const currentImage = ad.images[currentIndex];
   if (!currentImage) return null;
 
   return (
@@ -93,9 +91,9 @@ const SlideAdBanner = ({
         />
       </a>
       {/* Indicators */}
-      {images.length > 1 && (
+      {ad.images.length > 1 && (
         <div className="flex justify-center gap-1.5 mt-2">
-          {images.map((_, i) => (
+          {ad.images.map((_, i) => (
             <div
               key={i}
               className={`h-1 rounded-full transition-all duration-300 ${
@@ -112,31 +110,21 @@ const SlideAdBanner = ({
 };
 
 // Static Ad Component
-const StaticAdBanner = ({ 
-  type, 
-  imageUrl, 
-  linkUrl, 
-  adsenseCode 
-}: { 
-  type: 'image' | 'adsense';
-  imageUrl: string;
-  linkUrl: string;
-  adsenseCode: string;
-}) => {
-  if (type === 'adsense' && adsenseCode) {
-    return <AdSenseSlot code={adsenseCode} />;
+const StaticAdBanner = ({ ad }: { ad: StaticAd }) => {
+  if (ad.adType === 'adsense' && ad.adsenseCode) {
+    return <AdSenseSlot code={ad.adsenseCode} />;
   }
 
-  if (type === 'image' && imageUrl) {
+  if (ad.adType === 'image' && ad.imageUrl) {
     return (
       <a
-        href={linkUrl || '#'}
+        href={ad.linkUrl || '#'}
         target="_blank"
         rel="noopener noreferrer"
         className="block"
       >
         <img
-          src={imageUrl}
+          src={ad.imageUrl}
           alt="Publicité"
           className="w-full max-h-[300px] object-contain rounded-lg hover:opacity-90 transition-opacity shadow-lg"
         />
@@ -149,43 +137,42 @@ const StaticAdBanner = ({
 
 // Side column component
 const AdColumn = ({ 
-  side, 
-  sideSettings, 
+  ads, 
   heroSyncEnabled,
   heroSlideIndex,
 }: { 
-  side: 'left' | 'right';
-  sideSettings: SideAdSettings;
+  ads: Ad[];
   heroSyncEnabled: boolean;
   heroSlideIndex?: number;
 }) => {
-  const { slideAd, staticAd } = sideSettings;
-  
-  const hasSlideAd = slideAd.enabled && slideAd.images.length > 0;
-  const hasStaticAd = staticAd.enabled && (
-    (staticAd.type === 'image' && staticAd.imageUrl) ||
-    (staticAd.type === 'adsense' && staticAd.adsenseCode)
-  );
+  // Sort by order and filter enabled ads
+  const sortedAds = [...ads]
+    .filter(ad => ad.enabled)
+    .filter(ad => {
+      if (ad.type === 'slide') return ad.images.length > 0;
+      if (ad.type === 'static') return ad.adType === 'adsense' ? !!ad.adsenseCode : !!ad.imageUrl;
+      return false;
+    })
+    .sort((a, b) => a.order - b.order);
 
-  if (!hasSlideAd && !hasStaticAd) return null;
+  if (sortedAds.length === 0) return null;
 
   return (
-    <div className="sticky top-24 space-y-4">
-      {hasSlideAd && (
-        <SlideAdBanner
-          images={slideAd.images}
-          interval={slideAd.interval}
-          syncIndex={heroSyncEnabled ? heroSlideIndex : undefined}
-        />
-      )}
-      {hasStaticAd && (
-        <StaticAdBanner
-          type={staticAd.type}
-          imageUrl={staticAd.imageUrl}
-          linkUrl={staticAd.linkUrl}
-          adsenseCode={staticAd.adsenseCode}
-        />
-      )}
+    <div className="sticky top-24 space-y-4 max-h-[calc(100vh-120px)] overflow-y-auto scrollbar-hide">
+      {sortedAds.map((ad) => (
+        ad.type === 'slide' ? (
+          <SlideAdBanner
+            key={ad.id}
+            ad={ad}
+            syncIndex={heroSyncEnabled ? heroSlideIndex : undefined}
+          />
+        ) : (
+          <StaticAdBanner
+            key={ad.id}
+            ad={ad}
+          />
+        )
+      ))}
     </div>
   );
 };
@@ -201,15 +188,20 @@ const AdvancedAdLayout = ({
     return <>{children}</>;
   }
 
-  const hasLeftAds = (
-    (settings.left.slideAd.enabled && settings.left.slideAd.images.length > 0) ||
-    (settings.left.staticAd.enabled && (settings.left.staticAd.imageUrl || settings.left.staticAd.adsenseCode))
-  );
+  // Check if there are any active ads
+  const hasLeftAds = settings.left.ads.some(ad => {
+    if (!ad.enabled) return false;
+    if (ad.type === 'slide') return ad.images.length > 0;
+    if (ad.type === 'static') return ad.adType === 'adsense' ? !!ad.adsenseCode : !!ad.imageUrl;
+    return false;
+  });
 
-  const hasRightAds = (
-    (settings.right.slideAd.enabled && settings.right.slideAd.images.length > 0) ||
-    (settings.right.staticAd.enabled && (settings.right.staticAd.imageUrl || settings.right.staticAd.adsenseCode))
-  );
+  const hasRightAds = settings.right.ads.some(ad => {
+    if (!ad.enabled) return false;
+    if (ad.type === 'slide') return ad.images.length > 0;
+    if (ad.type === 'static') return ad.adType === 'adsense' ? !!ad.adsenseCode : !!ad.imageUrl;
+    return false;
+  });
 
   if (!hasLeftAds && !hasRightAds) {
     return <>{children}</>;
@@ -221,8 +213,7 @@ const AdvancedAdLayout = ({
       <div className="hidden lg:flex w-[160px] flex-shrink-0 p-3 justify-center">
         {hasLeftAds && (
           <AdColumn
-            side="left"
-            sideSettings={settings.left}
+            ads={settings.left.ads}
             heroSyncEnabled={settings.heroSyncEnabled}
             heroSlideIndex={heroSlideIndex}
           />
@@ -238,8 +229,7 @@ const AdvancedAdLayout = ({
       <div className="hidden lg:flex w-[160px] flex-shrink-0 p-3 justify-center">
         {hasRightAds && (
           <AdColumn
-            side="right"
-            sideSettings={settings.right}
+            ads={settings.right.ads}
             heroSyncEnabled={settings.heroSyncEnabled}
             heroSlideIndex={heroSlideIndex}
           />

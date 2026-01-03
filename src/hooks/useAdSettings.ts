@@ -1,19 +1,22 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import type { AdvancedAdSettings } from '@/types/ads';
+import type { AdvancedAdSettings, Ad } from '@/types/ads';
 import { DEFAULT_AD_SETTINGS } from '@/types/ads';
+import { toast } from 'sonner';
 
 const ADS_STORAGE_KEY = 'gctv-ads-settings';
 
 export const useAdSettings = () => {
   const [settings, setSettings] = useState<AdvancedAdSettings>(DEFAULT_AD_SETTINGS);
+  const [localSettings, setLocalSettings] = useState<AdvancedAdSettings>(DEFAULT_AD_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
+  const initialLoadDone = useRef(false);
 
-  // Load settings from Supabase, fallback to localStorage for migration
+  // Load settings from Supabase
   const loadSettings = useCallback(async () => {
     try {
-      // First try Supabase
       const { data, error } = await supabase
         .from('ad_settings')
         .select('settings')
@@ -26,36 +29,27 @@ export const useAdSettings = () => {
       }
 
       if (data?.settings) {
-        // Check if it's the new format (has 'left' and 'right' properties with slideAd)
         const dbSettings = data.settings as any;
-        if (dbSettings.left?.slideAd !== undefined) {
+        // Check if it's the new format with ads array
+        if (dbSettings.left?.ads !== undefined) {
           setSettings(dbSettings as AdvancedAdSettings);
+          if (!initialLoadDone.current) {
+            setLocalSettings(dbSettings as AdvancedAdSettings);
+            initialLoadDone.current = true;
+          }
         } else {
           // Old format - migrate to new format
           const migratedSettings = migrateOldSettings(dbSettings);
           setSettings(migratedSettings);
+          if (!initialLoadDone.current) {
+            setLocalSettings(migratedSettings);
+            initialLoadDone.current = true;
+          }
           // Save migrated settings
-          await saveSettings(migratedSettings);
+          await saveSettingsToDb(migratedSettings);
         }
       } else {
-        // Try localStorage for migration
-        const stored = localStorage.getItem(ADS_STORAGE_KEY);
-        if (stored) {
-          try {
-            const parsed = JSON.parse(stored);
-            // Check if old format
-            if (parsed.leftEnabled !== undefined) {
-              const migratedSettings = migrateOldSettings(parsed);
-              setSettings(migratedSettings);
-              // Save to Supabase
-              await saveSettingsToDb(migratedSettings);
-            } else if (parsed.left?.slideAd !== undefined) {
-              setSettings(parsed as AdvancedAdSettings);
-            }
-          } catch (e) {
-            console.error('Failed to parse localStorage ad settings:', e);
-          }
-        }
+        initialLoadDone.current = true;
       }
     } catch (e) {
       console.error('Error in loadSettings:', e);
@@ -66,36 +60,61 @@ export const useAdSettings = () => {
 
   // Migrate old settings format to new format
   const migrateOldSettings = (oldSettings: any): AdvancedAdSettings => {
+    const leftAds: Ad[] = [];
+    const rightAds: Ad[] = [];
+
+    // Check for old slideAd/staticAd format
+    if (oldSettings.left?.slideAd || oldSettings.left?.staticAd) {
+      if (oldSettings.left?.slideAd?.enabled && oldSettings.left?.slideAd?.images?.length > 0) {
+        leftAds.push({
+          id: Math.random().toString(36).substring(2, 9),
+          type: 'slide',
+          enabled: true,
+          images: oldSettings.left.slideAd.images,
+          interval: oldSettings.left.slideAd.interval || 30,
+          order: 0,
+        });
+      }
+      if (oldSettings.left?.staticAd?.enabled) {
+        leftAds.push({
+          id: Math.random().toString(36).substring(2, 9),
+          type: 'static',
+          enabled: true,
+          adType: oldSettings.left.staticAd.type || 'image',
+          imageUrl: oldSettings.left.staticAd.imageUrl || '',
+          linkUrl: oldSettings.left.staticAd.linkUrl || '',
+          adsenseCode: oldSettings.left.staticAd.adsenseCode || '',
+          order: 1,
+        });
+      }
+      if (oldSettings.right?.slideAd?.enabled && oldSettings.right?.slideAd?.images?.length > 0) {
+        rightAds.push({
+          id: Math.random().toString(36).substring(2, 9),
+          type: 'slide',
+          enabled: true,
+          images: oldSettings.right.slideAd.images,
+          interval: oldSettings.right.slideAd.interval || 30,
+          order: 0,
+        });
+      }
+      if (oldSettings.right?.staticAd?.enabled) {
+        rightAds.push({
+          id: Math.random().toString(36).substring(2, 9),
+          type: 'static',
+          enabled: true,
+          adType: oldSettings.right.staticAd.type || 'image',
+          imageUrl: oldSettings.right.staticAd.imageUrl || '',
+          linkUrl: oldSettings.right.staticAd.linkUrl || '',
+          adsenseCode: oldSettings.right.staticAd.adsenseCode || '',
+          order: 1,
+        });
+      }
+    }
+
     return {
-      left: {
-        slideAd: {
-          enabled: false,
-          images: [],
-          interval: 30,
-        },
-        staticAd: {
-          enabled: oldSettings.leftEnabled || false,
-          type: oldSettings.leftType || 'image',
-          imageUrl: oldSettings.leftImageUrl || '',
-          linkUrl: oldSettings.leftLinkUrl || '',
-          adsenseCode: oldSettings.leftAdsenseCode || '',
-        },
-      },
-      right: {
-        slideAd: {
-          enabled: false,
-          images: [],
-          interval: 30,
-        },
-        staticAd: {
-          enabled: oldSettings.rightEnabled || false,
-          type: oldSettings.rightType || 'image',
-          imageUrl: oldSettings.rightImageUrl || '',
-          linkUrl: oldSettings.rightLinkUrl || '',
-          adsenseCode: oldSettings.rightAdsenseCode || '',
-        },
-      },
-      heroSyncEnabled: true,
+      left: { ads: leftAds },
+      right: { ads: rightAds },
+      heroSyncEnabled: oldSettings.heroSyncEnabled ?? true,
     };
   };
 
@@ -120,39 +139,96 @@ export const useAdSettings = () => {
     }
   };
 
-  // Save settings
-  const saveSettings = async (newSettings: AdvancedAdSettings) => {
+  // Update local settings (without saving to DB)
+  const updateLocalSettings = useCallback((newSettings: AdvancedAdSettings) => {
+    setLocalSettings(newSettings);
+    setHasChanges(true);
+  }, []);
+
+  // Add ad to a side
+  const addAd = useCallback((side: 'left' | 'right', ad: Ad) => {
+    const newSettings = {
+      ...localSettings,
+      [side]: {
+        ads: [...localSettings[side].ads, ad],
+      },
+    };
+    updateLocalSettings(newSettings);
+  }, [localSettings, updateLocalSettings]);
+
+  // Remove ad from a side
+  const removeAd = useCallback((side: 'left' | 'right', adId: string) => {
+    const newSettings = {
+      ...localSettings,
+      [side]: {
+        ads: localSettings[side].ads.filter(ad => ad.id !== adId),
+      },
+    };
+    updateLocalSettings(newSettings);
+  }, [localSettings, updateLocalSettings]);
+
+  // Update a specific ad
+  const updateAd = useCallback((side: 'left' | 'right', adId: string, updates: Partial<Ad>) => {
+    const newSettings = {
+      ...localSettings,
+      [side]: {
+        ads: localSettings[side].ads.map(ad =>
+          ad.id === adId ? { ...ad, ...updates } as Ad : ad
+        ),
+      },
+    };
+    updateLocalSettings(newSettings);
+  }, [localSettings, updateLocalSettings]);
+
+  // Move ad up or down
+  const moveAd = useCallback((side: 'left' | 'right', adId: string, direction: 'up' | 'down') => {
+    const ads = [...localSettings[side].ads].sort((a, b) => a.order - b.order);
+    const index = ads.findIndex(ad => ad.id === adId);
+    if (index === -1) return;
+
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= ads.length) return;
+
+    // Swap orders
+    const temp = ads[index].order;
+    ads[index] = { ...ads[index], order: ads[newIndex].order };
+    ads[newIndex] = { ...ads[newIndex], order: temp };
+
+    const newSettings = {
+      ...localSettings,
+      [side]: { ads },
+    };
+    updateLocalSettings(newSettings);
+  }, [localSettings, updateLocalSettings]);
+
+  // Toggle hero sync
+  const toggleHeroSync = useCallback((enabled: boolean) => {
+    const newSettings = { ...localSettings, heroSyncEnabled: enabled };
+    updateLocalSettings(newSettings);
+  }, [localSettings, updateLocalSettings]);
+
+  // Save all changes
+  const saveAllChanges = useCallback(async () => {
     setSaving(true);
     try {
-      await saveSettingsToDb(newSettings);
-      setSettings(newSettings);
-      // Also update localStorage for backward compat and event dispatch
-      localStorage.setItem(ADS_STORAGE_KEY, JSON.stringify(newSettings));
+      await saveSettingsToDb(localSettings);
+      setSettings(localSettings);
+      setHasChanges(false);
+      localStorage.setItem(ADS_STORAGE_KEY, JSON.stringify(localSettings));
       window.dispatchEvent(new Event('gctv-ads-updated'));
+      toast.success('Paramètres publicitaires sauvegardés');
     } catch (e) {
       console.error('Error saving ad settings:', e);
-      throw e;
+      toast.error('Erreur lors de la sauvegarde');
     } finally {
       setSaving(false);
     }
-  };
+  }, [localSettings]);
 
-  // Update a specific side's settings
-  const updateSideSettings = useCallback(async (
-    side: 'left' | 'right',
-    updates: Partial<typeof settings.left>
-  ) => {
-    const newSettings = {
-      ...settings,
-      [side]: { ...settings[side], ...updates },
-    };
-    await saveSettings(newSettings);
-  }, [settings]);
-
-  // Toggle hero sync
-  const toggleHeroSync = useCallback(async (enabled: boolean) => {
-    const newSettings = { ...settings, heroSyncEnabled: enabled };
-    await saveSettings(newSettings);
+  // Discard changes
+  const discardChanges = useCallback(() => {
+    setLocalSettings(settings);
+    setHasChanges(false);
   }, [settings]);
 
   // Initial load
@@ -188,12 +264,18 @@ export const useAdSettings = () => {
   }, [loadSettings]);
 
   return {
-    settings,
+    settings, // Saved settings (for display)
+    localSettings, // Local edits (for editor)
     loading,
     saving,
-    saveSettings,
-    updateSideSettings,
+    hasChanges,
+    addAd,
+    removeAd,
+    updateAd,
+    moveAd,
     toggleHeroSync,
+    saveAllChanges,
+    discardChanges,
     reload: loadSettings,
   };
 };

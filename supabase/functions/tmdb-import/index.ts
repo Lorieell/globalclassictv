@@ -1,9 +1,15 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Supabase client for direct database operations
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // API configurations
 const TMDB_API_KEY = Deno.env.get('TMDB_API_KEY') || '';
@@ -545,6 +551,68 @@ serve(async (req) => {
     }
     
     console.log(`Total content fetched: ${results.length} items`);
+
+    // If saveToDb flag is set, save directly to Supabase
+    const { saveToDb = false } = await req.json().catch(() => ({}));
+    
+    if (saveToDb && results.length > 0) {
+      console.log('Saving to database...');
+      let savedCount = 0;
+      let skippedCount = 0;
+      
+      for (const media of results) {
+        // Check if already exists by tmdb_id
+        const { data: existing } = await supabase
+          .from('media')
+          .select('id')
+          .eq('tmdb_id', media.tmdbId)
+          .maybeSingle();
+        
+        if (existing) {
+          skippedCount++;
+          continue;
+        }
+        
+        // Transform and insert
+        const dbMedia = {
+          title: media.title,
+          description: media.synopsis || media.description,
+          type: media.type === 'Film' ? 'film' : 'serie',
+          poster_url: media.image,
+          backdrop_url: media.backdrop || null,
+          video_urls: [],
+          genres: media.genres?.split(',').map((g: string) => g.trim()).filter(Boolean) || [],
+          quality: media.quality || 'HD',
+          language: media.language || 'VF',
+          director: media.director || null,
+          cast_members: media.actors?.split(',').map((a: string) => a.trim()).filter(Boolean) || [],
+          tmdb_id: media.tmdbId,
+          rating: media.rating || null,
+          year: media.year || null,
+          seasons: media.seasons || [],
+        };
+        
+        const { error } = await supabase.from('media').insert(dbMedia);
+        
+        if (error) {
+          console.error(`Error inserting ${media.title}:`, error.message);
+        } else {
+          savedCount++;
+        }
+      }
+      
+      console.log(`Saved ${savedCount} new items, skipped ${skippedCount} existing`);
+      
+      return new Response(JSON.stringify({ 
+        success: true, 
+        saved: savedCount,
+        skipped: skippedCount,
+        total: results.length,
+        message: `${savedCount} nouveaux contenus importés, ${skippedCount} déjà existants` 
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     return new Response(JSON.stringify({ 
       success: true, 

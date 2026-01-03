@@ -304,44 +304,31 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
     }
   };
 
-  // Reset library and reimport from TMDB (PRESERVE manual content)
+  // Reset library and reimport from TMDB - saves directly to Supabase
   const handleResetAndImport = async () => {
-    if (!confirm('Êtes-vous sûr de vouloir réimporter depuis TMDB ? Vos contenus ajoutés manuellement seront conservés.')) {
+    if (!confirm('Êtes-vous sûr de vouloir importer depuis TMDB ? Les contenus existants seront conservés, seuls les nouveaux seront ajoutés.')) {
       return;
     }
     
     setIsImporting(true);
     try {
-      // Get manually added content to preserve
-      const manualContent = library.filter(m => m.isManual || !m.id.startsWith('tmdb-'));
-      
-      toast.info('Import en cours... Vos contenus manuels sont préservés.');
+      toast.info('Import en cours... Cela peut prendre quelques minutes.');
       
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tmdb-import`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'all', pages: 5 }),
+          body: JSON.stringify({ type: 'all', pages: 5, saveToDb: true }),
         }
       );
       
       const result = await response.json();
       
-      if (result.success && result.data) {
-        // Add new TMDB content to Supabase directly
-        let addedCount = 0;
-        for (const newMedia of result.data) {
-          const exists = library.some(m => 
-            m.id === newMedia.id || 
-            m.title.toLowerCase() === newMedia.title.toLowerCase()
-          );
-          if (!exists && onAddMedia) {
-            await onAddMedia(newMedia);
-            addedCount++;
-          }
-        }
-        toast.success(`${addedCount} contenus TMDB importés dans la base de données, ${manualContent.length} contenus manuels préservés`);
+      if (result.success) {
+        toast.success(result.message || `${result.saved} nouveaux contenus importés`);
+        // Refresh page to load new data
+        window.location.reload();
       } else {
         toast.error(result.error || 'Erreur lors de l\'import');
       }
@@ -353,7 +340,7 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
     }
   };
 
-  // Import TMDB content (add to existing) - saves directly to Supabase
+  // Quick import - add new content only
   const handleImportTMDB = async () => {
     setIsImporting(true);
     try {
@@ -364,26 +351,15 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'all', pages: 5 }),
+          body: JSON.stringify({ type: 'all', pages: 3, saveToDb: true }),
         }
       );
       
       const result = await response.json();
       
-      if (result.success && result.data) {
-        let addedCount = 0;
-        for (const media of result.data) {
-          const exists = library.some(m => 
-            m.id === media.id || 
-            m.title.toLowerCase() === media.title.toLowerCase() ||
-            (m.tmdbId && m.tmdbId === media.tmdbId)
-          );
-          if (!exists && onAddMedia) {
-            await onAddMedia(media);
-            addedCount++;
-          }
-        }
-        toast.success(`${addedCount} nouveaux contenus importés dans la base de données`);
+      if (result.success) {
+        toast.success(result.message || `${result.saved} nouveaux contenus importés`);
+        window.location.reload();
       } else {
         toast.error(result.error || 'Erreur lors de l\'import');
       }
@@ -395,44 +371,29 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
     }
   };
 
-  // Check and add missing TMDB/OMDB content - saves directly to Supabase
+  // Check and add missing TMDB content
   const handleCheckMissingContent = async () => {
     setIsCheckingAPI(true);
     try {
-      toast.info('Vérification des contenus manquants en cours...');
+      toast.info('Vérification des contenus manquants...');
       
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tmdb-import`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'all', pages: 10 }),
+          body: JSON.stringify({ type: 'all', pages: 10, saveToDb: true }),
         }
       );
       
       const result = await response.json();
       
-      if (result.success && result.data) {
-        const existingIds = new Set(library.map(m => m.id));
-        const existingTitles = new Set(library.map(m => m.title.toLowerCase()));
-        const existingTmdbIds = new Set(library.filter(m => m.tmdbId).map(m => m.tmdbId));
-        
-        let addedCount = 0;
-        for (const media of result.data) {
-          const isDuplicate = existingIds.has(media.id) || 
-            existingTitles.has(media.title.toLowerCase()) ||
-            (media.tmdbId && existingTmdbIds.has(media.tmdbId));
-          
-          if (!isDuplicate && onAddMedia) {
-            await onAddMedia(media);
-            addedCount++;
-          }
-        }
-        
-        if (addedCount > 0) {
-          toast.success(`${addedCount} contenus manquants ajoutés à la base de données`);
+      if (result.success) {
+        if (result.saved > 0) {
+          toast.success(`${result.saved} contenus manquants ajoutés`);
+          window.location.reload();
         } else {
-          toast.success('Aucun contenu manquant détecté, la bibliothèque est à jour');
+          toast.success('Aucun contenu manquant, la bibliothèque est à jour');
         }
       } else {
         toast.error(result.error || 'Erreur lors de la vérification');

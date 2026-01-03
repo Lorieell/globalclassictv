@@ -1,15 +1,18 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Supabase client
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
 // TMDB API config
 const TMDB_API_KEY = Deno.env.get('TMDB_API_KEY') || '';
-if (!TMDB_API_KEY) {
-  console.error('TMDB_API_KEY not configured');
-}
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/w500';
 const TMDB_BACKDROP_BASE = 'https://image.tmdb.org/t/p/original';
@@ -26,14 +29,6 @@ const LANGUAGE_MAP: Record<string, string> = {
   'ko': 'VOSTFR',
   'zh': 'VOSTFR',
 };
-
-interface MaintenanceResult {
-  languageUpdates: number;
-  qualityUpdates: number;
-  newSeriesAdded: number;
-  skippedManual: number;
-  errors: string[];
-}
 
 async function fetchFromTMDB(endpoint: string, params: Record<string, string> = {}) {
   const url = new URL(`${TMDB_BASE_URL}${endpoint}`);
@@ -71,105 +66,76 @@ function getQualityLabel(rating: number, year: string): string {
   return 'HD';
 }
 
-async function checkAndUpdateMedia(library: any[]): Promise<{ languageUpdates: number; qualityUpdates: number; errors: string[]; skippedManual: number }> {
-  let languageUpdates = 0;
-  let qualityUpdates = 0;
-  let skippedManual = 0;
-  const errors: string[] = [];
-  
-  for (const media of library) {
-    try {
-      // Skip manually added content - never modify it
-      if (media.isManual === true) {
-        skippedManual++;
-        continue;
-      }
-      
-      // Extract TMDB ID
-      const tmdbIdMatch = media.id?.match(/tmdb-(movie|tv)-(\d+)/);
-      if (!tmdbIdMatch) {
-        // If no TMDB ID pattern, consider it manual content - skip
-        skippedManual++;
-        continue;
-      }
-      
-      const [, type, id] = tmdbIdMatch;
-      const endpoint = type === 'movie' ? `/movie/${id}` : `/tv/${id}`;
-      
-      const details = await fetchFromTMDB(endpoint);
-      
-      // Check language
-      const correctLanguage = getLanguageLabel(
-        details.original_language,
-        details.spoken_languages
-      );
-      if (media.language !== correctLanguage) {
-        media.language = correctLanguage;
-        languageUpdates++;
-      }
-      
-      // Check quality
-      const year = type === 'movie' 
-        ? details.release_date?.split('-')[0] 
-        : details.first_air_date?.split('-')[0];
-      const correctQuality = getQualityLabel(details.vote_average, year || '');
-      if (media.quality !== correctQuality) {
-        media.quality = correctQuality;
-        qualityUpdates++;
-      }
-      
-      // NEVER remove videoUrls or seasons that user has added
-      // Only update metadata, preserve user-added content
-      
-      // Add small delay to avoid rate limiting
-      await new Promise(resolve => setTimeout(resolve, 50));
-    } catch (error) {
-      errors.push(`Error updating ${media.title}: ${error}`);
-    }
-  }
-  
-  return { languageUpdates, qualityUpdates, errors, skippedManual };
-}
-
-async function fetchNewSeries(): Promise<any[]> {
-  const newSeries: any[] = [];
+// Fetch new movies/series from today's releases
+async function fetchTodayContent(): Promise<any[]> {
+  const today = new Date().toISOString().split('T')[0];
+  const results: any[] = [];
   
   try {
-    // Fetch latest airing series
-    const response = await fetchFromTMDB('/tv/on_the_air', { page: '1' });
+    console.log(`Fetching content released on or after ${today}...`);
     
-    for (const series of response.results.slice(0, 10)) {
-      if (!series.poster_path) continue;
+    // Fetch recently released movies
+    const moviesResponse = await fetchFromTMDB('/movie/now_playing', { page: '1' });
+    
+    for (const movie of moviesResponse.results.slice(0, 20)) {
+      if (!movie.poster_path) continue;
       
-      const details = await fetchFromTMDB(`/tv/${series.id}`);
-      const genres = details.genres?.map((g: any) => g.name).join(', ') || 'Drame';
-      const year = details.first_air_date?.split('-')[0] || '';
+      const details = await fetchFromTMDB(`/movie/${movie.id}`);
+      const genres = details.genres?.map((g: any) => g.name) || [];
+      const year = details.release_date?.split('-')[0] || '';
       
-      newSeries.push({
-        id: `tmdb-tv-${series.id}`,
-        title: details.name,
-        image: `${TMDB_IMAGE_BASE}${details.poster_path}`,
-        type: 'Série',
-        description: details.overview?.slice(0, 200) || 'Aucune description disponible.',
-        synopsis: details.overview || 'Aucune description disponible.',
+      results.push({
+        title: details.title,
+        description: details.overview || 'Aucune description disponible.',
+        type: 'film',
+        poster_url: `${TMDB_IMAGE_BASE}${details.poster_path}`,
+        backdrop_url: details.backdrop_path ? `${TMDB_BACKDROP_BASE}${details.backdrop_path}` : null,
         genres,
         quality: getQualityLabel(details.vote_average, year),
         language: getLanguageLabel(details.original_language, details.spoken_languages),
         rating: details.vote_average,
         year,
-        backdrop: details.backdrop_path ? `${TMDB_BACKDROP_BASE}${details.backdrop_path}` : '',
-        tmdbId: series.id,
+        tmdb_id: movie.id,
+        video_urls: [],
         seasons: [],
-        videoUrls: '',
+      });
+      
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    
+    // Fetch recently airing series
+    const seriesResponse = await fetchFromTMDB('/tv/airing_today', { page: '1' });
+    
+    for (const series of seriesResponse.results.slice(0, 20)) {
+      if (!series.poster_path) continue;
+      
+      const details = await fetchFromTMDB(`/tv/${series.id}`);
+      const genres = details.genres?.map((g: any) => g.name) || [];
+      const year = details.first_air_date?.split('-')[0] || '';
+      
+      results.push({
+        title: details.name,
+        description: details.overview || 'Aucune description disponible.',
+        type: 'serie',
+        poster_url: `${TMDB_IMAGE_BASE}${details.poster_path}`,
+        backdrop_url: details.backdrop_path ? `${TMDB_BACKDROP_BASE}${details.backdrop_path}` : null,
+        genres,
+        quality: getQualityLabel(details.vote_average, year),
+        language: getLanguageLabel(details.original_language, details.spoken_languages),
+        rating: details.vote_average,
+        year,
+        tmdb_id: series.id,
+        video_urls: [],
+        seasons: [],
       });
       
       await new Promise(resolve => setTimeout(resolve, 50));
     }
   } catch (error) {
-    console.error('Error fetching new series:', error);
+    console.error('Error fetching today content:', error);
   }
   
-  return newSeries;
+  return results;
 }
 
 serve(async (req) => {
@@ -178,53 +144,57 @@ serve(async (req) => {
   }
 
   try {
-    const { action = 'full', library = [] } = await req.json().catch(() => ({}));
+    const { action = 'daily' } = await req.json().catch(() => ({}));
     
-    console.log(`Daily maintenance started: action=${action}, library size=${library.length}`);
+    console.log(`Daily maintenance started: action=${action}`);
     
-    const result: MaintenanceResult = {
-      languageUpdates: 0,
-      qualityUpdates: 0,
-      newSeriesAdded: 0,
-      skippedManual: 0,
-      errors: [],
-    };
+    let newContentAdded = 0;
+    let skippedExisting = 0;
+    const errors: string[] = [];
     
-    // IMPORTANT: Never remove any content - only add or update metadata
-    let updatedLibrary = [...library];
+    // Fetch today's new content from TMDB
+    const newContent = await fetchTodayContent();
+    console.log(`Found ${newContent.length} items from TMDB`);
     
-    // Check and update language/quality for existing media (skip manual content)
-    if (action === 'full' || action === 'check') {
-      console.log('Checking language and quality (skipping manual content)...');
-      const checkResult = await checkAndUpdateMedia(updatedLibrary);
-      result.languageUpdates = checkResult.languageUpdates;
-      result.qualityUpdates = checkResult.qualityUpdates;
-      result.skippedManual = checkResult.skippedManual;
-      result.errors.push(...checkResult.errors);
-    }
+    // Get existing tmdb_ids from database
+    const { data: existingMedia } = await supabase
+      .from('media')
+      .select('tmdb_id')
+      .not('tmdb_id', 'is', null);
     
-    // Fetch and add new series
-    if (action === 'full' || action === 'add-series') {
-      console.log('Fetching new series...');
-      const newSeries = await fetchNewSeries();
+    const existingTmdbIds = new Set((existingMedia || []).map(m => m.tmdb_id));
+    
+    // Insert only new content
+    for (const media of newContent) {
+      if (existingTmdbIds.has(media.tmdb_id)) {
+        skippedExisting++;
+        continue;
+      }
       
-      // Only add series that don't already exist
-      const existingIds = new Set(updatedLibrary.map(m => m.id));
-      for (const series of newSeries) {
-        if (!existingIds.has(series.id)) {
-          updatedLibrary.push(series);
-          result.newSeriesAdded++;
-        }
+      const { error } = await supabase.from('media').insert(media);
+      
+      if (error) {
+        console.error(`Error inserting ${media.title}:`, error.message);
+        errors.push(`${media.title}: ${error.message}`);
+      } else {
+        newContentAdded++;
+        console.log(`Added: ${media.title}`);
       }
     }
     
-    console.log(`Maintenance complete: ${result.languageUpdates} language updates, ${result.qualityUpdates} quality updates, ${result.newSeriesAdded} new series`);
+    const result = {
+      newContentAdded,
+      skippedExisting,
+      errors,
+      timestamp: new Date().toISOString(),
+    };
+    
+    console.log(`Maintenance complete: ${newContentAdded} new items, ${skippedExisting} skipped`);
     
     return new Response(JSON.stringify({
       success: true,
       result,
-      library: updatedLibrary,
-      message: `Maintenance: ${result.languageUpdates} langues, ${result.qualityUpdates} qualités mises à jour, ${result.newSeriesAdded} nouvelles séries ajoutées`,
+      message: `Maintenance quotidienne: ${newContentAdded} nouveaux contenus ajoutés, ${skippedExisting} déjà existants`,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

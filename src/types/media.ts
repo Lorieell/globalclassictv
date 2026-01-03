@@ -42,4 +42,5 @@ export interface HeroItem {
   description: string;
   image: string;
   mediaId: string;
+  duration?: number; // Custom duration in seconds for this slide
 }

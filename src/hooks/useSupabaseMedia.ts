@@ -467,6 +467,90 @@ export const useSupabaseMedia = () => {
       .sort((a, b) => ((b as any).rating || 0) - ((a as any).rating || 0));
   }, [series, classicThreshold]);
   
+  // Helper: Check if title contains Korean characters
+  const isKoreanTitle = (title: string): boolean => {
+    const koreanPattern = /[\uac00-\ud7af]/;
+    return koreanPattern.test(title);
+  };
+  
+  // Helper: Check if title contains Japanese characters (Hiragana, Katakana, or common Kanji)
+  const isJapaneseTitle = (title: string): boolean => {
+    const japanesePattern = /[\u3040-\u30ff\u31f0-\u31ff]/;
+    return japanesePattern.test(title);
+  };
+  
+  // Helper: Check if title contains Chinese characters (not Japanese)
+  const isChineseTitle = (title: string): boolean => {
+    const cjkPattern = /[\u4e00-\u9fff]/;
+    const japanesePattern = /[\u3040-\u30ff\u31f0-\u31ff]/;
+    return cjkPattern.test(title) && !japanesePattern.test(title);
+  };
+  
+  // Kdramas (Korean series) - popular with VF/VOSTFR
+  const kdramas = useMemo(() => {
+    return [...series]
+      .filter(s => {
+        const title = s.title || '';
+        const genres = s.genres?.toLowerCase() || '';
+        const language = s.language?.toLowerCase() || '';
+        // Korean title OR Korean-related genres
+        const isKorean = isKoreanTitle(title) || 
+          genres.includes('drama') && (genres.includes('korea') || genres.includes('coré')) ||
+          language.includes('coré') || language.includes('korea');
+        const hasSubtitles = language.includes('vostfr') || language.includes('vf') || language === 'vf';
+        return isKorean;
+      })
+      .sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+  }, [series]);
+  
+  // Japanese Animes - popular with VF/VOSTFR
+  const japaneseAnimes = useMemo(() => {
+    return [...library]
+      .filter(m => {
+        const title = m.title || '';
+        const genres = m.genres?.toLowerCase() || '';
+        const type = m.type;
+        // Anime type OR Japanese title with anime/animation genre
+        const isJapaneseAnime = type === 'Animé' || 
+          (isJapaneseTitle(title) && (genres.includes('anim') || genres.includes('anime'))) ||
+          genres.includes('anime');
+        return isJapaneseAnime;
+      })
+      .sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+  }, [library]);
+  
+  // Asian Films (Chinese, Korean, Japanese films)
+  const asianFilms = useMemo(() => {
+    return [...films]
+      .filter(f => {
+        const title = f.title || '';
+        const genres = f.genres?.toLowerCase() || '';
+        const language = f.language?.toLowerCase() || '';
+        const isAsian = isKoreanTitle(title) || isJapaneseTitle(title) || isChineseTitle(title) ||
+          language.includes('coré') || language.includes('japon') || language.includes('chin') ||
+          language.includes('asia') || genres.includes('asia');
+        return isAsian;
+      })
+      .sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+  }, [films]);
+  
+  // Bollywood (Indian films)
+  const bollywood = useMemo(() => {
+    return [...films]
+      .filter(f => {
+        const title = f.title || '';
+        const genres = f.genres?.toLowerCase() || '';
+        const language = f.language?.toLowerCase() || '';
+        // Hindi characters, Indian-related genres, or Hindi language
+        const hindiPattern = /[\u0900-\u097F]/;
+        const isIndian = hindiPattern.test(title) ||
+          language.includes('hindi') || language.includes('indien') || language.includes('india') ||
+          genres.includes('bollywood') || genres.includes('india');
+        return isIndian;
+      })
+      .sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+  }, [films]);
+  
   // "À venir" - Media without video URLs (coming soon)
   const comingSoon = useMemo(() => {
     return library.filter(m => {
@@ -515,6 +599,10 @@ export const useSupabaseMedia = () => {
     classicFilms,
     classicSeries,
     comingSoon,
+    kdramas,
+    japaneseAnimes,
+    asianFilms,
+    bollywood,
     heroItems,
     resumeList,
     watchProgress,

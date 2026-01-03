@@ -116,6 +116,10 @@ const Index = () => {
     classicFilms,
     classicSeries,
     comingSoon,
+    kdramas,
+    japaneseAnimes,
+    asianFilms,
+    bollywood,
     heroItems, 
     resumeList,
     watchPosition,
@@ -522,7 +526,80 @@ const Index = () => {
                     />
                   )}
                   
-                  {/* 7. Disponible en VF */}
+                  {/* NICHE CATEGORIES */}
+                  
+                  {/* Kdramas */}
+                  {kdramas.length > 0 && (
+                    <MediaRow
+                      title="Kdramas"
+                      titleIcon={<Sparkles size={20} className="text-pink-500" />}
+                      media={kdramas.slice(0, 20)}
+                      onSelect={handleSelectMedia}
+                      onSeeMore={() => openCategoryPage('Kdramas', m => {
+                        const title = m.title || '';
+                        const genres = m.genres?.toLowerCase() || '';
+                        const koreanPattern = /[\uac00-\ud7af]/;
+                        return m.type === 'Série' && (koreanPattern.test(title) || genres.includes('drama'));
+                      })}
+                      isAdmin={isAdmin}
+                      onEdit={handleEditMedia}
+                      onDelete={deleteMedia}
+                    />
+                  )}
+                  
+                  {/* Animes Japonais */}
+                  {japaneseAnimes.length > 0 && (
+                    <MediaRow
+                      title="Animes Japonais"
+                      titleIcon={<Sparkles size={20} className="text-red-500" />}
+                      media={japaneseAnimes.slice(0, 20)}
+                      onSelect={handleSelectMedia}
+                      onSeeMore={() => openCategoryPage('Animes Japonais', m => m.type === 'Animé')}
+                      isAdmin={isAdmin}
+                      onEdit={handleEditMedia}
+                      onDelete={deleteMedia}
+                    />
+                  )}
+                  
+                  {/* Films Asiatiques */}
+                  {asianFilms.length > 0 && (
+                    <MediaRow
+                      title="Films Asiatiques"
+                      titleIcon={<Globe size={20} className="text-yellow-500" />}
+                      media={asianFilms.slice(0, 20)}
+                      onSelect={handleSelectMedia}
+                      onSeeMore={() => openCategoryPage('Films Asiatiques', m => {
+                        const title = m.title || '';
+                        const koreanPattern = /[\uac00-\ud7af]/;
+                        const japanesePattern = /[\u3040-\u30ff\u31f0-\u31ff]/;
+                        const chinesePattern = /[\u4e00-\u9fff]/;
+                        return m.type === 'Film' && (koreanPattern.test(title) || japanesePattern.test(title) || chinesePattern.test(title));
+                      })}
+                      isAdmin={isAdmin}
+                      onEdit={handleEditMedia}
+                      onDelete={deleteMedia}
+                    />
+                  )}
+                  
+                  {/* Bollywood */}
+                  {bollywood.length > 0 && (
+                    <MediaRow
+                      title="Bollywood"
+                      titleIcon={<Film size={20} className="text-orange-500" />}
+                      media={bollywood.slice(0, 20)}
+                      onSelect={handleSelectMedia}
+                      onSeeMore={() => openCategoryPage('Bollywood', m => {
+                        const genres = m.genres?.toLowerCase() || '';
+                        const language = m.language?.toLowerCase() || '';
+                        return m.type === 'Film' && (genres.includes('bollywood') || genres.includes('india') || language.includes('hindi'));
+                      })}
+                      isAdmin={isAdmin}
+                      onEdit={handleEditMedia}
+                      onDelete={deleteMedia}
+                    />
+                  )}
+                  
+                  {/* Disponible en VF */}
                   {library.filter(m => m.language === 'VF').length > 0 && (
                     <MediaRow
                       title="Disponible en VF"

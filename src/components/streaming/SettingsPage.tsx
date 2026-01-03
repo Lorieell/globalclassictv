@@ -119,7 +119,7 @@ const defaultContent: ContentSettings = {
   genres: ['Action', 'Comédie', 'Drame', 'Horreur', 'Romance', 'Sci-Fi', 'Thriller'],
 };
 
-type SettingsTab = 'links' | 'ads' | 'appearance' | 'content' | 'liste';
+type SettingsTab = 'links' | 'ads' | 'appearance' | 'content' | 'liste' | 'update';
 
 
 // Apply theme to document
@@ -253,6 +253,7 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
     { key: 'appearance', icon: Palette, label: 'Apparence' },
     { key: 'content', icon: FolderOpen, label: 'Contenu' },
     { key: 'liste', icon: List, label: 'Liste' },
+    { key: 'update', icon: RefreshCw, label: 'Mise à jour' },
   ];
 
   // Liste tab state
@@ -261,6 +262,7 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
   const [isRunningMaintenance, setIsRunningMaintenance] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [isCheckingAPI, setIsCheckingAPI] = useState(false);
+  const [isRefreshingLayout, setIsRefreshingLayout] = useState(false);
 
   const filteredLibrary = library.filter(media => {
     const matchesSearch = listeSearch.trim() === '' || 
@@ -876,6 +878,90 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
                       {filteredLibrary.length} contenu{filteredLibrary.length > 1 ? 's' : ''} affiché{filteredLibrary.length > 1 ? 's' : ''}
                     </p>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* Update Tab */}
+            {activeTab === 'update' && (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="font-display text-xl font-semibold text-foreground mb-2">Mise à jour de l'affichage</h2>
+                  <p className="text-muted-foreground text-sm">
+                    Réorganise automatiquement les contenus pour mettre en avant les plus populaires dans chaque catégorie et génère de nouveaux slides hero.
+                  </p>
+                </div>
+
+                <div className="bg-card/50 rounded-2xl border border-border/50 p-6 space-y-6">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
+                      <RefreshCw size={24} className="text-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-medium text-foreground mb-1">Rafraîchir la disposition</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Met à jour l'ordre des contenus dans chaque catégorie selon leur popularité. Les hero slides seront également régénérés avec les contenus les plus populaires de l'année dernière.
+                      </p>
+                      <Button
+                        onClick={() => {
+                          setIsRefreshingLayout(true);
+                          // Clear hero items cache to force regeneration
+                          localStorage.removeItem('gctv-hero-rotation');
+                          // Dispatch event to trigger re-render
+                          window.dispatchEvent(new Event('gctv-layout-refresh'));
+                          // Simulate processing
+                          setTimeout(() => {
+                            setIsRefreshingLayout(false);
+                            toast.success('Disposition mise à jour ! Les contenus populaires sont maintenant en avant.');
+                            // Reload to apply changes
+                            window.location.reload();
+                          }, 1500);
+                        }}
+                        disabled={isRefreshingLayout}
+                        className="gap-2"
+                      >
+                        {isRefreshingLayout ? (
+                          <>
+                            <Loader2 size={16} className="animate-spin" />
+                            Mise à jour en cours...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw size={16} />
+                            Mettre à jour maintenant
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-border/30 pt-6">
+                    <h4 className="font-medium text-foreground mb-3">Ce qui sera mis à jour :</h4>
+                    <ul className="space-y-2 text-sm text-muted-foreground">
+                      <li className="flex items-center gap-2">
+                        <Check size={14} className="text-green-400" />
+                        Films populaires - triés par note et popularité récente
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <Check size={14} className="text-green-400" />
+                        Séries populaires - triés par note et popularité récente
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <Check size={14} className="text-green-400" />
+                        Hero slides - régénérés avec les blockbusters récents
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <Check size={14} className="text-green-400" />
+                        Catégories de niche - Kdramas, Animes, Bollywood triés par popularité
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="bg-muted/30 rounded-xl p-4 border border-border/30">
+                  <p className="text-sm text-muted-foreground">
+                    <strong className="text-foreground">Note :</strong> Cette action ne supprime aucun contenu. Elle réorganise uniquement l'ordre d'affichage pour mettre en valeur les contenus les plus populaires.
+                  </p>
                 </div>
               </div>
             )}

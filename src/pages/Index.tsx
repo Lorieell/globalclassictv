@@ -15,7 +15,7 @@ import HeroEditorModal from '@/components/streaming/HeroEditorModal';
 import SettingsPage from '@/components/streaming/SettingsPage';
 import AdLayout from '@/components/streaming/AdLayout';
 import Footer from '@/components/streaming/Footer';
-import { useMediaLibrary } from '@/hooks/useMediaLibrary';
+import { useSupabaseMedia } from '@/hooks/useSupabaseMedia';
 import { useAdmin } from '@/hooks/useAdmin';
 import type { Media, HeroItem } from '@/types/media';
 
@@ -102,7 +102,7 @@ const Index = () => {
     isInFavorites,
     toggleSeen,
     isSeen,
-  } = useMediaLibrary();
+  } = useSupabaseMedia();
 
   const { isAdmin, login, logout } = useAdmin();
 

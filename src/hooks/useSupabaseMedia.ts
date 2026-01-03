@@ -101,6 +101,7 @@ const transformDbHeroItem = (dbHero: any): HeroItem => ({
   description: dbHero.description || '',
   image: dbHero.image_url || '',
   mediaId: dbHero.media_id || '',
+  duration: dbHero.duration || 30,
 });
 
 export const useSupabaseMedia = () => {
@@ -281,6 +282,7 @@ export const useSupabaseMedia = () => {
       image_url: item.image,
       sort_order: index,
       is_active: true,
+      duration: item.duration || 30,
     }));
 
     if (dbItems.length > 0) {

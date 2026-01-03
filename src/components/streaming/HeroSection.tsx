@@ -22,11 +22,16 @@ const HeroSection = ({ heroItems, onPlay, onInfo }: HeroSectionProps) => {
 
   useEffect(() => {
     if (heroItems.length <= 1) return;
-    const interval = setInterval(() => {
+    
+    // Use custom duration for current slide, or default 30 seconds
+    const currentDuration = (heroItems[currentIndex]?.duration || 30) * 1000;
+    
+    const timer = setTimeout(() => {
       setCurrentIndex((prev) => (prev + 1) % heroItems.length);
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [heroItems.length]);
+    }, currentDuration);
+    
+    return () => clearTimeout(timer);
+  }, [heroItems, currentIndex]);
 
   if (heroItems.length === 0) return null;
 

@@ -329,14 +329,19 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
       const result = await response.json();
       
       if (result.success && result.data) {
-        // Merge: keep manual content + add new TMDB content
-        const tmdbContent = result.data.filter((newMedia: Media) => 
-          !manualContent.some(m => m.id === newMedia.id || m.title.toLowerCase() === newMedia.title.toLowerCase())
-        );
-        const mergedLibrary = [...manualContent, ...tmdbContent];
-        localStorage.setItem('gctv-library', JSON.stringify(mergedLibrary));
-        toast.success(`${tmdbContent.length} contenus TMDB importés, ${manualContent.length} contenus manuels préservés`);
-        window.location.reload();
+        // Add new TMDB content to Supabase directly
+        let addedCount = 0;
+        for (const newMedia of result.data) {
+          const exists = library.some(m => 
+            m.id === newMedia.id || 
+            m.title.toLowerCase() === newMedia.title.toLowerCase()
+          );
+          if (!exists && onAddMedia) {
+            await onAddMedia(newMedia);
+            addedCount++;
+          }
+        }
+        toast.success(`${addedCount} contenus TMDB importés dans la base de données, ${manualContent.length} contenus manuels préservés`);
       } else {
         toast.error(result.error || 'Erreur lors de l\'import');
       }
@@ -348,10 +353,12 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
     }
   };
 
-  // Import TMDB content (add to existing)
+  // Import TMDB content (add to existing) - saves directly to Supabase
   const handleImportTMDB = async () => {
     setIsImporting(true);
     try {
+      toast.info('Recherche de nouveaux contenus TMDB...');
+      
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tmdb-import`,
         {
@@ -366,16 +373,17 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
       if (result.success && result.data) {
         let addedCount = 0;
         for (const media of result.data) {
-          const exists = library.some(m => m.id === media.id || m.title === media.title);
+          const exists = library.some(m => 
+            m.id === media.id || 
+            m.title.toLowerCase() === media.title.toLowerCase() ||
+            (m.tmdbId && m.tmdbId === media.tmdbId)
+          );
           if (!exists && onAddMedia) {
-            onAddMedia(media);
+            await onAddMedia(media);
             addedCount++;
           }
         }
-        toast.success(`${addedCount} nouveaux contenus importés depuis TMDB`);
-        if (addedCount > 0) {
-          window.location.reload();
-        }
+        toast.success(`${addedCount} nouveaux contenus importés dans la base de données`);
       } else {
         toast.error(result.error || 'Erreur lors de l\'import');
       }
@@ -387,7 +395,7 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
     }
   };
 
-  // Check and add missing TMDB/OMDB content
+  // Check and add missing TMDB/OMDB content - saves directly to Supabase
   const handleCheckMissingContent = async () => {
     setIsCheckingAPI(true);
     try {
@@ -407,19 +415,22 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
       if (result.success && result.data) {
         const existingIds = new Set(library.map(m => m.id));
         const existingTitles = new Set(library.map(m => m.title.toLowerCase()));
+        const existingTmdbIds = new Set(library.filter(m => m.tmdbId).map(m => m.tmdbId));
         
         let addedCount = 0;
         for (const media of result.data) {
-          const isDuplicate = existingIds.has(media.id) || existingTitles.has(media.title.toLowerCase());
+          const isDuplicate = existingIds.has(media.id) || 
+            existingTitles.has(media.title.toLowerCase()) ||
+            (media.tmdbId && existingTmdbIds.has(media.tmdbId));
+          
           if (!isDuplicate && onAddMedia) {
-            onAddMedia(media);
+            await onAddMedia(media);
             addedCount++;
           }
         }
         
         if (addedCount > 0) {
-          toast.success(`${addedCount} contenus manquants ajoutés depuis TMDB`);
-          window.location.reload();
+          toast.success(`${addedCount} contenus manquants ajoutés à la base de données`);
         } else {
           toast.success('Aucun contenu manquant détecté, la bibliothèque est à jour');
         }

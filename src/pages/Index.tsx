@@ -311,24 +311,13 @@ const Index = () => {
   const autoHeroItems = useMemo(() => generateAutoHeroItems(library, featuredMedia), [library, featuredMedia]);
   const displayHeroItems = heroItems.length > 0 ? heroItems : autoHeroItems;
   
-  // Inverser les contenus populaires (les plus en bas deviennent premiers) pour Featured
+  // Inverser TOUS les contenus populaires (les plus en bas deviennent premiers)
   const invertedPopularFilms = useMemo(() => {
-    // Prioritize featured items first, then rest reversed
-    const featured = popularFilms.filter(m => (m as any).isFeatured);
-    const nonFeatured = popularFilms.filter(m => !(m as any).isFeatured);
-    // Shuffle featured randomly to avoid always showing same order
-    const shuffledFeatured = [...featured].sort(() => Math.random() - 0.5);
-    // Reverse non-featured (bottom items first)
-    const reversedNonFeatured = [...nonFeatured].reverse();
-    return [...shuffledFeatured, ...reversedNonFeatured];
+    return [...popularFilms].reverse();
   }, [popularFilms]);
   
   const invertedPopularSeries = useMemo(() => {
-    const featured = popularSeries.filter(m => (m as any).isFeatured);
-    const nonFeatured = popularSeries.filter(m => !(m as any).isFeatured);
-    const shuffledFeatured = [...featured].sort(() => Math.random() - 0.5);
-    const reversedNonFeatured = [...nonFeatured].reverse();
-    return [...shuffledFeatured, ...reversedNonFeatured];
+    return [...popularSeries].reverse();
   }, [popularSeries]);
   
   // Sélectionner les 4 genres principaux pour films et séries (pas de répétition)

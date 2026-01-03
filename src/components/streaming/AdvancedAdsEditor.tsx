@@ -1,12 +1,13 @@
 import { useState, useRef, useCallback } from 'react';
-import { Upload, X, Plus, ArrowUp, ArrowDown, Link2, Image as ImageIcon, Code, Loader2 } from 'lucide-react';
+import { Upload, X, Plus, ArrowUp, ArrowDown, Link2, Image as ImageIcon, Code, Loader2, Save, Trash2, GripVertical, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { useAdSettings } from '@/hooks/useAdSettings';
-import type { SlideImage, SideAdSettings } from '@/types/ads';
+import type { SlideImage, SlideAd, StaticAd, Ad } from '@/types/ads';
+import { createSlideAd, createStaticAd, generateAdId } from '@/types/ads';
 
 // Helper to convert file to base64
 const fileToBase64 = (file: File): Promise<string> => {
@@ -18,38 +19,35 @@ const fileToBase64 = (file: File): Promise<string> => {
   });
 };
 
-// Generate unique ID
-const generateId = () => Math.random().toString(36).substring(2, 9);
-
-interface SideAdEditorProps {
-  side: 'left' | 'right';
-  sideSettings: SideAdSettings;
-  onUpdate: (updates: Partial<SideAdSettings>) => void;
+interface SlideAdEditorProps {
+  ad: SlideAd;
+  onUpdate: (updates: Partial<SlideAd>) => void;
+  onRemove: () => void;
+  onMove: (direction: 'up' | 'down') => void;
+  isFirst: boolean;
+  isLast: boolean;
 }
 
-const SideAdEditor = ({ side, sideSettings, onUpdate }: SideAdEditorProps) => {
-  const [dragIndex, setDragIndex] = useState<number | null>(null);
+const SlideAdEditor = ({ ad, onUpdate, onRemove, onMove, isFirst, isLast }: SlideAdEditorProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const label = side === 'left' ? 'Gauche' : 'Droite';
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    const currentImages = sideSettings.slideAd.images;
-    if (currentImages.length >= 3) {
+    if (ad.images.length >= 3) {
       toast.error('Maximum 3 images par slide');
       return;
     }
 
     try {
       const newImages: SlideImage[] = [];
-      for (let i = 0; i < Math.min(files.length, 3 - currentImages.length); i++) {
+      for (let i = 0; i < Math.min(files.length, 3 - ad.images.length); i++) {
         const file = files[i];
         if (file.type.startsWith('image/')) {
           const base64 = await fileToBase64(file);
           newImages.push({
-            id: generateId(),
+            id: generateAdId(),
             imageUrl: base64,
             linkUrl: '',
           });
@@ -57,46 +55,30 @@ const SideAdEditor = ({ side, sideSettings, onUpdate }: SideAdEditorProps) => {
       }
 
       if (newImages.length > 0) {
-        onUpdate({
-          slideAd: {
-            ...sideSettings.slideAd,
-            images: [...currentImages, ...newImages],
-          },
-        });
+        onUpdate({ images: [...ad.images, ...newImages] });
         toast.success(`${newImages.length} image(s) ajoutée(s)`);
       }
     } catch {
       toast.error('Erreur lors du chargement');
     }
 
-    // Reset input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
   const removeSlideImage = (id: string) => {
-    onUpdate({
-      slideAd: {
-        ...sideSettings.slideAd,
-        images: sideSettings.slideAd.images.filter(img => img.id !== id),
-      },
-    });
+    onUpdate({ images: ad.images.filter(img => img.id !== id) });
   };
 
   const updateSlideImage = (id: string, updates: Partial<SlideImage>) => {
     onUpdate({
-      slideAd: {
-        ...sideSettings.slideAd,
-        images: sideSettings.slideAd.images.map(img =>
-          img.id === id ? { ...img, ...updates } : img
-        ),
-      },
+      images: ad.images.map(img => img.id === id ? { ...img, ...updates } : img),
     });
   };
 
   const moveSlideImage = (id: string, direction: 'up' | 'down') => {
-    const images = [...sideSettings.slideAd.images];
+    const images = [...ad.images];
     const index = images.findIndex(img => img.id === id);
     if (index === -1) return;
 
@@ -104,25 +86,170 @@ const SideAdEditor = ({ side, sideSettings, onUpdate }: SideAdEditorProps) => {
     if (newIndex < 0 || newIndex >= images.length) return;
 
     [images[index], images[newIndex]] = [images[newIndex], images[index]];
-    onUpdate({
-      slideAd: {
-        ...sideSettings.slideAd,
-        images,
-      },
-    });
+    onUpdate({ images });
   };
 
-  const handleStaticFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  return (
+    <div className="bg-muted/30 border border-border/50 rounded-lg p-4 space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <GripVertical className="text-muted-foreground" size={18} />
+          <div>
+            <h5 className="font-medium text-foreground flex items-center gap-2">
+              <RotateCcw size={14} />
+              Pub en Slide
+            </h5>
+            <p className="text-xs text-muted-foreground">Jusqu'à 3 images en rotation</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Switch
+            checked={ad.enabled}
+            onCheckedChange={(enabled) => onUpdate({ enabled })}
+          />
+          <div className="flex gap-1">
+            <button
+              onClick={() => onMove('up')}
+              disabled={isFirst}
+              className="p-1.5 hover:bg-muted rounded disabled:opacity-30"
+              title="Monter"
+            >
+              <ArrowUp size={14} />
+            </button>
+            <button
+              onClick={() => onMove('down')}
+              disabled={isLast}
+              className="p-1.5 hover:bg-muted rounded disabled:opacity-30"
+              title="Descendre"
+            >
+              <ArrowDown size={14} />
+            </button>
+            <button
+              onClick={onRemove}
+              className="p-1.5 hover:bg-destructive/20 text-destructive rounded"
+              title="Supprimer"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {ad.enabled && (
+        <div className="space-y-3 pt-2">
+          {/* Images list */}
+          <div className="space-y-2">
+            {ad.images.map((img, index) => (
+              <div
+                key={img.id}
+                className="flex gap-3 items-start p-2 bg-background/50 rounded border border-border/30"
+              >
+                <img
+                  src={img.imageUrl}
+                  alt={`Slide ${index + 1}`}
+                  className="w-16 h-12 object-cover rounded"
+                />
+                <div className="flex-1 space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-foreground">
+                      Image {index + 1}
+                    </span>
+                    <div className="flex gap-0.5 ml-auto">
+                      <button
+                        onClick={() => moveSlideImage(img.id, 'up')}
+                        disabled={index === 0}
+                        className="p-0.5 hover:bg-muted rounded disabled:opacity-30"
+                      >
+                        <ArrowUp size={12} />
+                      </button>
+                      <button
+                        onClick={() => moveSlideImage(img.id, 'down')}
+                        disabled={index === ad.images.length - 1}
+                        className="p-0.5 hover:bg-muted rounded disabled:opacity-30"
+                      >
+                        <ArrowDown size={12} />
+                      </button>
+                      <button
+                        onClick={() => removeSlideImage(img.id)}
+                        className="p-0.5 hover:bg-destructive/20 text-destructive rounded"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  </div>
+                  <Input
+                    value={img.linkUrl}
+                    onChange={(e) => updateSlideImage(img.id, { linkUrl: e.target.value })}
+                    placeholder="URL de redirection"
+                    className="bg-muted/50 text-xs h-7"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Add image button */}
+          {ad.images.length < 3 && (
+            <div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={handleFileSelect}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full border-dashed text-xs"
+              >
+                <Plus size={14} className="mr-1" />
+                Ajouter une image ({ad.images.length}/3)
+              </Button>
+            </div>
+          )}
+
+          {/* Interval setting */}
+          <div className="flex items-center gap-3">
+            <Label className="text-xs text-foreground whitespace-nowrap">
+              Intervalle (sec):
+            </Label>
+            <Input
+              type="number"
+              min={3}
+              max={120}
+              value={ad.interval}
+              onChange={(e) => onUpdate({
+                interval: Math.max(3, Math.min(120, parseInt(e.target.value) || 30)),
+              })}
+              className="w-16 bg-muted/50 h-7 text-xs"
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+interface StaticAdEditorProps {
+  ad: StaticAd;
+  onUpdate: (updates: Partial<StaticAd>) => void;
+  onRemove: () => void;
+  onMove: (direction: 'up' | 'down') => void;
+  isFirst: boolean;
+  isLast: boolean;
+  side: 'left' | 'right';
+}
+
+const StaticAdEditor = ({ ad, onUpdate, onRemove, onMove, isFirst, isLast, side }: StaticAdEditorProps) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && file.type.startsWith('image/')) {
       try {
         const base64 = await fileToBase64(file);
-        onUpdate({
-          staticAd: {
-            ...sideSettings.staticAd,
-            imageUrl: base64,
-          },
-        });
+        onUpdate({ imageUrl: base64 });
         toast.success('Image ajoutée');
       } catch {
         toast.error('Erreur lors du chargement');
@@ -131,291 +258,303 @@ const SideAdEditor = ({ side, sideSettings, onUpdate }: SideAdEditorProps) => {
   };
 
   return (
-    <div className="bg-card/50 border border-border/50 rounded-xl p-6 space-y-6">
-      <h3 className="font-semibold text-foreground text-lg">Publicité {label}</h3>
-
-      {/* Slide Ad Section */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
+    <div className="bg-muted/30 border border-border/50 rounded-lg p-4 space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <GripVertical className="text-muted-foreground" size={18} />
           <div>
-            <h4 className="font-medium text-foreground">Pub en slide</h4>
-            <p className="text-sm text-muted-foreground">Jusqu'à 3 images en rotation</p>
+            <h5 className="font-medium text-foreground flex items-center gap-2">
+              <ImageIcon size={14} />
+              Pub Statique
+            </h5>
+            <p className="text-xs text-muted-foreground">Image fixe ou AdSense</p>
           </div>
-          <Switch
-            checked={sideSettings.slideAd.enabled}
-            onCheckedChange={(checked) => onUpdate({
-              slideAd: { ...sideSettings.slideAd, enabled: checked }
-            })}
-          />
         </div>
-
-        {sideSettings.slideAd.enabled && (
-          <div className="space-y-4 pt-4 border-t border-border/50">
-            {/* Images list */}
-            <div className="space-y-3">
-              {sideSettings.slideAd.images.map((img, index) => (
-                <div
-                  key={img.id}
-                  className="flex gap-3 items-start p-3 bg-muted/30 rounded-lg border border-border/30"
-                >
-                  <img
-                    src={img.imageUrl}
-                    alt={`Slide ${index + 1}`}
-                    className="w-20 h-16 object-cover rounded"
-                  />
-                  <div className="flex-1 space-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-foreground">
-                        Image {index + 1}
-                      </span>
-                      <div className="flex gap-1 ml-auto">
-                        <button
-                          onClick={() => moveSlideImage(img.id, 'up')}
-                          disabled={index === 0}
-                          className="p-1 hover:bg-muted rounded disabled:opacity-30"
-                        >
-                          <ArrowUp size={14} />
-                        </button>
-                        <button
-                          onClick={() => moveSlideImage(img.id, 'down')}
-                          disabled={index === sideSettings.slideAd.images.length - 1}
-                          className="p-1 hover:bg-muted rounded disabled:opacity-30"
-                        >
-                          <ArrowDown size={14} />
-                        </button>
-                        <button
-                          onClick={() => removeSlideImage(img.id)}
-                          className="p-1 hover:bg-destructive/20 text-destructive rounded"
-                        >
-                          <X size={14} />
-                        </button>
-                      </div>
-                    </div>
-                    <Input
-                      value={img.linkUrl}
-                      onChange={(e) => updateSlideImage(img.id, { linkUrl: e.target.value })}
-                      placeholder="URL de redirection"
-                      className="bg-background/50 text-sm h-8"
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Add image button */}
-            {sideSettings.slideAd.images.length < 3 && (
-              <div>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  className="hidden"
-                  onChange={handleFileSelect}
-                />
-                <Button
-                  variant="outline"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full border-dashed"
-                >
-                  <Plus size={16} className="mr-2" />
-                  Ajouter une image ({sideSettings.slideAd.images.length}/3)
-                </Button>
-              </div>
-            )}
-
-            {/* Interval setting */}
-            <div className="flex items-center gap-4">
-              <Label className="text-sm text-foreground whitespace-nowrap">
-                Intervalle (sec):
-              </Label>
-              <Input
-                type="number"
-                min={3}
-                max={120}
-                value={sideSettings.slideAd.interval}
-                onChange={(e) => onUpdate({
-                  slideAd: {
-                    ...sideSettings.slideAd,
-                    interval: Math.max(3, Math.min(120, parseInt(e.target.value) || 30)),
-                  },
-                })}
-                className="w-20 bg-muted/50"
-              />
-              <span className="text-xs text-muted-foreground">
-                (Sera synchronisé avec le Hero si activé)
-              </span>
-            </div>
+        <div className="flex items-center gap-2">
+          <Switch
+            checked={ad.enabled}
+            onCheckedChange={(enabled) => onUpdate({ enabled })}
+          />
+          <div className="flex gap-1">
+            <button
+              onClick={() => onMove('up')}
+              disabled={isFirst}
+              className="p-1.5 hover:bg-muted rounded disabled:opacity-30"
+              title="Monter"
+            >
+              <ArrowUp size={14} />
+            </button>
+            <button
+              onClick={() => onMove('down')}
+              disabled={isLast}
+              className="p-1.5 hover:bg-muted rounded disabled:opacity-30"
+              title="Descendre"
+            >
+              <ArrowDown size={14} />
+            </button>
+            <button
+              onClick={onRemove}
+              className="p-1.5 hover:bg-destructive/20 text-destructive rounded"
+              title="Supprimer"
+            >
+              <Trash2 size={14} />
+            </button>
           </div>
-        )}
+        </div>
       </div>
 
-      {/* Static Ad Section */}
-      <div className="space-y-4 pt-4 border-t border-border/50">
-        <div className="flex items-center justify-between">
-          <div>
-            <h4 className="font-medium text-foreground">Pub statique</h4>
-            <p className="text-sm text-muted-foreground">Image fixe ou AdSense</p>
+      {ad.enabled && (
+        <div className="space-y-3 pt-2">
+          {/* Type selector */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => onUpdate({ adType: 'image' })}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg border-2 transition-all text-xs ${
+                ad.adType === 'image'
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-border text-muted-foreground hover:border-muted-foreground'
+              }`}
+            >
+              <ImageIcon size={14} />
+              Image
+            </button>
+            <button
+              onClick={() => onUpdate({ adType: 'adsense' })}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg border-2 transition-all text-xs ${
+                ad.adType === 'adsense'
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-border text-muted-foreground hover:border-muted-foreground'
+              }`}
+            >
+              <Code size={14} />
+              AdSense
+            </button>
           </div>
-          <Switch
-            checked={sideSettings.staticAd.enabled}
-            onCheckedChange={(checked) => onUpdate({
-              staticAd: { ...sideSettings.staticAd, enabled: checked }
-            })}
-          />
-        </div>
 
-        {sideSettings.staticAd.enabled && (
-          <div className="space-y-4 pt-4">
-            {/* Type selector */}
-            <div className="flex gap-2">
-              <button
-                onClick={() => onUpdate({
-                  staticAd: { ...sideSettings.staticAd, type: 'image' }
-                })}
-                className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg border-2 transition-all ${
-                  sideSettings.staticAd.type === 'image'
-                    ? 'border-primary bg-primary/10 text-primary'
-                    : 'border-border text-muted-foreground hover:border-muted-foreground'
-                }`}
-              >
-                <ImageIcon size={16} />
-                Image
-              </button>
-              <button
-                onClick={() => onUpdate({
-                  staticAd: { ...sideSettings.staticAd, type: 'adsense' }
-                })}
-                className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg border-2 transition-all ${
-                  sideSettings.staticAd.type === 'adsense'
-                    ? 'border-primary bg-primary/10 text-primary'
-                    : 'border-border text-muted-foreground hover:border-muted-foreground'
-                }`}
-              >
-                <Code size={16} />
-                AdSense
-              </button>
-            </div>
-
-            {sideSettings.staticAd.type === 'image' ? (
-              <div className="space-y-3">
-                {/* Image preview/upload */}
-                <div className="space-y-2">
-                  <Label>Image</Label>
-                  {sideSettings.staticAd.imageUrl ? (
-                    <div className="relative">
-                      <img
-                        src={sideSettings.staticAd.imageUrl}
-                        alt="Static ad"
-                        className="w-full max-h-32 object-contain rounded-lg bg-muted/30"
-                      />
-                      <button
-                        onClick={() => onUpdate({
-                          staticAd: { ...sideSettings.staticAd, imageUrl: '' }
-                        })}
-                        className="absolute top-2 right-2 p-1 bg-destructive text-destructive-foreground rounded-full"
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-                  ) : (
-                    <div>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        id={`static-file-${side}`}
-                        onChange={handleStaticFileSelect}
-                      />
-                      <label
-                        htmlFor={`static-file-${side}`}
-                        className="flex flex-col items-center gap-2 p-6 border-2 border-dashed border-border rounded-lg cursor-pointer hover:border-muted-foreground transition-colors"
-                      >
-                        <Upload size={24} className="text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">
-                          Cliquez pour uploader
-                        </span>
-                      </label>
-                    </div>
-                  )}
-                </div>
-
-                {/* URL input */}
-                <div className="space-y-2">
-                  <Label>Ou URL de l'image</Label>
-                  <Input
-                    value={sideSettings.staticAd.imageUrl.startsWith('data:') ? '' : sideSettings.staticAd.imageUrl}
-                    onChange={(e) => onUpdate({
-                      staticAd: { ...sideSettings.staticAd, imageUrl: e.target.value }
-                    })}
-                    placeholder="https://example.com/image.png"
-                    className="bg-muted/50"
+          {ad.adType === 'image' ? (
+            <div className="space-y-2">
+              {/* Image preview/upload */}
+              {ad.imageUrl ? (
+                <div className="relative">
+                  <img
+                    src={ad.imageUrl}
+                    alt="Static ad"
+                    className="w-full max-h-24 object-contain rounded-lg bg-muted/30"
                   />
+                  <button
+                    onClick={() => onUpdate({ imageUrl: '' })}
+                    className="absolute top-1 right-1 p-1 bg-destructive text-destructive-foreground rounded-full"
+                  >
+                    <X size={12} />
+                  </button>
                 </div>
-
-                {/* Link URL */}
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <Link2 size={14} />
-                    URL de redirection
-                  </Label>
-                  <Input
-                    value={sideSettings.staticAd.linkUrl}
-                    onChange={(e) => onUpdate({
-                      staticAd: { ...sideSettings.staticAd, linkUrl: e.target.value }
-                    })}
-                    placeholder="https://example.com"
-                    className="bg-muted/50"
+              ) : (
+                <div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    id={`static-file-${ad.id}-${side}`}
+                    onChange={handleFileSelect}
                   />
+                  <label
+                    htmlFor={`static-file-${ad.id}-${side}`}
+                    className="flex flex-col items-center gap-1 p-4 border-2 border-dashed border-border rounded-lg cursor-pointer hover:border-muted-foreground transition-colors"
+                  >
+                    <Upload size={18} className="text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">
+                      Cliquez pour uploader
+                    </span>
+                  </label>
                 </div>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <Label>Code Google AdSense</Label>
-                <textarea
-                  value={sideSettings.staticAd.adsenseCode}
-                  onChange={(e) => onUpdate({
-                    staticAd: { ...sideSettings.staticAd, adsenseCode: e.target.value }
-                  })}
-                  placeholder={'<script async src="..."></script>\n<ins class="adsbygoogle"...></ins>'}
-                  className="w-full h-32 bg-muted/50 border border-border rounded-lg p-3 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+              )}
+
+              {/* URL input */}
+              <div className="space-y-1">
+                <Label className="text-xs">Ou URL de l'image</Label>
+                <Input
+                  value={ad.imageUrl.startsWith('data:') ? '' : ad.imageUrl}
+                  onChange={(e) => onUpdate({ imageUrl: e.target.value })}
+                  placeholder="https://example.com/image.png"
+                  className="bg-muted/50 text-xs h-7"
                 />
               </div>
-            )}
-          </div>
-        )}
+
+              {/* Link URL */}
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center gap-1">
+                  <Link2 size={12} />
+                  URL de redirection
+                </Label>
+                <Input
+                  value={ad.linkUrl}
+                  onChange={(e) => onUpdate({ linkUrl: e.target.value })}
+                  placeholder="https://example.com"
+                  className="bg-muted/50 text-xs h-7"
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <Label className="text-xs">Code Google AdSense</Label>
+              <textarea
+                value={ad.adsenseCode}
+                onChange={(e) => onUpdate({ adsenseCode: e.target.value })}
+                placeholder={'<script async src="..."></script>\n<ins class="adsbygoogle"...></ins>'}
+                className="w-full h-20 bg-muted/50 border border-border rounded-lg p-2 text-xs font-mono resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+interface SideAdsEditorProps {
+  side: 'left' | 'right';
+  ads: Ad[];
+  onAddSlide: () => void;
+  onAddStatic: () => void;
+  onUpdateAd: (adId: string, updates: Partial<Ad>) => void;
+  onRemoveAd: (adId: string) => void;
+  onMoveAd: (adId: string, direction: 'up' | 'down') => void;
+}
+
+const SideAdsEditor = ({ side, ads, onAddSlide, onAddStatic, onUpdateAd, onRemoveAd, onMoveAd }: SideAdsEditorProps) => {
+  const label = side === 'left' ? 'Gauche' : 'Droite';
+  const sortedAds = [...ads].sort((a, b) => a.order - b.order);
+
+  return (
+    <div className="bg-card/50 border border-border/50 rounded-xl p-5 space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold text-foreground text-lg">Côté {label}</h3>
+        <span className="text-sm text-muted-foreground">{ads.length} pub(s)</span>
+      </div>
+
+      {/* Ads list */}
+      <div className="space-y-3">
+        {sortedAds.map((ad, index) => (
+          ad.type === 'slide' ? (
+            <SlideAdEditor
+              key={ad.id}
+              ad={ad}
+              onUpdate={(updates) => onUpdateAd(ad.id, updates)}
+              onRemove={() => onRemoveAd(ad.id)}
+              onMove={(dir) => onMoveAd(ad.id, dir)}
+              isFirst={index === 0}
+              isLast={index === sortedAds.length - 1}
+            />
+          ) : (
+            <StaticAdEditor
+              key={ad.id}
+              ad={ad}
+              onUpdate={(updates) => onUpdateAd(ad.id, updates)}
+              onRemove={() => onRemoveAd(ad.id)}
+              onMove={(dir) => onMoveAd(ad.id, dir)}
+              isFirst={index === 0}
+              isLast={index === sortedAds.length - 1}
+              side={side}
+            />
+          )
+        ))}
+      </div>
+
+      {/* Add buttons */}
+      <div className="flex gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onAddSlide}
+          className="flex-1"
+        >
+          <Plus size={14} className="mr-1" />
+          Pub Slide
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onAddStatic}
+          className="flex-1"
+        >
+          <Plus size={14} className="mr-1" />
+          Pub Statique
+        </Button>
       </div>
     </div>
   );
 };
 
 const AdvancedAdsEditor = () => {
-  const { settings, saving, updateSideSettings, toggleHeroSync } = useAdSettings();
+  const { 
+    localSettings, 
+    saving, 
+    hasChanges,
+    addAd,
+    removeAd,
+    updateAd,
+    moveAd,
+    toggleHeroSync,
+    saveAllChanges,
+    discardChanges,
+  } = useAdSettings();
 
-  const handleUpdateLeft = useCallback((updates: Partial<SideAdSettings>) => {
-    updateSideSettings('left', updates);
-  }, [updateSideSettings]);
-
-  const handleUpdateRight = useCallback((updates: Partial<SideAdSettings>) => {
-    updateSideSettings('right', updates);
-  }, [updateSideSettings]);
+  const getNextOrder = (side: 'left' | 'right') => {
+    const ads = localSettings[side].ads;
+    return ads.length > 0 ? Math.max(...ads.map(a => a.order)) + 1 : 0;
+  };
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold text-foreground mb-2">Publicités</h2>
-        <p className="text-muted-foreground text-sm">
-          Configurez les publicités affichées sur les côtés du site.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-semibold text-foreground mb-1">Publicités</h2>
+          <p className="text-muted-foreground text-sm">
+            Configurez les publicités affichées sur les côtés du site.
+          </p>
+        </div>
+        
+        {/* Save button */}
+        <div className="flex gap-2">
+          {hasChanges && (
+            <Button
+              variant="outline"
+              onClick={discardChanges}
+              disabled={saving}
+            >
+              Annuler
+            </Button>
+          )}
+          <Button
+            onClick={saveAllChanges}
+            disabled={!hasChanges || saving}
+            className="gap-2"
+          >
+            {saving ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Save size={16} />
+            )}
+            Sauvegarder
+          </Button>
+        </div>
       </div>
+
+      {/* Unsaved changes indicator */}
+      {hasChanges && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-2 text-sm text-amber-600 dark:text-amber-400">
+          Vous avez des modifications non sauvegardées.
+        </div>
+      )}
 
       {/* Explanation */}
       <div className="bg-muted/30 border border-border/30 rounded-lg p-4 text-sm text-muted-foreground">
         <p className="mb-2 font-medium text-foreground">Comment ça marche ?</p>
-        <ul className="space-y-1.5">
+        <ul className="space-y-1">
           <li><strong>Pubs en slide</strong> : Jusqu'à 3 images en rotation automatique</li>
           <li><strong>Pubs statiques</strong> : Image fixe ou code AdSense</li>
-          <li>Vous pouvez activer les deux sur chaque côté</li>
+          <li>Ajoutez autant de pubs que vous voulez sur chaque côté</li>
+          <li>Réorganisez-les avec les flèches haut/bas</li>
         </ul>
       </div>
 
@@ -429,33 +568,33 @@ const AdvancedAdsEditor = () => {
             </p>
           </div>
           <Switch
-            checked={settings.heroSyncEnabled}
+            checked={localSettings.heroSyncEnabled}
             onCheckedChange={toggleHeroSync}
           />
         </div>
       </div>
 
       {/* Left Side Editor */}
-      <SideAdEditor
+      <SideAdsEditor
         side="left"
-        sideSettings={settings.left}
-        onUpdate={handleUpdateLeft}
+        ads={localSettings.left.ads}
+        onAddSlide={() => addAd('left', createSlideAd(getNextOrder('left')))}
+        onAddStatic={() => addAd('left', createStaticAd(getNextOrder('left')))}
+        onUpdateAd={(id, updates) => updateAd('left', id, updates)}
+        onRemoveAd={(id) => removeAd('left', id)}
+        onMoveAd={(id, dir) => moveAd('left', id, dir)}
       />
 
       {/* Right Side Editor */}
-      <SideAdEditor
+      <SideAdsEditor
         side="right"
-        sideSettings={settings.right}
-        onUpdate={handleUpdateRight}
+        ads={localSettings.right.ads}
+        onAddSlide={() => addAd('right', createSlideAd(getNextOrder('right')))}
+        onAddStatic={() => addAd('right', createStaticAd(getNextOrder('right')))}
+        onUpdateAd={(id, updates) => updateAd('right', id, updates)}
+        onRemoveAd={(id) => removeAd('right', id)}
+        onMoveAd={(id, dir) => moveAd('right', id, dir)}
       />
-
-      {/* Save indicator */}
-      {saving && (
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Loader2 size={16} className="animate-spin" />
-          <span className="text-sm">Sauvegarde en cours...</span>
-        </div>
-      )}
     </div>
   );
 };

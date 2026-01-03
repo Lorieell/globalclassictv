@@ -6,7 +6,10 @@ const corsHeaders = {
 };
 
 // API configurations
-const TMDB_API_KEY = 'ac50a108046652cc08e96dc5bf2abb8a';
+const TMDB_API_KEY = Deno.env.get('TMDB_API_KEY') || '';
+if (!TMDB_API_KEY) {
+  console.error('TMDB_API_KEY not configured');
+}
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/w500';
 const TMDB_BACKDROP_BASE = 'https://image.tmdb.org/t/p/original';

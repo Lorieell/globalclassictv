@@ -14,7 +14,286 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      ad_settings: {
+        Row: {
+          id: string
+          settings: Json
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          settings?: Json
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          settings?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      favorites: {
+        Row: {
+          created_at: string
+          id: string
+          media_id: string
+          session_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          media_id: string
+          session_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          media_id?: string
+          session_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "favorites_media_id_fkey"
+            columns: ["media_id"]
+            isOneToOne: false
+            referencedRelation: "media"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hero_items: {
+        Row: {
+          button_text: string | null
+          created_at: string
+          description: string | null
+          id: string
+          image_url: string | null
+          is_active: boolean | null
+          media_id: string | null
+          sort_order: number | null
+          subtitle: string | null
+          title: string
+          updated_at: string
+          video_url: string | null
+        }
+        Insert: {
+          button_text?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          media_id?: string | null
+          sort_order?: number | null
+          subtitle?: string | null
+          title: string
+          updated_at?: string
+          video_url?: string | null
+        }
+        Update: {
+          button_text?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          media_id?: string | null
+          sort_order?: number | null
+          subtitle?: string | null
+          title?: string
+          updated_at?: string
+          video_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hero_items_media_id_fkey"
+            columns: ["media_id"]
+            isOneToOne: false
+            referencedRelation: "media"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      media: {
+        Row: {
+          backdrop_url: string | null
+          cast_members: string[] | null
+          created_at: string
+          description: string | null
+          director: string | null
+          duration: string | null
+          genres: string[] | null
+          id: string
+          is_new: boolean | null
+          language: string | null
+          original_title: string | null
+          poster_url: string | null
+          quality: string | null
+          rating: number | null
+          seasons: Json | null
+          title: string
+          tmdb_id: number | null
+          type: Database["public"]["Enums"]["media_type"]
+          updated_at: string
+          video_urls: string[] | null
+          year: string | null
+        }
+        Insert: {
+          backdrop_url?: string | null
+          cast_members?: string[] | null
+          created_at?: string
+          description?: string | null
+          director?: string | null
+          duration?: string | null
+          genres?: string[] | null
+          id?: string
+          is_new?: boolean | null
+          language?: string | null
+          original_title?: string | null
+          poster_url?: string | null
+          quality?: string | null
+          rating?: number | null
+          seasons?: Json | null
+          title: string
+          tmdb_id?: number | null
+          type?: Database["public"]["Enums"]["media_type"]
+          updated_at?: string
+          video_urls?: string[] | null
+          year?: string | null
+        }
+        Update: {
+          backdrop_url?: string | null
+          cast_members?: string[] | null
+          created_at?: string
+          description?: string | null
+          director?: string | null
+          duration?: string | null
+          genres?: string[] | null
+          id?: string
+          is_new?: boolean | null
+          language?: string | null
+          original_title?: string | null
+          poster_url?: string | null
+          quality?: string | null
+          rating?: number | null
+          seasons?: Json | null
+          title?: string
+          tmdb_id?: number | null
+          type?: Database["public"]["Enums"]["media_type"]
+          updated_at?: string
+          video_urls?: string[] | null
+          year?: string | null
+        }
+        Relationships: []
+      }
+      seen: {
+        Row: {
+          created_at: string
+          id: string
+          media_id: string
+          session_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          media_id: string
+          session_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          media_id?: string
+          session_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seen_media_id_fkey"
+            columns: ["media_id"]
+            isOneToOne: false
+            referencedRelation: "media"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      watch_progress: {
+        Row: {
+          episode_id: string | null
+          id: string
+          last_watched_at: string
+          media_id: string
+          progress: number | null
+          season_id: string | null
+          session_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          episode_id?: string | null
+          id?: string
+          last_watched_at?: string
+          media_id: string
+          progress?: number | null
+          season_id?: string | null
+          session_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          episode_id?: string | null
+          id?: string
+          last_watched_at?: string
+          media_id?: string
+          progress?: number | null
+          season_id?: string | null
+          session_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "watch_progress_media_id_fkey"
+            columns: ["media_id"]
+            isOneToOne: false
+            referencedRelation: "media"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      watchlist: {
+        Row: {
+          created_at: string
+          id: string
+          media_id: string
+          session_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          media_id: string
+          session_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          media_id?: string
+          session_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "watchlist_media_id_fkey"
+            columns: ["media_id"]
+            isOneToOne: false
+            referencedRelation: "media"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +302,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      media_type: "film" | "serie"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +429,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      media_type: ["film", "serie"],
+    },
   },
 } as const

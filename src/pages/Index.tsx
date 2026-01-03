@@ -6,6 +6,7 @@ import Header from '@/components/streaming/Header';
 import HeroSection from '@/components/streaming/HeroSection';
 import ResumeSection from '@/components/streaming/ResumeSection';
 import MediaRow from '@/components/streaming/MediaRow';
+import ToggleSlideRow from '@/components/streaming/ToggleSlideRow';
 import CategoryPage from '@/components/streaming/CategoryPage';
 import MediaDetailPage from '@/components/streaming/MediaDetailPage';
 import VideoPlayer from '@/components/streaming/VideoPlayer';
@@ -373,17 +374,17 @@ const Index = () => {
                     />
                   )}
 
-                  {/* 1. Films populaires */}
+                  {/* 1. Films populaires - Toggle Slide Row */}
                   {films.length > 0 && (
-                    <MediaRow
+                    <ToggleSlideRow
                       title="Films populaires"
                       titleIcon={<Film size={20} className="text-primary" />}
                       media={films.slice(0, 20)}
                       onSelect={handleSelectMedia}
+                      onPlay={(media) => handlePlayFromDetail(media)}
+                      onAddToWatchlist={toggleWatchlist}
+                      isInWatchlist={isInWatchlist}
                       onSeeMore={() => openCategoryPage('Films populaires', m => m.type === 'Film')}
-                      isAdmin={isAdmin}
-                      onEdit={handleEditMedia}
-                      onDelete={deleteMedia}
                     />
                   )}
 

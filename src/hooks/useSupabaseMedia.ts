@@ -409,7 +409,7 @@ export const useSupabaseMedia = () => {
   
   // Current year for filtering recent vs classic content
   const currentYear = new Date().getFullYear();
-  const recentThreshold = currentYear - 3; // Films from last 3 years are "recent"
+  const recentThreshold = currentYear - 2; // Films from last 2 years are "recent/popular"
   const classicThreshold = currentYear - 10; // Films older than 10 years are "classics"
   
   // Recent popular films (last 3 years, sorted by popularity)

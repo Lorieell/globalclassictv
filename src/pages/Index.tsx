@@ -20,23 +20,35 @@ import { useSupabaseMedia } from '@/hooks/useSupabaseMedia';
 import { useAdmin } from '@/hooks/useAdmin';
 import type { Media, HeroItem } from '@/types/media';
 
-// Génère les hero items automatiquement à partir des médias populaires (change toutes les heures)
+// Génère les hero items automatiquement à partir des médias populaires récents (1 an max)
 const generateAutoHeroItems = (library: Media[]): HeroItem[] => {
   if (library.length === 0) return [];
   
   const now = new Date();
+  const currentYear = now.getFullYear();
+  const heroThreshold = currentYear - 1; // Only content from last 1 year for hero
+  
   // Rotation toutes les heures
   const hoursSinceEpoch = Math.floor(now.getTime() / (1000 * 60 * 60));
   const rotationPeriod = hoursSinceEpoch;
   
-  // Filtrer les médias avec backdrop et bonne note
-  const eligibleMedia = library.filter(m => 
-    (m as any).backdrop && (m as any).rating >= 6
-  );
+  // Filtrer les médias récents (1 an) avec backdrop et bonne note, triés par popularité
+  const eligibleMedia = library
+    .filter(m => {
+      const year = parseInt((m as any).year || '0');
+      const hasBackdrop = !!(m as any).backdrop;
+      const hasGoodRating = ((m as any).rating || 0) >= 6;
+      const isRecent = year >= heroThreshold;
+      return hasBackdrop && hasGoodRating && isRecent;
+    })
+    .sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
   
   if (eligibleMedia.length === 0) {
-    // Fallback: prendre les premiers médias avec image
-    const fallback = library.filter(m => m.image).slice(0, 6);
+    // Fallback: prendre les médias les plus populaires avec image (sans filtre d'année)
+    const fallback = library
+      .filter(m => m.image && (m as any).backdrop)
+      .sort((a, b) => (b.popularity || 0) - (a.popularity || 0))
+      .slice(0, 6);
     return fallback.map(m => ({
       id: `hero-auto-${m.id}-${rotationPeriod}`,
       title: m.title.toUpperCase(),
@@ -46,11 +58,15 @@ const generateAutoHeroItems = (library: Media[]): HeroItem[] => {
     }));
   }
   
-  // Mélanger de façon déterministe basée sur l'heure de rotation
-  const shuffled = [...eligibleMedia].sort((a, b) => {
-    const hashA = ((a.title.charCodeAt(0) || 0) * rotationPeriod + (a.title.length || 0) + ((a as any).rating || 0) * 100) % 10000;
-    const hashB = ((b.title.charCodeAt(0) || 0) * rotationPeriod + (b.title.length || 0) + ((b as any).rating || 0) * 100) % 10000;
-    return hashA - hashB;
+  // Mélanger légèrement les top 20 pour variété, mais garder les plus populaires en priorité
+  const top20 = eligibleMedia.slice(0, 20);
+  const shuffled = [...top20].sort((a, b) => {
+    const popA = a.popularity || 0;
+    const popB = b.popularity || 0;
+    // Ajouter un peu de randomisation basée sur l'heure
+    const hashA = ((a.title.charCodeAt(0) || 0) * rotationPeriod) % 100;
+    const hashB = ((b.title.charCodeAt(0) || 0) * rotationPeriod) % 100;
+    return (popB + hashB) - (popA + hashA);
   });
   
   // Prendre 6 items

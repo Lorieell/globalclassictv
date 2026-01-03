@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 import type { Media } from '@/types/media';
 
 // Reddit icon - forwardRef to prevent ref warning
@@ -903,19 +904,33 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
                         Met à jour l'ordre des contenus dans chaque catégorie selon leur popularité. Les hero slides seront également régénérés avec les contenus les plus populaires de l'année dernière.
                       </p>
                       <Button
-                        onClick={() => {
+                        onClick={async () => {
                           setIsRefreshingLayout(true);
-                          // Clear hero items cache to force regeneration
-                          localStorage.removeItem('gctv-hero-rotation');
-                          // Dispatch event to trigger re-render
-                          window.dispatchEvent(new Event('gctv-layout-refresh'));
-                          // Simulate processing
-                          setTimeout(() => {
+                          try {
+                            // Delete all hero items from database to force auto-regeneration
+                            const { error } = await supabase
+                              .from('hero_items')
+                              .delete()
+                              .neq('id', '00000000-0000-0000-0000-000000000000');
+                            
+                            if (error) {
+                              console.error('Error clearing hero items:', error);
+                              toast.error('Erreur lors de la suppression des slides hero');
+                              setIsRefreshingLayout(false);
+                              return;
+                            }
+                            
+                            toast.success('Hero slides supprimés ! Régénération automatique en cours...');
+                            
+                            // Wait a moment then reload to apply changes
+                            setTimeout(() => {
+                              window.location.reload();
+                            }, 1000);
+                          } catch (err) {
+                            console.error('Error:', err);
+                            toast.error('Une erreur est survenue');
                             setIsRefreshingLayout(false);
-                            toast.success('Disposition mise à jour ! Les contenus populaires sont maintenant en avant.');
-                            // Reload to apply changes
-                            window.location.reload();
-                          }, 1500);
+                          }
                         }}
                         disabled={isRefreshingLayout}
                         className="gap-2"

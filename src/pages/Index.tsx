@@ -90,6 +90,8 @@ const Index = () => {
     documentaries,
     popularFilms,
     popularSeries,
+    classicFilms,
+    classicSeries,
     comingSoon,
     heroItems, 
     resumeList,
@@ -435,7 +437,41 @@ const Index = () => {
                     />
                   )}
                   
-                  {/* 5. Documentaires */}
+                  {/* 5. Films cultes */}
+                  {classicFilms.length > 0 && (
+                    <MediaRow
+                      title="Films cultes"
+                      titleIcon={<Sparkles size={20} className="text-accent" />}
+                      media={classicFilms.slice(0, 20)}
+                      onSelect={handleSelectMedia}
+                      onSeeMore={() => openCategoryPage('Films cultes', m => {
+                        const year = parseInt((m as any).year || '0');
+                        return m.type === 'Film' && year > 0 && year <= new Date().getFullYear() - 10;
+                      })}
+                      isAdmin={isAdmin}
+                      onEdit={handleEditMedia}
+                      onDelete={deleteMedia}
+                    />
+                  )}
+                  
+                  {/* 6. Séries cultes */}
+                  {classicSeries.length > 0 && (
+                    <MediaRow
+                      title="Séries cultes"
+                      titleIcon={<Tv size={20} className="text-secondary" />}
+                      media={classicSeries.slice(0, 20)}
+                      onSelect={handleSelectMedia}
+                      onSeeMore={() => openCategoryPage('Séries cultes', m => {
+                        const year = parseInt((m as any).year || '0');
+                        return m.type === 'Série' && year > 0 && year <= new Date().getFullYear() - 10;
+                      })}
+                      isAdmin={isAdmin}
+                      onEdit={handleEditMedia}
+                      onDelete={deleteMedia}
+                    />
+                  )}
+                  
+                  {/* 7. Documentaires */}
                   {documentaries.length > 0 && (
                     <MediaRow
                       title="Documentaires"
@@ -449,7 +485,7 @@ const Index = () => {
                     />
                   )}
                   
-                  {/* 6. Émissions */}
+                  {/* 8. Émissions */}
                   {emissions.length > 0 && (
                     <MediaRow
                       title="Émissions TV"

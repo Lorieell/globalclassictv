@@ -85,6 +85,11 @@ const Index = () => {
     library, 
     films, 
     series,
+    animes,
+    emissions,
+    documentaries,
+    popularFilms,
+    popularSeries,
     comingSoon,
     heroItems, 
     resumeList,
@@ -375,11 +380,11 @@ const Index = () => {
                   )}
 
                   {/* 1. Films populaires - Toggle Slide Row */}
-                  {films.length > 0 && (
+                  {popularFilms.length > 0 && (
                     <ToggleSlideRow
                       title="Films populaires"
                       titleIcon={<Film size={20} className="text-primary" />}
-                      media={films.slice(0, 20)}
+                      media={popularFilms.slice(0, 20)}
                       onSelect={handleSelectMedia}
                       onPlay={(media) => handlePlayFromDetail(media)}
                       onAddToWatchlist={toggleWatchlist}
@@ -389,11 +394,11 @@ const Index = () => {
                   )}
 
                   {/* 2. Séries populaires */}
-                  {series.length > 0 && (
+                  {popularSeries.length > 0 && (
                     <MediaRow
                       title="Séries populaires"
                       titleIcon={<Tv size={20} className="text-primary" />}
-                      media={series.slice(0, 20)}
+                      media={popularSeries.slice(0, 20)}
                       onSelect={handleSelectMedia}
                       onSeeMore={() => openCategoryPage('Séries populaires', m => m.type === 'Série')}
                       isAdmin={isAdmin}
@@ -402,7 +407,21 @@ const Index = () => {
                     />
                   )}
                   
-                  {/* 3. Films en 4K */}
+                  {/* 3. Animés */}
+                  {animes.length > 0 && (
+                    <MediaRow
+                      title="Animés"
+                      titleIcon={<Sparkles size={20} className="text-accent" />}
+                      media={animes.slice(0, 20)}
+                      onSelect={handleSelectMedia}
+                      onSeeMore={() => openCategoryPage('Animés', m => m.type === 'Animé')}
+                      isAdmin={isAdmin}
+                      onEdit={handleEditMedia}
+                      onDelete={deleteMedia}
+                    />
+                  )}
+                  
+                  {/* 4. Films en 4K */}
                   {films.filter(f => f.quality === '4K').length > 0 && (
                     <MediaRow
                       title="Films en 4K"
@@ -416,7 +435,35 @@ const Index = () => {
                     />
                   )}
                   
-                  {/* 4. Disponible en VF */}
+                  {/* 5. Documentaires */}
+                  {documentaries.length > 0 && (
+                    <MediaRow
+                      title="Documentaires"
+                      titleIcon={<Globe size={20} className="text-secondary" />}
+                      media={documentaries.slice(0, 20)}
+                      onSelect={handleSelectMedia}
+                      onSeeMore={() => openCategoryPage('Documentaires', m => m.type === 'Documentaire')}
+                      isAdmin={isAdmin}
+                      onEdit={handleEditMedia}
+                      onDelete={deleteMedia}
+                    />
+                  )}
+                  
+                  {/* 6. Émissions */}
+                  {emissions.length > 0 && (
+                    <MediaRow
+                      title="Émissions TV"
+                      titleIcon={<Tv size={20} className="text-accent" />}
+                      media={emissions.slice(0, 20)}
+                      onSelect={handleSelectMedia}
+                      onSeeMore={() => openCategoryPage('Émissions TV', m => m.type === 'Émission')}
+                      isAdmin={isAdmin}
+                      onEdit={handleEditMedia}
+                      onDelete={deleteMedia}
+                    />
+                  )}
+                  
+                  {/* 7. Disponible en VF */}
                   {library.filter(m => m.language === 'VF').length > 0 && (
                     <MediaRow
                       title="Disponible en VF"

@@ -12,24 +12,56 @@ const getSessionId = (): string => {
   return sessionId;
 };
 
+// Determine content type based on genres
+const determineContentType = (dbMedia: any): 'Film' | 'Série' | 'Animé' | 'Émission' | 'Documentaire' => {
+  const genres = dbMedia.genres || [];
+  const genresLower = genres.map((g: string) => g.toLowerCase());
+  
+  // Check for anime
+  if (genresLower.some((g: string) => g.includes('anim') || g.includes('anime'))) {
+    return 'Animé';
+  }
+  
+  // Check for documentary
+  if (genresLower.some((g: string) => g.includes('document'))) {
+    return 'Documentaire';
+  }
+  
+  // Check for TV show / émission
+  if (genresLower.some((g: string) => 
+    g.includes('talk') || g.includes('reality') || g.includes('émission') || 
+    g.includes('game show') || g.includes('news')
+  )) {
+    return 'Émission';
+  }
+  
+  // Default based on original type
+  return dbMedia.type === 'film' ? 'Film' : 'Série';
+};
+
 // Transform database media to app Media type
 const transformDbMedia = (dbMedia: any): Media => {
+  const contentType = determineContentType(dbMedia);
+  
   const media: Media = {
     id: dbMedia.id,
     title: dbMedia.title,
     image: dbMedia.poster_url || '',
-    type: dbMedia.type === 'film' ? 'Film' : 'Série',
+    type: contentType,
     description: dbMedia.description || '',
     synopsis: dbMedia.description || '',
     genres: dbMedia.genres?.join(', ') || '',
     quality: dbMedia.quality || 'HD',
     language: dbMedia.language || 'VF',
     videoUrls: dbMedia.video_urls?.[0] || '',
+    trailerUrl: dbMedia.video_urls?.[1] || '', // Second URL as trailer
     seasons: dbMedia.seasons || [],
     director: dbMedia.director || '',
     actors: dbMedia.cast_members?.join(', ') || '',
     tmdbId: dbMedia.tmdb_id,
     updatedAt: new Date(dbMedia.updated_at).getTime(),
+    createdAt: new Date(dbMedia.created_at).getTime(),
+    popularity: (dbMedia as any).rating || 0,
   };
   // Add extra properties that might not be in the type
   (media as any).backdrop = dbMedia.backdrop_url;
@@ -39,23 +71,28 @@ const transformDbMedia = (dbMedia: any): Media => {
 };
 
 // Transform app Media to database format
-const transformToDbMedia = (media: Partial<Media>) => ({
-  title: media.title,
-  description: media.description || media.synopsis,
-  type: media.type === 'Film' ? 'film' : 'serie',
-  poster_url: media.image,
-  backdrop_url: (media as any).backdrop || null,
-  video_urls: media.videoUrls ? [media.videoUrls] : [],
-  genres: media.genres?.split(',').map(g => g.trim()).filter(Boolean) || [],
-  quality: media.quality || 'HD',
-  language: media.language || 'VF',
-  director: media.director || null,
-  cast_members: media.actors?.split(',').map(a => a.trim()).filter(Boolean) || [],
-  tmdb_id: media.tmdbId || null,
-  rating: (media as any).rating || null,
-  year: (media as any).year || null,
-  seasons: JSON.parse(JSON.stringify(media.seasons || [])),
-});
+const transformToDbMedia = (media: Partial<Media>) => {
+  // Map app types back to DB types (only 'film' and 'serie' exist in DB)
+  const dbType = media.type === 'Film' ? 'film' : 'serie';
+  
+  return {
+    title: media.title,
+    description: media.description || media.synopsis,
+    type: dbType,
+    poster_url: media.image,
+    backdrop_url: (media as any).backdrop || null,
+    video_urls: media.videoUrls ? [media.videoUrls, media.trailerUrl].filter(Boolean) : [],
+    genres: media.genres?.split(',').map(g => g.trim()).filter(Boolean) || [],
+    quality: media.quality || 'HD',
+    language: media.language || 'VF',
+    director: media.director || null,
+    cast_members: media.actors?.split(',').map(a => a.trim()).filter(Boolean) || [],
+    tmdb_id: media.tmdbId || null,
+    rating: (media as any).rating || media.popularity || null,
+    year: (media as any).year || null,
+    seasons: JSON.parse(JSON.stringify(media.seasons || [])),
+  };
+};
 
 // Transform database hero item to app HeroItem type
 const transformDbHeroItem = (dbHero: any): HeroItem => ({
@@ -366,16 +403,28 @@ export const useSupabaseMedia = () => {
   // Computed values
   const films = useMemo(() => library.filter(m => m.type === 'Film'), [library]);
   const series = useMemo(() => library.filter(m => m.type === 'Série'), [library]);
+  const animes = useMemo(() => library.filter(m => m.type === 'Animé'), [library]);
+  const emissions = useMemo(() => library.filter(m => m.type === 'Émission'), [library]);
+  const documentaries = useMemo(() => library.filter(m => m.type === 'Documentaire'), [library]);
+  
+  // Popular content sorted by rating/popularity
+  const popularFilms = useMemo(() => 
+    [...films].sort((a, b) => ((b as any).rating || 0) - ((a as any).rating || 0)),
+  [films]);
+  
+  const popularSeries = useMemo(() => 
+    [...series].sort((a, b) => ((b as any).rating || 0) - ((a as any).rating || 0)),
+  [series]);
   
   // "À venir" - Media without video URLs (coming soon)
   const comingSoon = useMemo(() => {
     return library.filter(m => {
       // For films: no videoUrls
-      if (m.type === 'Film') {
+      if (m.type === 'Film' || m.type === 'Animé' || m.type === 'Documentaire') {
         return !m.videoUrls || m.videoUrls.trim() === '';
       }
-      // For series: no episodes with video URLs
-      if (m.type === 'Série') {
+      // For series/emissions: no episodes with video URLs
+      if (m.type === 'Série' || m.type === 'Émission') {
         const hasAnyVideo = m.seasons?.some(s => 
           s.episodes?.some(e => e.videoUrls && e.videoUrls.trim() !== '')
         );
@@ -407,6 +456,11 @@ export const useSupabaseMedia = () => {
     library,
     films,
     series,
+    animes,
+    emissions,
+    documentaries,
+    popularFilms,
+    popularSeries,
     comingSoon,
     heroItems,
     resumeList,

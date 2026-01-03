@@ -32,14 +32,21 @@ const generateAutoHeroItems = (library: Media[]): HeroItem[] => {
   const hoursSinceEpoch = Math.floor(now.getTime() / (1000 * 60 * 60));
   const rotationPeriod = hoursSinceEpoch;
   
-  // Filtrer les médias récents (1 an) avec backdrop et bonne note, triés par popularité
+  // Helper: Check if title is mainstream (latin characters, no CJK/Korean scripts)
+  const isMainstreamTitle = (title: string): boolean => {
+    const cjkPattern = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uf900-\ufaff]/;
+    return !cjkPattern.test(title);
+  };
+  
+  // Filtrer les médias récents (1 an), mainstream, avec backdrop et bonne note, triés par popularité
   const eligibleMedia = library
     .filter(m => {
       const year = parseInt((m as any).year || '0');
       const hasBackdrop = !!(m as any).backdrop;
       const hasGoodRating = ((m as any).rating || 0) >= 6;
       const isRecent = year >= heroThreshold;
-      return hasBackdrop && hasGoodRating && isRecent;
+      const isMainstream = isMainstreamTitle(m.title);
+      return hasBackdrop && hasGoodRating && isRecent && isMainstream;
     })
     .sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
   

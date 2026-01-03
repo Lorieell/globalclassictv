@@ -412,22 +412,33 @@ export const useSupabaseMedia = () => {
   const recentThreshold = currentYear - 2; // Films from last 2 years are "recent/popular"
   const classicThreshold = currentYear - 10; // Films older than 10 years are "classics"
   
-  // Recent popular films (last 3 years, sorted by popularity)
+  // Helper: Check if title is mainstream (latin characters, no CJK/Korean scripts)
+  const isMainstreamTitle = (title: string): boolean => {
+    // Regex to detect CJK (Chinese, Japanese, Korean) characters
+    const cjkPattern = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uf900-\ufaff]/;
+    return !cjkPattern.test(title);
+  };
+  
+  // Recent popular films (last 2 years, mainstream titles, sorted by popularity)
   const popularFilms = useMemo(() => {
     return [...films]
       .filter(f => {
         const year = parseInt((f as any).year || '0');
-        return year >= recentThreshold;
+        const isRecent = year >= recentThreshold;
+        const isMainstream = isMainstreamTitle(f.title);
+        return isRecent && isMainstream;
       })
       .sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
   }, [films, recentThreshold]);
   
-  // Recent popular series (last 3 years, sorted by popularity)
+  // Recent popular series (last 2 years, mainstream titles, sorted by popularity)
   const popularSeries = useMemo(() => {
     return [...series]
       .filter(s => {
         const year = parseInt((s as any).year || '0');
-        return year >= recentThreshold;
+        const isRecent = year >= recentThreshold;
+        const isMainstream = isMainstreamTitle(s.title);
+        return isRecent && isMainstream;
       })
       .sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
   }, [series, recentThreshold]);

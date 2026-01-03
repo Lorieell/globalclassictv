@@ -1,7 +1,8 @@
-import { useRef, useState, ReactNode } from 'react';
-import { ChevronRight, ChevronLeft, Play, Plus, Info, VolumeX } from 'lucide-react';
+import { useRef, useState, ReactNode, useEffect } from 'react';
+import { ChevronRight, ChevronLeft, Play, Plus, Info, Volume2, VolumeX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Media } from '@/types/media';
+import { useNavigate } from 'react-router-dom';
 
 interface ToggleSlideRowProps {
   title: string;
@@ -13,6 +14,15 @@ interface ToggleSlideRowProps {
   isInWatchlist: (mediaId: string) => boolean;
   onSeeMore?: () => void;
 }
+
+// Check if content is actually new (added within last 14 days)
+const isNewContent = (media: Media): boolean => {
+  if (!media.createdAt && !media.updatedAt) return false;
+  const createdDate = media.createdAt || media.updatedAt || 0;
+  const now = Date.now();
+  const fourteenDays = 14 * 24 * 60 * 60 * 1000;
+  return now - createdDate < fourteenDays;
+};
 
 const ToggleSlideRow = ({
   title,
@@ -28,6 +38,10 @@ const ToggleSlideRow = ({
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [isMuted, setIsMuted] = useState(true);
+  const [videoReady, setVideoReady] = useState<Record<string, boolean>>({});
+  const videoRefs = useRef<Record<string, HTMLVideoElement | null>>({});
+  const navigate = useNavigate();
 
   const updateScrollButtons = () => {
     if (!scrollRef.current) return;
@@ -49,7 +63,24 @@ const ToggleSlideRow = ({
   // Only show films
   const filmsOnly = media.filter(m => m.type === 'Film');
   
-  if (filmsOnly.length === 0) return null;
+  // Sort by popularity if available
+  const sortedFilms = [...filmsOnly].sort((a, b) => {
+    const popA = (a as any).popularity || 0;
+    const popB = (b as any).popularity || 0;
+    return popB - popA;
+  });
+  
+  if (sortedFilms.length === 0) return null;
+
+  // Handle video play on hover
+  useEffect(() => {
+    if (hoveredId) {
+      const video = videoRefs.current[hoveredId];
+      if (video) {
+        video.play().catch(() => {});
+      }
+    }
+  }, [hoveredId]);
 
   return (
     <section className="mb-10 group/section">
@@ -91,9 +122,12 @@ const ToggleSlideRow = ({
           className="flex gap-2 overflow-x-auto scrollbar-hide scroll-smooth px-2"
           style={{ paddingBottom: '8px' }}
         >
-          {filmsOnly.map((item) => {
+          {sortedFilms.map((item) => {
             const isHovered = hoveredId === item.id;
             const backdrop = (item as any).backdrop || item.image;
+            const trailerUrl = (item as any).trailerUrl;
+            const hasTrailer = !!trailerUrl;
+            const isNew = isNewContent(item);
             
             return (
               <div 
@@ -104,7 +138,15 @@ const ToggleSlideRow = ({
                   height: '240px',
                 }}
                 onMouseEnter={() => setHoveredId(item.id)}
-                onMouseLeave={() => setHoveredId(null)}
+                onMouseLeave={() => {
+                  setHoveredId(null);
+                  // Pause video when leaving
+                  const video = videoRefs.current[item.id];
+                  if (video) {
+                    video.pause();
+                    video.currentTime = 0;
+                  }
+                }}
               >
                 {/* Collapsed State - Poster */}
                 <div 
@@ -119,15 +161,17 @@ const ToggleSlideRow = ({
                     className="w-full h-full object-cover"
                     loading="lazy"
                   />
-                  {/* Badge */}
-                  <div className="absolute top-2 right-2">
-                    <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-primary/90 text-primary-foreground">
-                      NOUVEAU FILM
-                    </span>
-                  </div>
+                  {/* New Badge - only show if actually new */}
+                  {isNew && (
+                    <div className="absolute top-2 right-2">
+                      <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-primary/90 text-primary-foreground">
+                        NOUVEAU
+                      </span>
+                    </div>
+                  )}
                 </div>
 
-                {/* Expanded State - Backdrop with Controls */}
+                {/* Expanded State - Backdrop/Video with Controls */}
                 <div 
                   className={`absolute inset-0 rounded-xl overflow-hidden transition-all duration-500 ${
                     isHovered ? 'opacity-100' : 'opacity-0 pointer-events-none'
@@ -135,18 +179,45 @@ const ToggleSlideRow = ({
                 >
                   {/* Backdrop Image or Video Preview */}
                   <div className="absolute inset-0">
+                    {/* Always show backdrop as fallback */}
                     <img 
                       src={backdrop} 
                       alt={item.title}
-                      className="w-full h-full object-cover"
+                      className={`w-full h-full object-cover transition-opacity duration-300 ${
+                        hasTrailer && videoReady[item.id] ? 'opacity-0' : 'opacity-100'
+                      }`}
                     />
-                    {/* Video Preview Overlay - Shows trailer if available */}
-                    {item.videoUrls && (
-                      <div className="absolute top-2 right-2 z-10">
-                        <div className="w-8 h-8 rounded-full bg-background/60 backdrop-blur-sm flex items-center justify-center">
+                    
+                    {/* Video trailer preview */}
+                    {hasTrailer && isHovered && (
+                      <video
+                        ref={(el) => { videoRefs.current[item.id] = el; }}
+                        src={trailerUrl}
+                        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
+                          videoReady[item.id] ? 'opacity-100' : 'opacity-0'
+                        }`}
+                        muted={isMuted}
+                        loop
+                        playsInline
+                        onCanPlay={() => setVideoReady(prev => ({ ...prev, [item.id]: true }))}
+                      />
+                    )}
+                    
+                    {/* Volume toggle */}
+                    {hasTrailer && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsMuted(!isMuted);
+                        }}
+                        className="absolute top-2 right-2 z-10 w-8 h-8 rounded-full bg-background/60 backdrop-blur-sm flex items-center justify-center hover:bg-background/80 transition-colors"
+                      >
+                        {isMuted ? (
                           <VolumeX size={14} className="text-foreground/70" />
-                        </div>
-                      </div>
+                        ) : (
+                          <Volume2 size={14} className="text-foreground/70" />
+                        )}
+                      </button>
                     )}
                   </div>
                   

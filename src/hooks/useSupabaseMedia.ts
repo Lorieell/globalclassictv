@@ -486,22 +486,21 @@ export const useSupabaseMedia = () => {
     return cjkPattern.test(title) && !japanesePattern.test(title);
   };
   
-  // Kdramas (Korean series) - popular with VF/VOSTFR
+  // Kdramas (Korean content - films AND series) - popular with VF/VOSTFR
   const kdramas = useMemo(() => {
-    return [...series]
-      .filter(s => {
-        const title = s.title || '';
-        const genres = s.genres?.toLowerCase() || '';
-        const language = s.language?.toLowerCase() || '';
+    return [...library]
+      .filter(m => {
+        const title = m.title || '';
+        const genres = m.genres?.toLowerCase() || '';
+        const language = m.language?.toLowerCase() || '';
         // Korean title OR Korean-related genres
         const isKorean = isKoreanTitle(title) || 
-          genres.includes('drama') && (genres.includes('korea') || genres.includes('coré')) ||
+          (genres.includes('drama') && (genres.includes('korea') || genres.includes('coré'))) ||
           language.includes('coré') || language.includes('korea');
-        const hasSubtitles = language.includes('vostfr') || language.includes('vf') || language === 'vf';
         return isKorean;
       })
       .sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
-  }, [series]);
+  }, [library]);
   
   // Japanese Animes - popular with VF/VOSTFR
   const japaneseAnimes = useMemo(() => {

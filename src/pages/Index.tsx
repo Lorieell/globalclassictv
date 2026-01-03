@@ -538,8 +538,11 @@ const Index = () => {
                       onSeeMore={() => openCategoryPage('Kdramas', m => {
                         const title = m.title || '';
                         const genres = m.genres?.toLowerCase() || '';
+                        const language = m.language?.toLowerCase() || '';
                         const koreanPattern = /[\uac00-\ud7af]/;
-                        return m.type === 'Série' && (koreanPattern.test(title) || genres.includes('drama'));
+                        return koreanPattern.test(title) || 
+                          (genres.includes('drama') && (genres.includes('korea') || genres.includes('coré'))) ||
+                          language.includes('coré') || language.includes('korea');
                       })}
                       isAdmin={isAdmin}
                       onEdit={handleEditMedia}
@@ -547,14 +550,14 @@ const Index = () => {
                     />
                   )}
                   
-                  {/* Animes Japonais */}
+                  {/* Animes */}
                   {japaneseAnimes.length > 0 && (
                     <MediaRow
-                      title="Animes Japonais"
+                      title="Animes"
                       titleIcon={<Sparkles size={20} className="text-red-500" />}
                       media={japaneseAnimes.slice(0, 20)}
                       onSelect={handleSelectMedia}
-                      onSeeMore={() => openCategoryPage('Animes Japonais', m => m.type === 'Animé')}
+                      onSeeMore={() => openCategoryPage('Animes', m => m.type === 'Animé')}
                       isAdmin={isAdmin}
                       onEdit={handleEditMedia}
                       onDelete={deleteMedia}

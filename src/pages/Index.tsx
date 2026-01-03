@@ -775,7 +775,7 @@ const Index = () => {
 
       <HeroEditorModal
         isOpen={showHeroEditor}
-        heroItems={heroItems}
+        heroItems={displayHeroItems}
         mediaOptions={library}
         onClose={() => setShowHeroEditor(false)}
         onSave={handleSaveHeroItems}

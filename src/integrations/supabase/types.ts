@@ -69,6 +69,7 @@ export type Database = {
           button_text: string | null
           created_at: string
           description: string | null
+          duration: number | null
           id: string
           image_url: string | null
           is_active: boolean | null
@@ -83,6 +84,7 @@ export type Database = {
           button_text?: string | null
           created_at?: string
           description?: string | null
+          duration?: number | null
           id?: string
           image_url?: string | null
           is_active?: boolean | null
@@ -97,6 +99,7 @@ export type Database = {
           button_text?: string | null
           created_at?: string
           description?: string | null
+          duration?: number | null
           id?: string
           image_url?: string | null
           is_active?: boolean | null

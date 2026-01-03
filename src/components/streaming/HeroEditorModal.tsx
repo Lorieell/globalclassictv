@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { X, Plus, Save, Trash2, Image, Type, FileText, Wand2, Search } from 'lucide-react';
+import { X, Plus, Save, Trash2, Image, Type, FileText, Wand2, Search, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import type { HeroItem, Media } from '@/types/media';
@@ -22,7 +22,12 @@ const HeroEditorModal = ({ isOpen, heroItems, mediaOptions, onClose, onSave }: H
     if (isOpen) {
       // Always load the current hero items when modal opens
       console.log('HeroEditorModal opened with heroItems:', heroItems);
-      setItems(heroItems.length > 0 ? [...heroItems] : []);
+      // Deep clone to avoid mutating original
+      const clonedItems = heroItems.map(item => ({
+        ...item,
+        duration: item.duration || 30,
+      }));
+      setItems(clonedItems.length > 0 ? clonedItems : []);
       setSearchQueries({});
     }
   }, [isOpen, heroItems]);
@@ -36,13 +41,17 @@ const HeroEditorModal = ({ isOpen, heroItems, mediaOptions, onClose, onSave }: H
       description: 'Description du slide...',
       image: '',
       mediaId: '',
+      duration: 30,
     };
     setItems([...items, newItem]);
   };
 
-  const updateItem = (id: string, field: keyof HeroItem, value: string) => {
+  const updateItem = (id: string, field: keyof HeroItem, value: string | number) => {
     setItems(items.map(item => 
-      item.id === id ? { ...item, [field]: value } : item
+      item.id === id ? { 
+        ...item, 
+        [field]: field === 'duration' ? Number(value) : value 
+      } : item
     ));
   };
 
@@ -210,6 +219,29 @@ const HeroEditorModal = ({ isOpen, heroItems, mediaOptions, onClose, onSave }: H
                       placeholder="https://..."
                       className="w-full bg-background/50 border border-border/50 rounded-xl px-4 py-2.5 outline-none focus:border-primary/50 text-sm text-foreground"
                     />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-2">
+                      <Clock size={12} /> Durée d'affichage (secondes)
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="range"
+                        min="10"
+                        max="120"
+                        step="5"
+                        value={item.duration || 30}
+                        onChange={(e) => updateItem(item.id, 'duration', e.target.value)}
+                        className="flex-1 accent-primary"
+                      />
+                      <span className="text-sm font-mono text-foreground w-12 text-center">
+                        {item.duration || 30}s
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Durée avant passage au slide suivant
+                    </p>
                   </div>
                 </div>
 

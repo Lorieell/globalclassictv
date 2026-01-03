@@ -12,6 +12,49 @@ interface HeroEditorModalProps {
   onSave: (items: HeroItem[]) => void;
 }
 
+// Parse duration input like "30s", "5m", "1h", "2j", "1sem" to seconds
+const parseDurationInput = (input: string): number | null => {
+  const trimmed = input.trim().toLowerCase();
+  const match = trimmed.match(/^(\d+(?:\.\d+)?)\s*(s|sec|m|min|h|j|d|sem|semaine)?$/);
+  if (!match) return null;
+  
+  const value = parseFloat(match[1]);
+  const unit = match[2] || 's';
+  
+  switch (unit) {
+    case 's':
+    case 'sec':
+      return Math.max(5, Math.round(value));
+    case 'm':
+    case 'min':
+      return Math.max(5, Math.round(value * 60));
+    case 'h':
+      return Math.max(5, Math.round(value * 3600));
+    case 'j':
+    case 'd':
+      return Math.max(5, Math.round(value * 86400));
+    case 'sem':
+    case 'semaine':
+      return Math.max(5, Math.round(value * 604800));
+    default:
+      return Math.max(5, Math.round(value));
+  }
+};
+
+// Format seconds to human-readable string
+const formatDurationInput = (seconds: number): string => {
+  if (seconds >= 604800 && seconds % 604800 === 0) {
+    return `${seconds / 604800}sem`;
+  } else if (seconds >= 86400 && seconds % 86400 === 0) {
+    return `${seconds / 86400}j`;
+  } else if (seconds >= 3600 && seconds % 3600 === 0) {
+    return `${seconds / 3600}h`;
+  } else if (seconds >= 60 && seconds % 60 === 0) {
+    return `${seconds / 60}m`;
+  }
+  return `${seconds}s`;
+};
+
 const HeroEditorModal = ({ isOpen, heroItems, mediaOptions, onClose, onSave }: HeroEditorModalProps) => {
   const { toast } = useToast();
   const [items, setItems] = useState<HeroItem[]>([]);
@@ -223,24 +266,22 @@ const HeroEditorModal = ({ isOpen, heroItems, mediaOptions, onClose, onSave }: H
 
                   <div>
                     <label className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-2">
-                      <Clock size={12} /> Durée d'affichage (secondes)
+                      <Clock size={12} /> Durée d'affichage
                     </label>
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="range"
-                        min="10"
-                        max="120"
-                        step="5"
-                        value={item.duration || 30}
-                        onChange={(e) => updateItem(item.id, 'duration', e.target.value)}
-                        className="flex-1 accent-primary"
-                      />
-                      <span className="text-sm font-mono text-foreground w-12 text-center">
-                        {item.duration || 30}s
-                      </span>
-                    </div>
+                    <input
+                      type="text"
+                      value={formatDurationInput(item.duration || 30)}
+                      onChange={(e) => {
+                        const seconds = parseDurationInput(e.target.value);
+                        if (seconds !== null) {
+                          updateItem(item.id, 'duration', seconds);
+                        }
+                      }}
+                      placeholder="30s, 5m, 1h, 1j, 1sem"
+                      className="w-full bg-background/50 border border-border/50 rounded-xl px-4 py-2.5 outline-none focus:border-primary/50 text-sm text-foreground"
+                    />
                     <p className="text-xs text-muted-foreground mt-1">
-                      Durée avant passage au slide suivant
+                      Formats: 30s, 5m, 1h, 2j, 1sem
                     </p>
                   </div>
                 </div>

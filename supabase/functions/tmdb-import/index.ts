@@ -359,7 +359,9 @@ serve(async (req) => {
   }
 
   try {
-    const { type = 'all', pages = 5, search = '' } = await req.json().catch(() => ({}));
+    // Parse body once and store all values
+    const body = await req.json().catch(() => ({}));
+    const { type = 'all', pages = 2, search = '', saveToDb = false } = body;
     
     console.log(`Importing TMDB content: type=${type}, pages=${pages}, search=${search}`);
     
@@ -421,24 +423,30 @@ serve(async (req) => {
         '/movie/upcoming',
       ];
       
-      // Fetch from standard endpoints
+      // Fetch from standard endpoints - process in batches
       for (const endpoint of movieEndpoints) {
         for (let page = 1; page <= pages; page++) {
           try {
             const response = await fetchFromTMDB(endpoint, { page: String(page) });
             
-            for (const movie of response.results) {
-              if (!movie.poster_path) continue;
-              const id = `tmdb-movie-${movie.id}`;
-              if (processedIds.has(id)) continue;
-              processedIds.add(id);
-              
-              const details = await getMovieDetails(movie.id);
-              if (details && details.overview) {
-                results.push(await transformMovieDetails(details));
-              }
-              
-              await new Promise(resolve => setTimeout(resolve, 30));
+            // Process movies in parallel batches of 5
+            const moviesWithPoster = response.results.filter((m: any) => m.poster_path);
+            for (let i = 0; i < moviesWithPoster.length; i += 5) {
+              const batch = moviesWithPoster.slice(i, i + 5);
+              const batchResults = await Promise.all(
+                batch.map(async (movie: any) => {
+                  const id = `tmdb-movie-${movie.id}`;
+                  if (processedIds.has(id)) return null;
+                  processedIds.add(id);
+                  
+                  const details = await getMovieDetails(movie.id);
+                  if (details && details.overview) {
+                    return await transformMovieDetails(details);
+                  }
+                  return null;
+                })
+              );
+              results.push(...batchResults.filter(Boolean));
             }
           } catch (error) {
             console.error(`Error fetching ${endpoint} page ${page}:`, error);
@@ -446,33 +454,36 @@ serve(async (req) => {
         }
       }
       
-      // Fetch by genre to get more variety
-      const movieGenreIds = Object.values(GENRE_IDS.movies);
-      for (const genreId of movieGenreIds) {
-        for (let page = 1; page <= Math.min(pages, 3); page++) {
-          try {
-            const response = await fetchFromTMDB('/discover/movie', { 
-              page: String(page),
-              with_genres: String(genreId),
-              sort_by: 'popularity.desc'
-            });
-            
-            for (const movie of response.results) {
-              if (!movie.poster_path) continue;
-              const id = `tmdb-movie-${movie.id}`;
-              if (processedIds.has(id)) continue;
-              processedIds.add(id);
-              
-              const details = await getMovieDetails(movie.id);
-              if (details && details.overview) {
-                results.push(await transformMovieDetails(details));
-              }
-              
-              await new Promise(resolve => setTimeout(resolve, 30));
-            }
-          } catch (error) {
-            console.error(`Error fetching movies by genre ${genreId}:`, error);
+      // Only fetch 2 key genres for variety (not all)
+      const keyGenres = [GENRE_IDS.movies.action, GENRE_IDS.movies.comedy, GENRE_IDS.movies.drama];
+      for (const genreId of keyGenres) {
+        try {
+          const response = await fetchFromTMDB('/discover/movie', { 
+            page: '1',
+            with_genres: String(genreId),
+            sort_by: 'popularity.desc'
+          });
+          
+          const moviesWithPoster = response.results.filter((m: any) => m.poster_path);
+          for (let i = 0; i < moviesWithPoster.length; i += 5) {
+            const batch = moviesWithPoster.slice(i, i + 5);
+            const batchResults = await Promise.all(
+              batch.map(async (movie: any) => {
+                const id = `tmdb-movie-${movie.id}`;
+                if (processedIds.has(id)) return null;
+                processedIds.add(id);
+                
+                const details = await getMovieDetails(movie.id);
+                if (details && details.overview) {
+                  return await transformMovieDetails(details);
+                }
+                return null;
+              })
+            );
+            results.push(...batchResults.filter(Boolean));
           }
+        } catch (error) {
+          console.error(`Error fetching movies by genre ${genreId}:`, error);
         }
       }
       
@@ -492,24 +503,30 @@ serve(async (req) => {
       
       const seriesStartCount = results.length;
       
-      // Fetch from standard endpoints
+      // Fetch from standard endpoints - process in batches
       for (const endpoint of seriesEndpoints) {
         for (let page = 1; page <= pages; page++) {
           try {
             const response = await fetchFromTMDB(endpoint, { page: String(page) });
             
-            for (const series of response.results) {
-              if (!series.poster_path) continue;
-              const id = `tmdb-tv-${series.id}`;
-              if (processedIds.has(id)) continue;
-              processedIds.add(id);
-              
-              const details = await getSeriesDetails(series.id);
-              if (details && details.overview) {
-                results.push(await transformSeriesDetails(details));
-              }
-              
-              await new Promise(resolve => setTimeout(resolve, 30));
+            // Process series in parallel batches of 5
+            const seriesWithPoster = response.results.filter((s: any) => s.poster_path);
+            for (let i = 0; i < seriesWithPoster.length; i += 5) {
+              const batch = seriesWithPoster.slice(i, i + 5);
+              const batchResults = await Promise.all(
+                batch.map(async (series: any) => {
+                  const id = `tmdb-tv-${series.id}`;
+                  if (processedIds.has(id)) return null;
+                  processedIds.add(id);
+                  
+                  const details = await getSeriesDetails(series.id);
+                  if (details && details.overview) {
+                    return await transformSeriesDetails(details);
+                  }
+                  return null;
+                })
+              );
+              results.push(...batchResults.filter(Boolean));
             }
           } catch (error) {
             console.error(`Error fetching ${endpoint} page ${page}:`, error);
@@ -517,43 +534,45 @@ serve(async (req) => {
         }
       }
       
-      // Fetch by genre to get more variety (kids, animation, etc.)
-      const tvGenreIds = Object.values(GENRE_IDS.tv);
-      for (const genreId of tvGenreIds) {
-        for (let page = 1; page <= Math.min(pages, 3); page++) {
-          try {
-            const response = await fetchFromTMDB('/discover/tv', { 
-              page: String(page),
-              with_genres: String(genreId),
-              sort_by: 'popularity.desc'
-            });
-            
-            for (const series of response.results) {
-              if (!series.poster_path) continue;
-              const id = `tmdb-tv-${series.id}`;
-              if (processedIds.has(id)) continue;
-              processedIds.add(id);
-              
-              const details = await getSeriesDetails(series.id);
-              if (details && details.overview) {
-                results.push(await transformSeriesDetails(details));
-              }
-              
-              await new Promise(resolve => setTimeout(resolve, 30));
-            }
-          } catch (error) {
-            console.error(`Error fetching series by genre ${genreId}:`, error);
+      // Only fetch 2 key genres for variety
+      const keyTvGenres = [GENRE_IDS.tv.drama, GENRE_IDS.tv.comedy, GENRE_IDS.tv.action];
+      for (const genreId of keyTvGenres) {
+        try {
+          const response = await fetchFromTMDB('/discover/tv', { 
+            page: '1',
+            with_genres: String(genreId),
+            sort_by: 'popularity.desc'
+          });
+          
+          const seriesWithPoster = response.results.filter((s: any) => s.poster_path);
+          for (let i = 0; i < seriesWithPoster.length; i += 5) {
+            const batch = seriesWithPoster.slice(i, i + 5);
+            const batchResults = await Promise.all(
+              batch.map(async (series: any) => {
+                const id = `tmdb-tv-${series.id}`;
+                if (processedIds.has(id)) return null;
+                processedIds.add(id);
+                
+                const details = await getSeriesDetails(series.id);
+                if (details && details.overview) {
+                  return await transformSeriesDetails(details);
+                }
+                return null;
+              })
+            );
+            results.push(...batchResults.filter(Boolean));
           }
+        } catch (error) {
+          console.error(`Error fetching series by genre ${genreId}:`, error);
         }
       }
       
       console.log(`Fetched ${results.length - seriesStartCount} series with full details`);
     }
-    
+
     console.log(`Total content fetched: ${results.length} items`);
 
-    // If saveToDb flag is set, save directly to Supabase
-    const { saveToDb = false } = await req.json().catch(() => ({}));
+    // If saveToDb flag is set, save directly to Supabase (use already parsed body)
     
     if (saveToDb && results.length > 0) {
       console.log('Saving to database...');

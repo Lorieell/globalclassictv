@@ -1,34 +1,58 @@
 import { useState } from 'react';
-import { X, Shield } from 'lucide-react';
+import { Shield, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 
 interface AdminLoginModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onLogin: (code: string) => boolean;
+  onLogin: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 const AdminLoginModal = ({ isOpen, onClose, onLogin }: AdminLoginModalProps) => {
-  const [code, setCode] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
   if (!isOpen) return null;
 
-  const handleSubmit = () => {
-    if (onLogin(code)) {
+  const handleSubmit = async () => {
+    if (!email || !password) {
       toast({
-        title: "Connexion réussie",
-        description: "Bienvenue dans le panneau d'administration",
-      });
-      setCode('');
-      onClose();
-    } else {
-      toast({
-        title: "Code incorrect",
-        description: "Veuillez réessayer",
+        title: "Champs requis",
+        description: "Veuillez remplir tous les champs",
         variant: "destructive",
       });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const result = await onLogin(email, password);
+      if (result.success) {
+        toast({
+          title: "Connexion réussie",
+          description: "Bienvenue dans le panneau d'administration",
+        });
+        setEmail('');
+        setPassword('');
+        onClose();
+      } else {
+        toast({
+          title: "Erreur de connexion",
+          description: result.error || "Identifiants incorrects ou accès non autorisé",
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "Erreur",
+        description: "Une erreur inattendue s'est produite",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -45,28 +69,50 @@ const AdminLoginModal = ({ isOpen, onClose, onLogin }: AdminLoginModalProps) => 
           Accès Admin
         </h2>
         <p className="text-muted-foreground text-center text-sm mb-6">
-          Entrez le code d'administration
+          Connectez-vous avec votre compte administrateur
         </p>
 
-        <input
-          type="password"
-          value={code}
-          onChange={(e) => setCode(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-          placeholder="••••••••"
-          className="w-full bg-secondary/50 border border-border/50 rounded-xl px-4 py-3 outline-none focus:border-primary/50 mb-4 text-center text-lg tracking-widest text-foreground placeholder:text-muted-foreground"
-        />
+        <div className="space-y-4">
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+            placeholder="Email"
+            disabled={loading}
+            className="w-full bg-secondary/50 border border-border/50 rounded-xl px-4 py-3 outline-none focus:border-primary/50 text-foreground placeholder:text-muted-foreground disabled:opacity-50"
+          />
+
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+            placeholder="Mot de passe"
+            disabled={loading}
+            className="w-full bg-secondary/50 border border-border/50 rounded-xl px-4 py-3 outline-none focus:border-primary/50 text-foreground placeholder:text-muted-foreground disabled:opacity-50"
+          />
+        </div>
 
         <Button
           onClick={handleSubmit}
-          className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-3 rounded-xl font-bold"
+          disabled={loading}
+          className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-3 rounded-xl font-bold mt-4"
         >
-          Connexion
+          {loading ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Connexion...
+            </>
+          ) : (
+            'Connexion'
+          )}
         </Button>
 
         <Button
           variant="ghost"
           onClick={onClose}
+          disabled={loading}
           className="w-full mt-2 text-muted-foreground"
         >
           Annuler

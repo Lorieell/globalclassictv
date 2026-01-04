@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Sliders, Plus, ArrowUp, Film, Tv, Sparkles, Globe, Bookmark, Heart, Clock } from 'lucide-react';
+import { useDocumentMeta } from '@/hooks/useDocumentMeta';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import Header from '@/components/streaming/Header';
@@ -33,16 +34,18 @@ const hasVideoUploaded = (m: Media): boolean => {
 
 // Génère les hero items automatiquement à partir des médias populaires récents (1 an max)
 // Moitié featured (marqués populaire par admin), moitié random
-const generateAutoHeroItems = (library: Media[], featuredMedia: Media[] = []): HeroItem[] => {
+const generateAutoHeroItems = (library: Media[], featuredMedia: Media[] = [], hourSeed: number): HeroItem[] => {
   if (library.length === 0) return [];
   
   const now = new Date();
   const currentYear = now.getFullYear();
   const heroThreshold = currentYear - 1; // Only content from last 1 year for hero
   
-  // Rotation toutes les heures
-  const hoursSinceEpoch = Math.floor(now.getTime() / (1000 * 60 * 60));
-  const rotationPeriod = hoursSinceEpoch;
+  // Simple seeded random function
+  const seededRandom = (seed: number, index: number): number => {
+    const x = Math.sin(seed * 9999 + index * 1234) * 10000;
+    return x - Math.floor(x);
+  };
   
   // Helper: Check if title is mainstream (latin characters, no CJK/Korean scripts)
   const isMainstreamTitle = (title: string): boolean => {
@@ -53,7 +56,7 @@ const generateAutoHeroItems = (library: Media[], featuredMedia: Media[] = []): H
   // Get featured media with video and backdrop (for hero display)
   const eligibleFeatured = featuredMedia
     .filter(m => hasVideoUploaded(m) && (m as any).backdrop)
-    .sort(() => (Math.random() - 0.5) * rotationPeriod % 10); // Randomize based on hour
+    .sort((a, b) => seededRandom(hourSeed, a.title.charCodeAt(0)) - seededRandom(hourSeed, b.title.charCodeAt(0)));
   
   // Filtrer les médias récents (1 an), mainstream, avec backdrop, bonne note, ET avec vidéo uploadée
   const eligibleMedia = library
@@ -75,12 +78,12 @@ const generateAutoHeroItems = (library: Media[], featuredMedia: Media[] = []): H
   
   const selectedFeatured = eligibleFeatured.slice(0, numFeatured);
   
-  // Shuffle random selection based on rotation period
-  const shuffledRandom = [...eligibleMedia.slice(0, 20)].sort((a, b) => {
-    const hashA = ((a.title.charCodeAt(0) || 0) * rotationPeriod) % 100;
-    const hashB = ((b.title.charCodeAt(0) || 0) * rotationPeriod) % 100;
-    return hashB - hashA;
-  }).slice(0, numRandom);
+  // Shuffle random selection based on hour seed
+  const shuffledRandom = [...eligibleMedia.slice(0, 20)]
+    .map((m, i) => ({ m, sort: seededRandom(hourSeed, i) }))
+    .sort((a, b) => a.sort - b.sort)
+    .map(x => x.m)
+    .slice(0, numRandom);
   
   // Combine and interleave: featured, random, featured, random...
   const combined: Media[] = [];
@@ -96,7 +99,7 @@ const generateAutoHeroItems = (library: Media[], featuredMedia: Media[] = []): H
       .sort((a, b) => (b.popularity || 0) - (a.popularity || 0))
       .slice(0, 6);
     return fallback.map(m => ({
-      id: `hero-auto-${m.id}-${rotationPeriod}`,
+      id: `hero-auto-${m.id}-${hourSeed}`,
       title: m.title.toUpperCase(),
       description: m.description || m.synopsis || '',
       image: (m as any).backdrop || m.image,
@@ -105,7 +108,7 @@ const generateAutoHeroItems = (library: Media[], featuredMedia: Media[] = []): H
   }
   
   return combined.slice(0, 6).map(m => ({
-    id: `hero-auto-${m.id}-${rotationPeriod}`,
+    id: `hero-auto-${m.id}-${hourSeed}`,
     title: m.title.toUpperCase(),
     description: m.description || m.synopsis || '',
     image: (m as any).backdrop || m.image,
@@ -278,6 +281,38 @@ const Index = () => {
 
   const { isAdmin, login, logout } = useAdmin();
 
+  // Dynamic SEO meta tags based on current view
+  const seoMeta = useMemo(() => {
+    const baseMeta = {
+      title: 'GCTV - Streaming',
+      description: 'Découvrez les meilleurs films et séries en streaming sur GCTV.',
+    };
+    
+    switch (view) {
+      case 'films':
+        return { title: 'Films - GCTV', description: 'Explorez notre catalogue de films en streaming HD et 4K.' };
+      case 'series':
+        return { title: 'Séries - GCTV', description: 'Découvrez les meilleures séries en streaming sur GCTV.' };
+      case 'watchlist':
+        return { title: 'Ma Liste - GCTV', description: 'Votre liste de contenus à regarder.' };
+      case 'favorites':
+        return { title: 'Favoris - GCTV', description: 'Vos films et séries favoris.' };
+      case 'detail':
+        if (selectedMedia) {
+          return {
+            title: `${selectedMedia.title} - GCTV`,
+            description: selectedMedia.synopsis || selectedMedia.description || `Regardez ${selectedMedia.title} en streaming.`,
+            image: (selectedMedia as any).backdrop || selectedMedia.image,
+          };
+        }
+        return baseMeta;
+      default:
+        return baseMeta;
+    }
+  }, [view, selectedMedia]);
+  
+  useDocumentMeta(seoMeta);
+
   // Fallback: open settings even if the footer prop isn't wired (HMR / stale props)
   useEffect(() => {
     const listener = () => setView('settings');
@@ -435,16 +470,26 @@ const Index = () => {
   }, [heroRefreshKey]);
   
   // Générer les hero items automatiquement avec featured media (recalcule quand heroRefreshKey change)
-  const autoHeroItems = useMemo(() => generateAutoHeroItems(library, featuredMedia), [library, featuredMedia, heroRefreshKey]);
+  const autoHeroItems = useMemo(() => generateAutoHeroItems(library, featuredMedia, heroRefreshKey), [library, featuredMedia, heroRefreshKey]);
   const displayHeroItems = heroItems.length > 0 ? heroItems : autoHeroItems;
   
-  // Inverser TOUS les contenus populaires (les plus en bas deviennent premiers)
-  const invertedPopularFilms = useMemo(() => {
-    return [...popularFilms].reverse();
+  // Populaires : prioriser les contenus marqués featured, puis par popularité
+  const sortedPopularFilms = useMemo(() => {
+    return [...popularFilms].sort((a, b) => {
+      const aFeatured = (a as any).isFeatured ? 1 : 0;
+      const bFeatured = (b as any).isFeatured ? 1 : 0;
+      if (bFeatured !== aFeatured) return bFeatured - aFeatured;
+      return (b.popularity || 0) - (a.popularity || 0);
+    });
   }, [popularFilms]);
   
-  const invertedPopularSeries = useMemo(() => {
-    return [...popularSeries].reverse();
+  const sortedPopularSeries = useMemo(() => {
+    return [...popularSeries].sort((a, b) => {
+      const aFeatured = (a as any).isFeatured ? 1 : 0;
+      const bFeatured = (b as any).isFeatured ? 1 : 0;
+      if (bFeatured !== aFeatured) return bFeatured - aFeatured;
+      return (b.popularity || 0) - (a.popularity || 0);
+    });
   }, [popularSeries]);
   
   // Sélectionner les 4 genres principaux pour films et séries (pas de répétition)
@@ -574,11 +619,11 @@ const Index = () => {
                   )}
 
                   {/* 1. Films populaires - Toggle Slide Row */}
-                  {invertedPopularFilms.length > 0 && (
+                  {sortedPopularFilms.length > 0 && (
                     <ToggleSlideRow
                       title="Films populaires"
                       titleIcon={<Film size={20} className="text-primary" />}
-                      media={invertedPopularFilms.slice(0, 20)}
+                      media={sortedPopularFilms.slice(0, 20)}
                       onSelect={handleSelectMedia}
                       onPlay={(media) => handlePlayFromDetail(media)}
                       onAddToWatchlist={toggleWatchlist}
@@ -588,11 +633,11 @@ const Index = () => {
                   )}
 
                   {/* 2. Séries populaires */}
-                  {invertedPopularSeries.length > 0 && (
+                  {sortedPopularSeries.length > 0 && (
                     <MediaRow
                       title="Séries populaires"
                       titleIcon={<Tv size={20} className="text-primary" />}
-                      media={invertedPopularSeries.slice(0, 20)}
+                      media={sortedPopularSeries.slice(0, 20)}
                       onSelect={handleSelectMedia}
                       onSeeMore={() => openCategoryPage('Séries populaires', m => m.type === 'Série')}
                       isAdmin={isAdmin}

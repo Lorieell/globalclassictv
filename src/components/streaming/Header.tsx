@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Bookmark, Heart } from 'lucide-react';
 import { Search, LayoutGrid, Film, Tv, Settings, LogOut, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -26,9 +27,45 @@ const Header = ({
   library,
   onSelectMedia 
 }: HeaderProps) => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
+
+  // Map view to route path
+  const viewToPath: Record<ViewType, string> = {
+    home: '/',
+    films: '/films',
+    series: '/series',
+    watchlist: '/watchlist',
+    favorites: '/favorites',
+    settings: '/settings',
+    detail: '/detail',
+    player: '/player',
+  };
+
+  // Get current view from pathname
+  const getCurrentView = (): ViewType => {
+    const pathToView: Record<string, ViewType> = {
+      '/': 'home',
+      '/films': 'films',
+      '/series': 'series',
+      '/watchlist': 'watchlist',
+      '/favorites': 'favorites',
+      '/settings': 'settings',
+      '/detail': 'detail',
+      '/player': 'player',
+    };
+    return pathToView[location.pathname] || 'home';
+  };
+
+  const currentView = getCurrentView();
+
+  const handleNavClick = (navView: ViewType) => {
+    navigate(viewToPath[navView]);
+    setView(navView);
+  };
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -60,7 +97,7 @@ const Header = ({
         {/* Logo */}
         <div 
           className="flex items-center gap-3 cursor-pointer group shrink-0"
-          onClick={() => setView('home')}
+          onClick={() => handleNavClick('home')}
         >
           <img 
             src={logo} 
@@ -85,14 +122,14 @@ const Header = ({
             <Button
               key={id}
               variant="ghost"
-              onClick={() => setView(id)}
+              onClick={() => handleNavClick(id)}
               className={`${iconOnly ? 'px-2' : 'px-4'} py-2 rounded-xl font-semibold text-sm gap-2 transition-all ${
-                view === id 
+                currentView === id 
                   ? id === 'favorites' ? 'text-red-500 bg-red-500/10' : 'text-primary bg-primary/10'
                   : id === 'favorites' ? 'text-red-500 hover:bg-red-500/10' : 'text-muted-foreground hover:text-foreground'
               }`}
             >
-              <Icon size={18} className={id === 'favorites' ? (view === id ? 'fill-red-500' : '') : ''} />
+              <Icon size={18} className={id === 'favorites' ? (currentView === id ? 'fill-red-500' : '') : ''} />
               {label}
             </Button>
           ))}
@@ -194,14 +231,14 @@ const Header = ({
             key={id}
             variant="ghost"
             size="sm"
-            onClick={() => setView(id)}
+            onClick={() => handleNavClick(id)}
             className={`${iconOnly ? 'px-2' : 'px-3'} py-1.5 rounded-lg font-semibold text-xs gap-1.5 ${
-              view === id 
+              currentView === id 
                 ? id === 'favorites' ? 'text-red-500 bg-red-500/10' : 'text-primary bg-primary/10'
                 : id === 'favorites' ? 'text-red-500' : 'text-muted-foreground'
             }`}
           >
-            <Icon size={14} className={id === 'favorites' ? (view === id ? 'fill-red-500' : '') : ''} />
+            <Icon size={14} className={id === 'favorites' ? (currentView === id ? 'fill-red-500' : '') : ''} />
             {label}
           </Button>
         ))}

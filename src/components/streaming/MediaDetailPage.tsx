@@ -29,20 +29,34 @@ const MediaDetailPage = ({
   onToggleSeen,
   watchPosition,
 }: MediaDetailPageProps) => {
-  // Get the first unwatched episode in a season based on saved position
+  // Get the episode to resume in a season based on saved position
   const getResumeEpisodeForSeason = (seasonId: string) => {
     const season = media.seasons?.find(s => s.id === seasonId);
-    if (!season?.episodes?.length) return season?.episodes?.[0]?.id;
+    if (!season?.episodes?.length) return undefined;
     
-    // If user has a saved position in this season, use it
+    // If this is the season where the user was watching, resume at their saved episode
     if (watchPosition?.seasonId === seasonId && watchPosition?.episodeId) {
       const epExists = season.episodes.find(e => e.id === watchPosition.episodeId);
-      if (epExists) return watchPosition.episodeId;
+      if (epExists) {
+        return watchPosition.episodeId;
+      }
     }
     
-    // Otherwise return first episode
+    // If user was watching a LATER season, they've probably seen this season already
+    // -> return first episode to let them rewatch
+    const savedSeasonIndex = media.seasons?.findIndex(s => s.id === watchPosition?.seasonId) ?? -1;
+    const clickedSeasonIndex = media.seasons?.findIndex(s => s.id === seasonId) ?? -1;
+    
+    if (savedSeasonIndex > clickedSeasonIndex && savedSeasonIndex !== -1) {
+      // User has progressed past this season, start from episode 1
+      return season.episodes[0]?.id;
+    }
+    
+    // If user was watching an EARLIER season, they haven't started this one yet
+    // -> return first episode
     return season.episodes[0]?.id;
   };
+  
   const [seenAnimating, setSeenAnimating] = useState(false);
   const [favoriteAnimating, setFavoriteAnimating] = useState(false);
 

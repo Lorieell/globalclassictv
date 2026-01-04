@@ -92,17 +92,44 @@ const VideoPlayer = ({ media, initialSeasonId, initialEpisodeId, onBack, onProgr
     );
   }, [flatEpisodes, isSerie, selectedSeason, selectedEpisode]);
 
-  // Save last position + compute progress (series = episode-based)
+  // Save position immediately when episode changes
   useEffect(() => {
     if (!isSerie || !selectedSeason || !selectedEpisode) return;
 
+    // Save position immediately
     onPosition?.(media.id, selectedSeason.id, selectedEpisode.id);
 
+    // Compute and save progress
     if (onProgress && flatEpisodes.length > 0 && currentFlatIndex >= 0) {
       const pct = Math.round(((currentFlatIndex + 1) / flatEpisodes.length) * 100);
       onProgress(media.id, pct);
     }
   }, [currentFlatIndex, flatEpisodes.length, isSerie, media.id, onPosition, onProgress, selectedEpisode, selectedSeason]);
+
+  // Save progress on page unload (closing tab, navigating away)
+  useEffect(() => {
+    const saveOnUnload = () => {
+      if (isSerie && selectedSeason && selectedEpisode) {
+        // Use sendBeacon for reliable save on page close
+        const data = JSON.stringify({
+          session_id: localStorage.getItem('gctv-session-id'),
+          media_id: media.id,
+          season_id: selectedSeason.id,
+          episode_id: selectedEpisode.id,
+          progress: flatEpisodes.length > 0 && currentFlatIndex >= 0 
+            ? Math.round(((currentFlatIndex + 1) / flatEpisodes.length) * 100)
+            : 0,
+        });
+        navigator.sendBeacon(
+          `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/watch_progress?on_conflict=session_id,media_id`,
+          new Blob([data], { type: 'application/json' })
+        );
+      }
+    };
+
+    window.addEventListener('beforeunload', saveOnUnload);
+    return () => window.removeEventListener('beforeunload', saveOnUnload);
+  }, [isSerie, selectedSeason, selectedEpisode, media.id, flatEpisodes.length, currentFlatIndex]);
 
   // Update episode when season changes (keep initialEpisodeId on first mount)
   useEffect(() => {

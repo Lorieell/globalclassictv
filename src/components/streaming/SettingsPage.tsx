@@ -887,62 +887,66 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
 
                 {/* Filters */}
                 <div className="bg-card/50 border border-border/50 rounded-xl p-4 space-y-4">
-                  <div className="flex flex-col sm:flex-row gap-4">
-                    <div className="flex-1">
+                  <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+                    {/* Search input - takes most space */}
+                    <div className="flex-1 min-w-0">
                       <Input
                         value={listeSearch}
                         onChange={(e) => setListeSearch(e.target.value)}
                         placeholder="Rechercher un contenu..."
-                        className="bg-muted/50 border-border"
+                        className="bg-muted/50 border-border w-full"
                       />
                     </div>
-                    {/* Year filter */}
+                    
+                    {/* Year filter - compact */}
                     <select
                       value={listeYearFilter}
                       onChange={(e) => setListeYearFilter(e.target.value)}
-                      className="bg-muted/50 border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                      className="bg-muted/50 border border-border rounded-lg px-2 py-2 text-sm text-foreground w-auto min-w-[100px]"
                     >
-                      <option value="all">Toutes années</option>
+                      <option value="all">Année</option>
                       {availableYears.map(year => (
                         <option key={year} value={year}>{year}</option>
                       ))}
                     </select>
-                    <div className="flex gap-2 flex-wrap">
-                      <Button
-                        variant={listeFilter === 'all' ? 'default' : 'outline'}
-                        onClick={() => setListeFilter('all')}
-                        size="sm"
-                      >
-                        Tous ({library.length})
-                      </Button>
-                      <Button
-                        variant={listeFilter === 'popular' ? 'default' : 'outline'}
-                        onClick={() => setListeFilter('popular')}
-                        size="sm"
-                        className="gap-1"
-                      >
-                        <Star size={14} />
-                        Populaires ({popularCount})
-                      </Button>
-                      <Button
-                        variant={listeFilter === 'with-video' ? 'default' : 'outline'}
-                        onClick={() => setListeFilter('with-video')}
-                        size="sm"
-                        className="gap-1"
-                      >
-                        <Check size={14} />
-                        Avec vidéo
-                      </Button>
-                      <Button
-                        variant={listeFilter === 'without-video' ? 'default' : 'outline'}
-                        onClick={() => setListeFilter('without-video')}
-                        size="sm"
-                        className="gap-1"
-                      >
-                        <X size={14} />
-                        Sans vidéo
-                      </Button>
-                    </div>
+                  </div>
+                  
+                  {/* Filter buttons row */}
+                  <div className="flex gap-2 flex-wrap">
+                    <Button
+                      variant={listeFilter === 'all' ? 'default' : 'outline'}
+                      onClick={() => setListeFilter('all')}
+                      size="sm"
+                    >
+                      Tous ({filteredLibrary.length})
+                    </Button>
+                    <Button
+                      variant={listeFilter === 'popular' ? 'default' : 'outline'}
+                      onClick={() => setListeFilter('popular')}
+                      size="sm"
+                      className="gap-1"
+                    >
+                      <Star size={14} />
+                      Populaires ({library.filter(m => (m as any).isFeatured && (listeYearFilter === 'all' || String((m as any).year) === listeYearFilter)).length})
+                    </Button>
+                    <Button
+                      variant={listeFilter === 'with-video' ? 'default' : 'outline'}
+                      onClick={() => setListeFilter('with-video')}
+                      size="sm"
+                      className="gap-1"
+                    >
+                      <Check size={14} />
+                      Avec vidéo
+                    </Button>
+                    <Button
+                      variant={listeFilter === 'without-video' ? 'default' : 'outline'}
+                      onClick={() => setListeFilter('without-video')}
+                      size="sm"
+                      className="gap-1"
+                    >
+                      <X size={14} />
+                      Sans vidéo
+                    </Button>
                   </div>
 
                   {/* Multi-select controls */}

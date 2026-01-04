@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Play, Plus, Check, Heart, Eye, Film, Clapperboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,7 @@ import Footer from '@/components/streaming/Footer';
 import AdvancedAdLayout from '@/components/streaming/AdvancedAdLayout';
 import { useSupabaseMedia } from '@/hooks/useSupabaseMedia';
 import { useAdmin } from '@/hooks/useAdmin';
+import { useDocumentMeta } from '@/hooks/useDocumentMeta';
 import { generateSlug, findMediaBySlug } from '@/pages/CataloguePage';
 import type { Media } from '@/types/media';
 import { cn } from '@/lib/utils';
@@ -30,6 +31,18 @@ const MediaDetailPageRoute = () => {
   const [favoriteAnimating, setFavoriteAnimating] = useState(false);
 
   const media = slug ? findMediaBySlug(library, slug) : undefined;
+
+  // Dynamic SEO meta tags
+  const seoMeta = useMemo(() => {
+    if (!media) return {};
+    return {
+      title: `${media.title} - Global Classic TV`,
+      description: media.synopsis || media.description || `Regardez ${media.title} en streaming sur Global Classic TV`,
+      image: (media as any).backdrop || media.image,
+    };
+  }, [media]);
+  
+  useDocumentMeta(seoMeta);
 
   useEffect(() => {
     if (!loading && !media && slug) {
@@ -269,7 +282,7 @@ const MediaDetailPageRoute = () => {
               {media.seasons && media.seasons.length > 0 && media.seasons.map((season) => (
                 <button
                   key={season.id}
-                  onClick={() => handlePlay(season.id)}
+                  onClick={() => handlePlay(season.id, season.episodes?.[0]?.id)}
                   className="group relative w-[180px] aspect-video rounded-xl border-2 border-primary/50 hover:border-primary overflow-hidden transition-all shadow-card hover:shadow-glow"
                 >
                   <img 

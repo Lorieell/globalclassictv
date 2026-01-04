@@ -309,7 +309,7 @@ const VideoPlayer = ({ media, initialSeasonId, initialEpisodeId, onBack, onProgr
 
         {/* Player change hint */}
         <p className="text-center text-xs text-muted-foreground mb-4">
-          Pub insistante ou vidéo indisponible ? <span className="text-foreground font-semibold">Changez de lecteur.</span>
+          Pub insistante ou vidéo indisponible ? <span className="text-foreground font-semibold">Utilisez un bloqueur de publicité ou changez de lecteur.</span>
         </p>
 
         {/* Video Player */}

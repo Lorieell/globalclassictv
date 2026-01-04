@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, forwardRef } from 'react';
+import { useState, useEffect, useCallback, forwardRef, useMemo } from 'react';
 import { ArrowLeft, Link2, Megaphone, Palette, FolderOpen, Instagram, Youtube, Twitter, Sun, Moon, Monitor, Plus, X, Film, Tv, BookOpen, Music, Gamepad2, Mic, Globe, Sparkles, Heart, Skull, Laugh, Zap, Sword, Ghost, Rocket, Theater, Baby, Search, Mountain, Users, List, Check, Pencil, Play, RefreshCw, Loader2, Trash2, Download, Database, Star, type LucideIcon } from 'lucide-react';
 import AdvancedAdsEditor from '@/components/streaming/AdvancedAdsEditor';
 import { Button } from '@/components/ui/button';
@@ -262,10 +262,12 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
   // Liste tab state
   const [listeFilter, setListeFilter] = useState<'all' | 'with-video' | 'without-video' | 'popular'>('all');
   const [listeSearch, setListeSearch] = useState('');
+  const [listeYearFilter, setListeYearFilter] = useState<string>('all');
   const [isRunningMaintenance, setIsRunningMaintenance] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [isCheckingAPI, setIsCheckingAPI] = useState(false);
   const [isRefreshingLayout, setIsRefreshingLayout] = useState(false);
+  const [isDeletingAsian, setIsDeletingAsian] = useState(false);
   
   // Multi-select for bulk actions
   const [selectedMediaIds, setSelectedMediaIds] = useState<Set<string>>(new Set());
@@ -277,18 +279,30 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
 
   const popularCount = library.filter(m => (m as any).isFeatured).length;
 
+  // Get all unique years from library
+  const availableYears = useMemo(() => {
+    const years = new Set<string>();
+    library.forEach(m => {
+      const year = (m as any).year;
+      if (year) years.add(String(year));
+    });
+    return Array.from(years).sort((a, b) => Number(b) - Number(a));
+  }, [library]);
+
   const filteredLibrary = library.filter(media => {
     const matchesSearch = listeSearch.trim() === '' || 
       media.title.toLowerCase().includes(listeSearch.toLowerCase());
+    
+    const matchesYear = listeYearFilter === 'all' || String((media as any).year) === listeYearFilter;
     
     const hasVideo = media.type === 'Série' 
       ? media.seasons?.some(s => s.episodes.some(e => e.videoUrls && e.videoUrls.trim() !== ''))
       : media.videoUrls && media.videoUrls.trim() !== '';
     
-    if (listeFilter === 'popular') return matchesSearch && (media as any).isFeatured;
-    if (listeFilter === 'with-video') return matchesSearch && hasVideo;
-    if (listeFilter === 'without-video') return matchesSearch && !hasVideo;
-    return matchesSearch;
+    if (listeFilter === 'popular') return matchesSearch && matchesYear && (media as any).isFeatured;
+    if (listeFilter === 'with-video') return matchesSearch && matchesYear && hasVideo;
+    if (listeFilter === 'without-video') return matchesSearch && matchesYear && !hasVideo;
+    return matchesSearch && matchesYear;
   });
 
   // Pagination logic
@@ -301,7 +315,7 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
   // Reset page when filter/search changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [listeFilter, listeSearch]);
+  }, [listeFilter, listeSearch, listeYearFilter]);
 
   // Toggle selection for a media item
   const toggleMediaSelection = (mediaId: string) => {
@@ -467,6 +481,43 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
       toast.error('Erreur de connexion au service de vérification');
     } finally {
       setIsCheckingAPI(false);
+    }
+  };
+
+  // Delete Asian content without French titles
+  const handleDeleteAsianContent = async () => {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer tous les contenus asiatiques (chinois, coréens, japonais) sans titre français ? Cette action est irréversible.')) {
+      return;
+    }
+    
+    setIsDeletingAsian(true);
+    try {
+      // Pattern to detect CJK characters
+      const cjkPattern = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uf900-\ufaff]/;
+      
+      // Find all media with Asian titles (CJK characters in title)
+      const asianMedia = library.filter(m => cjkPattern.test(m.title));
+      
+      if (asianMedia.length === 0) {
+        toast.info('Aucun contenu asiatique à supprimer');
+        setIsDeletingAsian(false);
+        return;
+      }
+      
+      // Delete each one
+      let deleted = 0;
+      for (const media of asianMedia) {
+        await onDeleteMedia?.(media.id);
+        deleted++;
+      }
+      
+      toast.success(`${deleted} contenus asiatiques supprimés`);
+      window.location.reload();
+    } catch (error) {
+      console.error('Delete Asian content error:', error);
+      toast.error('Erreur lors de la suppression');
+    } finally {
+      setIsDeletingAsian(false);
     }
   };
 
@@ -788,6 +839,29 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
                   </div>
                 </div>
 
+                {/* Delete Asian Content Button */}
+                <div className="bg-card/50 border border-orange-500/30 rounded-xl p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-semibold text-foreground">Supprimer contenus asiatiques sans VF</h3>
+                      <p className="text-sm text-muted-foreground">Supprime les films/séries chinois, coréens, japonais sans titre français</p>
+                    </div>
+                    <Button
+                      onClick={handleDeleteAsianContent}
+                      disabled={isDeletingAsian}
+                      variant="outline"
+                      className="gap-2 border-orange-500/30 text-orange-500 hover:bg-orange-500/10"
+                    >
+                      {isDeletingAsian ? (
+                        <Loader2 size={16} className="animate-spin" />
+                      ) : (
+                        <Trash2 size={16} />
+                      )}
+                      Supprimer
+                    </Button>
+                  </div>
+                </div>
+
                 {/* Maintenance Button */}
                 <div className="bg-card/50 border border-border/50 rounded-xl p-4">
                   <div className="flex items-center justify-between">
@@ -822,6 +896,17 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
                         className="bg-muted/50 border-border"
                       />
                     </div>
+                    {/* Year filter */}
+                    <select
+                      value={listeYearFilter}
+                      onChange={(e) => setListeYearFilter(e.target.value)}
+                      className="bg-muted/50 border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                    >
+                      <option value="all">Toutes années</option>
+                      {availableYears.map(year => (
+                        <option key={year} value={year}>{year}</option>
+                      ))}
+                    </select>
                     <div className="flex gap-2 flex-wrap">
                       <Button
                         variant={listeFilter === 'all' ? 'default' : 'outline'}

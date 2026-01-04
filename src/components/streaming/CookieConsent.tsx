@@ -97,51 +97,36 @@ const CookieConsent = () => {
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-[9999] p-4 animate-in slide-in-from-bottom duration-300">
-      <div className="max-w-4xl mx-auto bg-card border border-border rounded-2xl shadow-2xl overflow-hidden">
+      <div className="max-w-2xl mx-auto bg-card/95 backdrop-blur-md border border-border/50 rounded-2xl shadow-xl overflow-hidden">
         {!showSettings ? (
-          // Main banner
-          <div className="p-6">
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
-                <Cookie className="w-6 h-6 text-primary" />
+          // Main banner - simplified and less intrusive
+          <div className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
+                <Cookie className="w-4 h-4 text-primary" />
               </div>
-              <div className="flex-1">
-                <h3 className="font-semibold text-foreground mb-2">Nous utilisons des cookies 🍪</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Nous utilisons des cookies pour améliorer votre expérience, analyser le trafic et afficher des publicités personnalisées. 
-                  En cliquant sur "Tout accepter", vous consentez à l'utilisation de tous les cookies.
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-muted-foreground">
+                  Ce site utilise des cookies pour améliorer votre expérience.
                 </p>
-                <div className="flex flex-wrap gap-3">
-                  <Button 
-                    onClick={acceptAll}
-                    className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                  >
-                    Tout accepter
-                  </Button>
-                  <Button 
-                    onClick={acceptNecessary}
-                    variant="outline"
-                    className="border-border"
-                  >
-                    Refuser les optionnels
-                  </Button>
-                  <Button 
-                    onClick={() => setShowSettings(true)}
-                    variant="ghost"
-                    className="gap-2 text-muted-foreground"
-                  >
-                    <Settings size={16} />
-                    Personnaliser
-                  </Button>
-                </div>
               </div>
-              <button 
-                onClick={acceptNecessary}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-                aria-label="Fermer"
-              >
-                <X size={20} />
-              </button>
+              <div className="flex gap-2 flex-shrink-0">
+                <Button 
+                  onClick={acceptAll}
+                  size="sm"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                >
+                  Accepter
+                </Button>
+                <Button 
+                  onClick={() => setShowSettings(true)}
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground text-xs"
+                >
+                  Options
+                </Button>
+              </div>
             </div>
           </div>
         ) : (

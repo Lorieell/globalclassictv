@@ -267,6 +267,10 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
   const [isCheckingAPI, setIsCheckingAPI] = useState(false);
   const [isRefreshingLayout, setIsRefreshingLayout] = useState(false);
   
+  // Multi-select for bulk actions
+  const [selectedMediaIds, setSelectedMediaIds] = useState<Set<string>>(new Set());
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 50;
@@ -298,6 +302,40 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
   useEffect(() => {
     setCurrentPage(1);
   }, [listeFilter, listeSearch]);
+
+  // Toggle selection for a media item
+  const toggleMediaSelection = (mediaId: string) => {
+    setSelectedMediaIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(mediaId)) {
+        newSet.delete(mediaId);
+      } else {
+        newSet.add(mediaId);
+      }
+      return newSet;
+    });
+  };
+
+  // Select all visible items
+  const selectAllVisible = () => {
+    setSelectedMediaIds(new Set(paginatedLibrary.map(m => m.id)));
+  };
+
+  // Deselect all
+  const deselectAll = () => {
+    setSelectedMediaIds(new Set());
+  };
+
+  // Bulk mark as popular
+  const bulkMarkAsPopular = async (popular: boolean) => {
+    const ids = Array.from(selectedMediaIds);
+    for (const id of ids) {
+      await onToggleFeatured?.(id, popular);
+    }
+    toast.success(`${ids.length} contenu(s) ${popular ? 'marqués comme populaires' : 'retirés des populaires'}`);
+    setSelectedMediaIds(new Set());
+    setIsSelectMode(false);
+  };
 
   const runDailyMaintenance = async () => {
     setIsRunningMaintenance(true);
@@ -821,6 +859,59 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
                       </Button>
                     </div>
                   </div>
+
+                  {/* Multi-select controls */}
+                  <div className="flex items-center gap-3 pt-2 border-t border-border/30">
+                    <Button
+                      variant={isSelectMode ? 'default' : 'outline'}
+                      onClick={() => {
+                        setIsSelectMode(!isSelectMode);
+                        if (isSelectMode) deselectAll();
+                      }}
+                      size="sm"
+                      className="gap-2"
+                    >
+                      <Check size={14} />
+                      {isSelectMode ? 'Mode sélection actif' : 'Sélection multiple'}
+                    </Button>
+
+                    {isSelectMode && (
+                      <>
+                        <Button
+                          variant="outline"
+                          onClick={selectAllVisible}
+                          size="sm"
+                        >
+                          Tout sélectionner ({paginatedLibrary.length})
+                        </Button>
+                        {selectedMediaIds.size > 0 && (
+                          <>
+                            <span className="text-sm text-muted-foreground">
+                              {selectedMediaIds.size} sélectionné(s)
+                            </span>
+                            <Button
+                              onClick={() => bulkMarkAsPopular(true)}
+                              size="sm"
+                              className="gap-1 bg-yellow-500/20 text-yellow-500 hover:bg-yellow-500/30 border-yellow-500/30"
+                              variant="outline"
+                            >
+                              <Star size={14} className="fill-yellow-500" />
+                              Marquer populaires
+                            </Button>
+                            <Button
+                              onClick={() => bulkMarkAsPopular(false)}
+                              size="sm"
+                              variant="outline"
+                              className="gap-1"
+                            >
+                              <X size={14} />
+                              Retirer populaires
+                            </Button>
+                          </>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
 
                 {/* Content List */}
@@ -829,6 +920,22 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
                     <table className="w-full">
                       <thead className="bg-muted/50 sticky top-0">
                         <tr>
+                          {isSelectMode && (
+                            <th className="w-10 p-3">
+                              <input 
+                                type="checkbox" 
+                                checked={paginatedLibrary.length > 0 && paginatedLibrary.every(m => selectedMediaIds.has(m.id))}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    selectAllVisible();
+                                  } else {
+                                    deselectAll();
+                                  }
+                                }}
+                                className="w-4 h-4 accent-primary rounded"
+                              />
+                            </th>
+                          )}
                           <th className="text-left p-3 text-sm font-medium text-muted-foreground">Contenu</th>
                           <th className="text-left p-3 text-sm font-medium text-muted-foreground w-20">Type</th>
                           <th className="text-center p-3 text-sm font-medium text-muted-foreground w-20">Vidéo</th>
@@ -841,9 +948,25 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
                             ? media.seasons?.some(s => s.episodes.some(e => e.videoUrls && e.videoUrls.trim() !== ''))
                             : media.videoUrls && media.videoUrls.trim() !== '';
                           const isFeatured = (media as any).isFeatured || false;
+                          const isSelected = selectedMediaIds.has(media.id);
                           
                           return (
-                            <tr key={media.id} className="hover:bg-muted/20 transition-colors">
+                            <tr 
+                              key={media.id} 
+                              className={`transition-colors ${isSelected ? 'bg-primary/10' : 'hover:bg-muted/20'}`}
+                              onClick={isSelectMode ? () => toggleMediaSelection(media.id) : undefined}
+                            >
+                              {isSelectMode && (
+                                <td className="p-3">
+                                  <input 
+                                    type="checkbox" 
+                                    checked={isSelected}
+                                    onChange={() => toggleMediaSelection(media.id)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="w-4 h-4 accent-primary rounded"
+                                  />
+                                </td>
+                              )}
                               <td className="p-3">
                                 <div className="flex items-center gap-3">
                                   <div className="relative">

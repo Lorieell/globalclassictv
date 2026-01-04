@@ -1,11 +1,11 @@
 import { useEffect, useState, useRef } from 'react';
-import { Play, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Play, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import type { Media } from '@/types/media';
+import type { EnhancedResumeMedia } from '@/hooks/useResumeProgress';
 
 interface ResumeSectionProps {
-  resumeList: (Media & { progress: number })[];
-  onSelect: (media: Media) => void;
+  resumeList: EnhancedResumeMedia[];
+  onSelect: (media: EnhancedResumeMedia, seasonId?: string, episodeId?: string) => void;
 }
 
 const ResumeSection = ({ resumeList, onSelect }: ResumeSectionProps) => {
@@ -86,7 +86,7 @@ const ResumeSection = ({ resumeList, onSelect }: ResumeSectionProps) => {
             <div
               key={media.id}
               data-resume-item
-              onClick={() => onSelect(media)}
+              onClick={() => onSelect(media, media.nextSeasonId, media.nextEpisodeId)}
               className="flex-[0_0_calc((100%_-_5rem)/5)] max-w-[calc((100%_-_5rem)/5)] flex-shrink-0 group cursor-pointer"
             >
               <div className="aspect-video bg-card rounded-3xl border border-border/30 overflow-hidden relative hover:border-primary/50 transition-all shadow-card">
@@ -94,6 +94,7 @@ const ResumeSection = ({ resumeList, onSelect }: ResumeSectionProps) => {
                 <img 
                   src={media.image} 
                   alt={media.title}
+                  loading="lazy"
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 />
                 
@@ -112,15 +113,27 @@ const ResumeSection = ({ resumeList, onSelect }: ResumeSectionProps) => {
                   />
                 </div>
 
-                {/* Progress Percentage */}
+                {/* Status Badge */}
                 <div className="absolute top-3 left-4">
-                  <div className={`text-[8px] font-black uppercase tracking-widest backdrop-blur-sm px-2 py-1 rounded-lg ${
-                    media.progress === 100 
-                      ? 'bg-green-500/80 text-white' 
-                      : 'bg-background/60 text-foreground/60'
-                  }`}>
-                    {media.progress === 100 ? '✓ Terminé' : `${media.progress}% Terminé`}
-                  </div>
+                  {media.hasNewSeason ? (
+                    <div className="text-[8px] font-black uppercase tracking-widest backdrop-blur-sm px-2 py-1 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 text-white flex items-center gap-1 animate-pulse">
+                      <Sparkles size={10} />
+                      NEW SEASON
+                    </div>
+                  ) : media.hasNewEpisodes ? (
+                    <div className="text-[8px] font-black uppercase tracking-widest backdrop-blur-sm px-2 py-1 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 text-white flex items-center gap-1 animate-pulse">
+                      <Sparkles size={10} />
+                      NEW EP
+                    </div>
+                  ) : media.isCompleted ? (
+                    <div className="text-[8px] font-black uppercase tracking-widest backdrop-blur-sm px-2 py-1 rounded-lg bg-green-500/80 text-white">
+                      ✓ Terminé
+                    </div>
+                  ) : (
+                    <div className="text-[8px] font-black uppercase tracking-widest backdrop-blur-sm px-2 py-1 rounded-lg bg-background/60 text-foreground/60">
+                      {media.progress}%
+                    </div>
+                  )}
                 </div>
               </div>
               
@@ -129,7 +142,9 @@ const ResumeSection = ({ resumeList, onSelect }: ResumeSectionProps) => {
                   {media.title}
                 </div>
                 <div className="text-[8px] font-bold text-muted-foreground uppercase mt-0.5 tracking-widest italic">
-                  {media.progress === 100 ? 'Revoir' : 'Continuer la lecture'}
+                  {media.hasNewSeason ? 'Nouvelle saison disponible' : 
+                   media.hasNewEpisodes ? 'Nouvel épisode disponible' :
+                   media.isCompleted ? 'Revoir' : 'Continuer la lecture'}
                 </div>
               </div>
             </div>

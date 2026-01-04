@@ -54,6 +54,20 @@ const Footer = ({ isAdmin, onSettingsClick }: FooterProps) => {
     if (stored) setLinks(JSON.parse(stored));
   }, []);
 
+  // Re-read links when localStorage changes (from settings page)
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const stored = localStorage.getItem(SOCIAL_STORAGE_KEY);
+      if (stored) setLinks(JSON.parse(stored));
+    };
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('gctv-social-updated', handleStorageChange);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('gctv-social-updated', handleStorageChange);
+    };
+  }, []);
+
   const socialItems = [
     { key: 'instagram', icon: Instagram, label: 'Instagram' },
     { key: 'youtube', icon: Youtube, label: 'YouTube' },

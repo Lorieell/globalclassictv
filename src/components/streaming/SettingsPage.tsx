@@ -202,6 +202,7 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
 
   const saveLinks = () => {
     localStorage.setItem(SOCIAL_STORAGE_KEY, JSON.stringify(links));
+    window.dispatchEvent(new Event('gctv-social-updated'));
     toast.success('Liens sauvegardés');
   };
 

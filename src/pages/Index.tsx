@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Sliders, Plus, ArrowUp, Film, Tv, Sparkles, Globe, Bookmark, Heart, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -121,24 +121,28 @@ interface CategoryView {
 }
 
 const Index = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
-  const [view, setViewState] = useState<ViewType>(() => {
-    const raw = (searchParams.get('v') ?? 'home') as ViewType;
-    const allowed: ViewType[] = [
-      'home',
-      'films',
-      'series',
-      'watchlist',
-      'favorites',
-      'detail',
-      'player',
-      'settings',
-      'category',
-    ];
-    return allowed.includes(raw) ? raw : 'home';
-  });
+  // Map pathname to view type
+  const getViewFromPath = (pathname: string): ViewType => {
+    const pathMap: Record<string, ViewType> = {
+      '/': 'home',
+      '/films': 'films',
+      '/series': 'series',
+      '/watchlist': 'watchlist',
+      '/favorites': 'favorites',
+      '/settings': 'settings',
+      '/detail': 'detail',
+      '/player': 'player',
+    };
+    return pathMap[pathname] || 'home';
+  };
 
+  const [view, setViewState] = useState<ViewType>(() => getViewFromPath(location.pathname));
+
+  // Navigate to a proper route
   const setView = (
     next: ViewType,
     options?: { replace?: boolean; mediaId?: string; seasonId?: string; episodeId?: string },
@@ -148,18 +152,33 @@ const Index = () => {
     // Category view uses an in-memory filter function -> keep URL unchanged
     if (next === 'category') return;
 
+    // Build the target path
+    const pathMap: Record<ViewType, string> = {
+      home: '/',
+      films: '/films',
+      series: '/series',
+      watchlist: '/watchlist',
+      favorites: '/favorites',
+      settings: '/settings',
+      detail: '/detail',
+      player: '/player',
+      category: '/',
+    };
+
+    let targetPath = pathMap[next] || '/';
+
+    // Add query params for detail/player views
     const params = new URLSearchParams();
-
-    // Keep the home URL clean (no query string)
-    if (next !== 'home') {
-      params.set('v', next);
-    }
-
     if (options?.mediaId) params.set('id', options.mediaId);
     if (options?.seasonId) params.set('s', options.seasonId);
     if (options?.episodeId) params.set('e', options.episodeId);
 
-    setSearchParams(params, { replace: options?.replace ?? false });
+    const queryString = params.toString();
+    if (queryString) {
+      targetPath += `?${queryString}`;
+    }
+
+    navigate(targetPath, { replace: options?.replace ?? false });
   };
 
   const [categoryView, setCategoryView] = useState<CategoryView | null>(null);
@@ -211,19 +230,7 @@ const Index = () => {
 
   // Sync UI state to URL (and support browser back/forward + shared links)
   useEffect(() => {
-    const raw = (searchParams.get('v') ?? 'home') as ViewType;
-    const allowed: ViewType[] = [
-      'home',
-      'films',
-      'series',
-      'watchlist',
-      'favorites',
-      'detail',
-      'player',
-      'settings',
-      'category',
-    ];
-    const nextView = allowed.includes(raw) ? raw : 'home';
+    const nextView = getViewFromPath(location.pathname);
 
     // Category can't be reconstructed from URL (its filter is a function)
     if (nextView === 'category') {
@@ -238,7 +245,7 @@ const Index = () => {
         setSelectedMedia(null);
         setPlayerSeasonId(undefined);
         setPlayerEpisodeId(undefined);
-        setViewState('home');
+        navigate('/', { replace: true });
         return;
       }
 
@@ -258,13 +265,13 @@ const Index = () => {
         setSelectedMedia(null);
         setPlayerSeasonId(undefined);
         setPlayerEpisodeId(undefined);
-        setViewState('home');
+        navigate('/', { replace: true });
       }
       return;
     }
 
     setViewState(nextView);
-  }, [searchParams, library, loading]);
+  }, [location.pathname, searchParams, library, loading, navigate]);
 
   // Enhanced resume list with new episode detection
   const resumeList = useEnhancedResumeList(library, watchProgress, watchPosition);

@@ -42,6 +42,13 @@ const App = () => (
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/" element={<Index />} />
+            <Route path="/films" element={<Index />} />
+            <Route path="/series" element={<Index />} />
+            <Route path="/watchlist" element={<Index />} />
+            <Route path="/favorites" element={<Index />} />
+            <Route path="/settings" element={<Index />} />
+            <Route path="/detail" element={<Index />} />
+            <Route path="/player" element={<Index />} />
             <Route path="/catalogue" element={<CataloguePage />} />
             <Route path="/catalogue/:slug" element={<MediaDetailPageRoute />} />
             <Route path="/catalogue/:slug/player" element={<PlayerPageRoute />} />

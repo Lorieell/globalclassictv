@@ -16,7 +16,9 @@ import HeroEditorModal from '@/components/streaming/HeroEditorModal';
 import SettingsPage from '@/components/streaming/SettingsPage';
 import AdvancedAdLayout from '@/components/streaming/AdvancedAdLayout';
 import Footer from '@/components/streaming/Footer';
+import CookieConsent from '@/components/streaming/CookieConsent';
 import { useSupabaseMedia } from '@/hooks/useSupabaseMedia';
+import { useEnhancedResumeList, type EnhancedResumeMedia } from '@/hooks/useResumeProgress';
 import { useAdmin } from '@/hooks/useAdmin';
 import type { Media, HeroItem } from '@/types/media';
 
@@ -145,7 +147,7 @@ const Index = () => {
     asianFilms,
     bollywood,
     heroItems, 
-    resumeList,
+    watchProgress,
     featuredMedia,
     watchPosition,
     watchlistMedia,
@@ -165,6 +167,9 @@ const Index = () => {
     toggleSeen,
     isSeen,
   } = useSupabaseMedia();
+
+  // Enhanced resume list with new episode detection
+  const resumeList = useEnhancedResumeList(library, watchProgress, watchPosition);
 
   const { isAdmin, login, logout } = useAdmin();
 
@@ -248,9 +253,11 @@ const Index = () => {
     setView('player');
   };
 
-  // Resume playing (use saved season/episode for series)
-  const handleResumeSelect = (media: Media) => {
-    const { seasonId, episodeId } = getResumeParams(media);
+  // Resume playing (use next episode/season if new content available, else saved position)
+  const handleResumeSelect = (media: EnhancedResumeMedia, overrideSeasonId?: string, overrideEpisodeId?: string) => {
+    // Use the override (new content) if provided, otherwise fall back to saved position
+    const seasonId = overrideSeasonId || watchPosition[media.id]?.seasonId;
+    const episodeId = overrideEpisodeId || watchPosition[media.id]?.episodeId;
     setSelectedMedia(media);
     setPlayerSeasonId(seasonId);
     setPlayerEpisodeId(episodeId);
@@ -897,6 +904,9 @@ const Index = () => {
         onClose={() => setShowHeroEditor(false)}
         onSave={handleSaveHeroItems}
       />
+
+      {/* Cookie Consent Banner */}
+      <CookieConsent />
     </div>
   );
 };

@@ -399,6 +399,7 @@ const Index = () => {
             onToggleFavorite={toggleFavorite}
             isSeen={isSeen(selectedMedia.id)}
             onToggleSeen={toggleSeen}
+            watchPosition={watchPosition[selectedMedia.id]}
           />
         ) : view === 'category' && categoryView ? (
           <CategoryPage

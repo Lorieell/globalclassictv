@@ -14,6 +14,7 @@ interface MediaDetailPageProps {
   onToggleFavorite: (mediaId: string) => void;
   isSeen: boolean;
   onToggleSeen: (mediaId: string) => void;
+  watchPosition?: { seasonId?: string; episodeId?: string };
 }
 
 const MediaDetailPage = ({ 
@@ -26,7 +27,22 @@ const MediaDetailPage = ({
   onToggleFavorite,
   isSeen,
   onToggleSeen,
+  watchPosition,
 }: MediaDetailPageProps) => {
+  // Get the first unwatched episode in a season based on saved position
+  const getResumeEpisodeForSeason = (seasonId: string) => {
+    const season = media.seasons?.find(s => s.id === seasonId);
+    if (!season?.episodes?.length) return season?.episodes?.[0]?.id;
+    
+    // If user has a saved position in this season, use it
+    if (watchPosition?.seasonId === seasonId && watchPosition?.episodeId) {
+      const epExists = season.episodes.find(e => e.id === watchPosition.episodeId);
+      if (epExists) return watchPosition.episodeId;
+    }
+    
+    // Otherwise return first episode
+    return season.episodes[0]?.id;
+  };
   const [seenAnimating, setSeenAnimating] = useState(false);
   const [favoriteAnimating, setFavoriteAnimating] = useState(false);
 
@@ -231,7 +247,7 @@ const MediaDetailPage = ({
           {media.seasons && media.seasons.length > 0 && media.seasons.map((season) => (
             <button
               key={season.id}
-              onClick={() => onPlay(media, season.id, season.episodes?.[0]?.id)}
+              onClick={() => onPlay(media, season.id, getResumeEpisodeForSeason(season.id))}
               className="group relative w-[180px] aspect-video rounded-xl border-2 border-primary/50 hover:border-primary overflow-hidden transition-all shadow-card hover:shadow-glow"
             >
               <img 

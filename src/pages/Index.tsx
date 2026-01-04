@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Sliders, Plus, ArrowUp, Film, Tv, Sparkles, Globe, Bookmark, Heart, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -120,7 +121,47 @@ interface CategoryView {
 }
 
 const Index = () => {
-  const [view, setView] = useState<ViewType>('home');
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const [view, setViewState] = useState<ViewType>(() => {
+    const raw = (searchParams.get('v') ?? 'home') as ViewType;
+    const allowed: ViewType[] = [
+      'home',
+      'films',
+      'series',
+      'watchlist',
+      'favorites',
+      'detail',
+      'player',
+      'settings',
+      'category',
+    ];
+    return allowed.includes(raw) ? raw : 'home';
+  });
+
+  const setView = (
+    next: ViewType,
+    options?: { replace?: boolean; mediaId?: string; seasonId?: string; episodeId?: string },
+  ) => {
+    setViewState(next);
+
+    // Category view uses an in-memory filter function -> keep URL unchanged
+    if (next === 'category') return;
+
+    const params = new URLSearchParams();
+
+    // Keep the home URL clean (no query string)
+    if (next !== 'home') {
+      params.set('v', next);
+    }
+
+    if (options?.mediaId) params.set('id', options.mediaId);
+    if (options?.seasonId) params.set('s', options.seasonId);
+    if (options?.episodeId) params.set('e', options.episodeId);
+
+    setSearchParams(params, { replace: options?.replace ?? false });
+  };
+
   const [categoryView, setCategoryView] = useState<CategoryView | null>(null);
   const [selectedMedia, setSelectedMedia] = useState<Media | null>(null);
   const [playerSeasonId, setPlayerSeasonId] = useState<string | undefined>();
@@ -167,6 +208,63 @@ const Index = () => {
     toggleSeen,
     isSeen,
   } = useSupabaseMedia();
+
+  // Sync UI state to URL (and support browser back/forward + shared links)
+  useEffect(() => {
+    const raw = (searchParams.get('v') ?? 'home') as ViewType;
+    const allowed: ViewType[] = [
+      'home',
+      'films',
+      'series',
+      'watchlist',
+      'favorites',
+      'detail',
+      'player',
+      'settings',
+      'category',
+    ];
+    const nextView = allowed.includes(raw) ? raw : 'home';
+
+    // Category can't be reconstructed from URL (its filter is a function)
+    if (nextView === 'category') {
+      setCategoryView(null);
+      setViewState('home');
+      return;
+    }
+
+    if (nextView === 'detail' || nextView === 'player') {
+      const id = searchParams.get('id');
+      if (!id) {
+        setSelectedMedia(null);
+        setPlayerSeasonId(undefined);
+        setPlayerEpisodeId(undefined);
+        setViewState('home');
+        return;
+      }
+
+      const media = library.find(m => m.id === id);
+      if (media) {
+        setSelectedMedia(media);
+        if (nextView === 'player') {
+          setPlayerSeasonId(searchParams.get('s') ?? undefined);
+          setPlayerEpisodeId(searchParams.get('e') ?? undefined);
+        }
+        setViewState(nextView);
+        return;
+      }
+
+      // If the library finished loading and we still can't find it, go home
+      if (!loading) {
+        setSelectedMedia(null);
+        setPlayerSeasonId(undefined);
+        setPlayerEpisodeId(undefined);
+        setViewState('home');
+      }
+      return;
+    }
+
+    setViewState(nextView);
+  }, [searchParams, library, loading]);
 
   // Enhanced resume list with new episode detection
   const resumeList = useEnhancedResumeList(library, watchProgress, watchPosition);
@@ -215,7 +313,7 @@ const Index = () => {
   // Go to detail page when clicking a media card
   const handleSelectMedia = (media: Media) => {
     setSelectedMedia(media);
-    setView('detail');
+    setView('detail', { mediaId: media.id });
   };
 
   const getResumeParams = (media: Media) => {
@@ -232,7 +330,7 @@ const Index = () => {
       setSelectedMedia(media);
       setPlayerSeasonId(seasonId);
       setPlayerEpisodeId(episodeId);
-      setView('player');
+      setView('player', { mediaId: media.id, seasonId, episodeId });
     }
   };
 
@@ -241,7 +339,7 @@ const Index = () => {
     const media = library.find(m => m.id === mediaId);
     if (media) {
       setSelectedMedia(media);
-      setView('detail');
+      setView('detail', { mediaId: media.id });
     }
   };
 
@@ -250,7 +348,7 @@ const Index = () => {
     setSelectedMedia(media);
     setPlayerSeasonId(seasonId);
     setPlayerEpisodeId(episodeId);
-    setView('player');
+    setView('player', { mediaId: media.id, seasonId, episodeId });
   };
 
   // Resume playing (use next episode/season if new content available, else saved position)
@@ -261,7 +359,7 @@ const Index = () => {
     setSelectedMedia(media);
     setPlayerSeasonId(seasonId);
     setPlayerEpisodeId(episodeId);
-    setView('player');
+    setView('player', { mediaId: media.id, seasonId, episodeId });
   };
 
   const handleBack = () => {
@@ -270,15 +368,15 @@ const Index = () => {
       if (selectedMedia?.type === 'Film') {
         updateProgress(selectedMedia.id, 100);
       }
-      setView('detail');
+      setView('detail', { replace: true, mediaId: selectedMedia?.id });
       setPlayerSeasonId(undefined);
       setPlayerEpisodeId(undefined);
     } else if (view === 'category') {
       setCategoryView(null);
-      setView('home');
+      setView('home', { replace: true });
     } else {
       setSelectedMedia(null);
-      setView('home');
+      setView('home', { replace: true });
     }
   };
 

@@ -314,8 +314,23 @@ const Index = () => {
     updatePosition(mediaId, seasonId, episodeId);
   };
 
-  // Générer les hero items automatiquement avec featured media
-  const autoHeroItems = useMemo(() => generateAutoHeroItems(library, featuredMedia), [library, featuredMedia]);
+  // Force hero refresh every hour with state-based refresh trigger
+  const [heroRefreshKey, setHeroRefreshKey] = useState(() => Math.floor(Date.now() / (1000 * 60 * 60)));
+  
+  useEffect(() => {
+    // Check every minute if we need to refresh hero items
+    const checkInterval = setInterval(() => {
+      const currentHour = Math.floor(Date.now() / (1000 * 60 * 60));
+      if (currentHour !== heroRefreshKey) {
+        setHeroRefreshKey(currentHour);
+      }
+    }, 60000); // Check every minute
+    
+    return () => clearInterval(checkInterval);
+  }, [heroRefreshKey]);
+  
+  // Générer les hero items automatiquement avec featured media (recalcule quand heroRefreshKey change)
+  const autoHeroItems = useMemo(() => generateAutoHeroItems(library, featuredMedia), [library, featuredMedia, heroRefreshKey]);
   const displayHeroItems = heroItems.length > 0 ? heroItems : autoHeroItems;
   
   // Inverser TOUS les contenus populaires (les plus en bas deviennent premiers)

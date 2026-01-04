@@ -231,7 +231,7 @@ const MediaDetailPage = ({
           {media.seasons && media.seasons.length > 0 && media.seasons.map((season) => (
             <button
               key={season.id}
-              onClick={() => onPlay(media, season.id)}
+              onClick={() => onPlay(media, season.id, season.episodes?.[0]?.id)}
               className="group relative w-[180px] aspect-video rounded-xl border-2 border-primary/50 hover:border-primary overflow-hidden transition-all shadow-card hover:shadow-glow"
             >
               <img 

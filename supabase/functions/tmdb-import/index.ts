@@ -342,10 +342,37 @@ async function transformSeriesDetails(series: TMDBSeriesDetails, fetchOmdb: bool
   };
 }
 
+// Filter out Asian content that doesn't have French title or isn't popular in France
+const isEligibleForFrenchAudience = (item: any): boolean => {
+  const origLang = item.original_language || '';
+  const title = item.title || item.name || '';
+  
+  // Asian languages to filter
+  const asianLanguages = ['zh', 'ko', 'ja', 'th', 'vi', 'id', 'ms', 'tl'];
+  const isAsianContent = asianLanguages.includes(origLang);
+  
+  if (!isAsianContent) return true; // Non-Asian content is always eligible
+  
+  // Check if title contains CJK characters (not translated to French)
+  const cjkPattern = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uf900-\ufaff]/;
+  const hasAsianTitle = cjkPattern.test(title);
+  
+  if (hasAsianTitle) return false; // No French title
+  
+  // Check if it has French in spoken languages
+  const hasFrench = item.spoken_languages?.some((l: any) => l.iso_639_1 === 'fr');
+  
+  // Allow if it has good rating (popular internationally)
+  const hasGoodRating = (item.vote_average || 0) >= 7.5;
+  const hasEnoughVotes = (item.vote_count || 0) >= 500;
+  
+  return hasFrench || (hasGoodRating && hasEnoughVotes);
+};
+
 async function searchContent(query: string, type: 'movie' | 'tv'): Promise<any[]> {
   try {
     const response = await fetchFromTMDB(`/search/${type}`, { query });
-    return response.results || [];
+    return (response.results || []).filter(isEligibleForFrenchAudience);
   } catch (error) {
     console.error(`Error searching ${type} for "${query}":`, error);
     return [];
@@ -429,8 +456,10 @@ serve(async (req) => {
           try {
             const response = await fetchFromTMDB(endpoint, { page: String(page) });
             
-            // Process movies in parallel batches of 5
-            const moviesWithPoster = response.results.filter((m: any) => m.poster_path);
+            // Process movies in parallel batches of 5, filtering out non-eligible content
+            const moviesWithPoster = response.results
+              .filter((m: any) => m.poster_path)
+              .filter(isEligibleForFrenchAudience);
             for (let i = 0; i < moviesWithPoster.length; i += 5) {
               const batch = moviesWithPoster.slice(i, i + 5);
               const batchResults = await Promise.all(
@@ -440,7 +469,7 @@ serve(async (req) => {
                   processedIds.add(id);
                   
                   const details = await getMovieDetails(movie.id);
-                  if (details && details.overview) {
+                  if (details && details.overview && isEligibleForFrenchAudience(details)) {
                     return await transformMovieDetails(details);
                   }
                   return null;
@@ -464,7 +493,9 @@ serve(async (req) => {
             sort_by: 'popularity.desc'
           });
           
-          const moviesWithPoster = response.results.filter((m: any) => m.poster_path);
+          const moviesWithPoster = response.results
+            .filter((m: any) => m.poster_path)
+            .filter(isEligibleForFrenchAudience);
           for (let i = 0; i < moviesWithPoster.length; i += 5) {
             const batch = moviesWithPoster.slice(i, i + 5);
             const batchResults = await Promise.all(
@@ -474,7 +505,7 @@ serve(async (req) => {
                 processedIds.add(id);
                 
                 const details = await getMovieDetails(movie.id);
-                if (details && details.overview) {
+                if (details && details.overview && isEligibleForFrenchAudience(details)) {
                   return await transformMovieDetails(details);
                 }
                 return null;
@@ -509,8 +540,10 @@ serve(async (req) => {
           try {
             const response = await fetchFromTMDB(endpoint, { page: String(page) });
             
-            // Process series in parallel batches of 5
-            const seriesWithPoster = response.results.filter((s: any) => s.poster_path);
+            // Process series in parallel batches of 5, filtering out non-eligible content
+            const seriesWithPoster = response.results
+              .filter((s: any) => s.poster_path)
+              .filter(isEligibleForFrenchAudience);
             for (let i = 0; i < seriesWithPoster.length; i += 5) {
               const batch = seriesWithPoster.slice(i, i + 5);
               const batchResults = await Promise.all(
@@ -520,7 +553,7 @@ serve(async (req) => {
                   processedIds.add(id);
                   
                   const details = await getSeriesDetails(series.id);
-                  if (details && details.overview) {
+                  if (details && details.overview && isEligibleForFrenchAudience(details)) {
                     return await transformSeriesDetails(details);
                   }
                   return null;
@@ -544,7 +577,9 @@ serve(async (req) => {
             sort_by: 'popularity.desc'
           });
           
-          const seriesWithPoster = response.results.filter((s: any) => s.poster_path);
+          const seriesWithPoster = response.results
+            .filter((s: any) => s.poster_path)
+            .filter(isEligibleForFrenchAudience);
           for (let i = 0; i < seriesWithPoster.length; i += 5) {
             const batch = seriesWithPoster.slice(i, i + 5);
             const batchResults = await Promise.all(
@@ -554,7 +589,7 @@ serve(async (req) => {
                 processedIds.add(id);
                 
                 const details = await getSeriesDetails(series.id);
-                if (details && details.overview) {
+                if (details && details.overview && isEligibleForFrenchAudience(details)) {
                   return await transformSeriesDetails(details);
                 }
                 return null;
@@ -583,16 +618,16 @@ serve(async (req) => {
         // Check if already exists by tmdb_id
         const { data: existing } = await supabase
           .from('media')
-          .select('id')
+          .select('id, is_featured')
           .eq('tmdb_id', media.tmdbId)
           .maybeSingle();
         
         if (existing) {
           skippedCount++;
-          continue;
+          continue; // Don't update existing content - preserves is_featured and custom data
         }
         
-        // Transform and insert
+        // Transform and insert - only for NEW content
         const dbMedia = {
           title: media.title,
           description: media.synopsis || media.description,
@@ -609,6 +644,7 @@ serve(async (req) => {
           rating: media.rating || null,
           year: media.year || null,
           seasons: media.seasons || [],
+          is_featured: false, // New content is not featured by default
         };
         
         const { error } = await supabase.from('media').insert(dbMedia);
@@ -620,14 +656,14 @@ serve(async (req) => {
         }
       }
       
-      console.log(`Saved ${savedCount} new items, skipped ${skippedCount} existing`);
+      console.log(`Saved ${savedCount} new items, skipped ${skippedCount} existing (preserving is_featured status)`);
       
       return new Response(JSON.stringify({ 
         success: true, 
         saved: savedCount,
         skipped: skippedCount,
         total: results.length,
-        message: `${savedCount} nouveaux contenus importés, ${skippedCount} déjà existants` 
+        message: `${savedCount} nouveaux contenus importés, ${skippedCount} déjà existants (popularité préservée)` 
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

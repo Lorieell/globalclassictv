@@ -8,12 +8,75 @@ interface AdvancedAdLayoutProps {
   heroSlideIndex?: number; // Sync with hero slider
 }
 
+// Validate that AdSense code only contains legitimate Google AdSense scripts
+const isValidAdSenseCode = (code: string): boolean => {
+  if (!code || typeof code !== 'string') return false;
+  
+  // Only allow Google AdSense domains
+  const allowedDomains = [
+    'pagead2.googlesyndication.com',
+    'adsbygoogle.js',
+    'googleadservices.com',
+    'googlesyndication.com'
+  ];
+  
+  // Check for script src attributes - only allow Google domains
+  const scriptSrcPattern = /<script[^>]*src\s*=\s*["']([^"']+)["'][^>]*>/gi;
+  let match;
+  while ((match = scriptSrcPattern.exec(code)) !== null) {
+    const src = match[1];
+    if (!allowedDomains.some(domain => src.includes(domain))) {
+      console.warn('AdSense validation failed: unauthorized script domain:', src);
+      return false;
+    }
+  }
+  
+  // Check for inline scripts with actual code (not just closing tags)
+  // This pattern matches scripts that have content between opening and closing tags
+  const inlineScriptPattern = /<script[^>]*>([^<]+)<\/script>/gi;
+  while ((match = inlineScriptPattern.exec(code)) !== null) {
+    const scriptContent = match[1].trim();
+    // Only allow the standard adsbygoogle.push call or empty content
+    if (scriptContent && !scriptContent.match(/^\s*\(adsbygoogle\s*=\s*window\.adsbygoogle\s*\|\|\s*\[\]\)\.push\s*\(\s*\{\s*\}\s*\)\s*;?\s*$/)) {
+      console.warn('AdSense validation failed: unauthorized inline script content');
+      return false;
+    }
+  }
+  
+  // Check for event handlers (onclick, onerror, onload, etc.)
+  const eventHandlerPattern = /\bon\w+\s*=/i;
+  if (eventHandlerPattern.test(code)) {
+    console.warn('AdSense validation failed: event handlers not allowed');
+    return false;
+  }
+  
+  // Check for javascript: URLs
+  if (/javascript:/i.test(code)) {
+    console.warn('AdSense validation failed: javascript: URLs not allowed');
+    return false;
+  }
+  
+  // Check for data: URLs (can be used for XSS)
+  if (/data:/i.test(code)) {
+    console.warn('AdSense validation failed: data: URLs not allowed');
+    return false;
+  }
+  
+  return true;
+};
+
 // Component to render AdSense code safely
 const AdSenseSlot = ({ code }: { code: string }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!containerRef.current || !code) return;
+    
+    // SECURITY: Validate AdSense code before rendering
+    if (!isValidAdSenseCode(code)) {
+      console.error('Invalid AdSense code detected - refusing to render');
+      return;
+    }
     
     containerRef.current.innerHTML = '';
     

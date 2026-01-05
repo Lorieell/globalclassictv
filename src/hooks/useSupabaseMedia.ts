@@ -427,8 +427,8 @@ export const useSupabaseMedia = () => {
   
   // Current year for filtering recent vs classic content
   const currentYear = new Date().getFullYear();
-  const recentThreshold = currentYear - 2; // Films from last 2 years are "recent/popular"
-  const classicThreshold = currentYear - 10; // Films older than 10 years are "classics"
+  const recentThreshold = currentYear - 5; // Films from last 5 years are "recent/popular"
+  const classicThreshold = currentYear - 15; // Films older than 15 years are "classics"
   
   // Helper: Check if title is mainstream (latin characters, no CJK/Korean scripts)
   const isMainstreamTitle = (title: string): boolean => {

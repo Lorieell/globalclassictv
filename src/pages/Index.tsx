@@ -373,22 +373,30 @@ const Index = () => {
 
   // Play from hero - go directly to player (resume for series)
   const handlePlayHero = (mediaId: string) => {
+    console.log('handlePlayHero called with mediaId:', mediaId);
     const media = library.find(m => m.id === mediaId);
+    console.log('Found media:', media?.title || 'NOT FOUND', 'Library size:', library.length);
     if (media) {
       const { seasonId, episodeId } = getResumeParams(media);
       setSelectedMedia(media);
       setPlayerSeasonId(seasonId);
       setPlayerEpisodeId(episodeId);
       setView('player', { mediaId: media.id, seasonId, episodeId });
+    } else {
+      toast.error('Média introuvable');
     }
   };
 
   // Info from hero - open detail page
   const handleInfoHero = (mediaId: string) => {
+    console.log('handleInfoHero called with mediaId:', mediaId);
     const media = library.find(m => m.id === mediaId);
+    console.log('Found media:', media?.title || 'NOT FOUND');
     if (media) {
       setSelectedMedia(media);
       setView('detail', { mediaId: media.id });
+    } else {
+      toast.error('Média introuvable');
     }
   };
 

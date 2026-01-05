@@ -320,6 +320,13 @@ const Index = () => {
     return () => window.removeEventListener('gctv-open-settings', listener);
   }, []);
 
+  // Listen for force hero rotation event from settings
+  useEffect(() => {
+    const listener = () => setHeroRefreshKey(prev => prev + 1);
+    window.addEventListener('gctv-force-hero-rotation', listener);
+    return () => window.removeEventListener('gctv-force-hero-rotation', listener);
+  }, []);
+
   // Get unique genres from library
   const allGenres = useMemo(() => {
     const genreSet = new Set<string>();
@@ -1069,6 +1076,7 @@ const Index = () => {
         mediaOptions={library}
         onClose={() => setShowHeroEditor(false)}
         onSave={handleSaveHeroItems}
+        onForceRotation={() => setHeroRefreshKey(prev => prev + 1)}
       />
 
       {/* Cookie Consent Banner */}

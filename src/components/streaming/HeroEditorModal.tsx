@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { X, Plus, Save, Trash2, Image, Type, FileText, Wand2, Search, Clock } from 'lucide-react';
+import { X, Plus, Save, Trash2, Image, Type, FileText, Wand2, Search, Clock, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import type { HeroItem, Media } from '@/types/media';
@@ -10,6 +10,7 @@ interface HeroEditorModalProps {
   mediaOptions: Media[];
   onClose: () => void;
   onSave: (items: HeroItem[]) => void;
+  onForceRotation?: () => void;
 }
 
 // Parse duration input like "30s", "5m", "1h", "2j", "1sem" to seconds
@@ -55,7 +56,7 @@ const formatDurationInput = (seconds: number): string => {
   return `${seconds}s`;
 };
 
-const HeroEditorModal = ({ isOpen, heroItems, mediaOptions, onClose, onSave }: HeroEditorModalProps) => {
+const HeroEditorModal = ({ isOpen, heroItems, mediaOptions, onClose, onSave, onForceRotation }: HeroEditorModalProps) => {
   const { toast } = useToast();
   const [items, setItems] = useState<HeroItem[]>([]);
   const [searchQueries, setSearchQueries] = useState<Record<string, string>>({});
@@ -156,14 +157,33 @@ const HeroEditorModal = ({ isOpen, heroItems, mediaOptions, onClose, onSave }: H
         </div>
 
         <div className="bg-primary/10 border border-primary/30 rounded-xl p-4 mb-6">
-          <p className="text-sm text-foreground">
-            <Wand2 size={16} className="inline mr-2 text-primary" />
-            <strong>Auto-rotation activée :</strong> Les slides changent automatiquement toutes les heures avec de nouveaux médias populaires.
-            <br />
-            <span className="text-muted-foreground text-xs mt-1 block">
-              Sélectionnez un média pour remplir automatiquement les champs.
-            </span>
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-foreground">
+                <Wand2 size={16} className="inline mr-2 text-primary" />
+                <strong>Auto-rotation activée :</strong> Les slides changent automatiquement toutes les heures.
+              </p>
+              <span className="text-muted-foreground text-xs mt-1 block">
+                Sélectionnez un média pour remplir automatiquement les champs.
+              </span>
+            </div>
+            {onForceRotation && (
+              <Button
+                onClick={() => {
+                  onForceRotation();
+                  toast({
+                    title: "Rotation forcée",
+                    description: "Les slides ont été régénérés avec de nouveaux contenus",
+                  });
+                }}
+                variant="outline"
+                className="gap-2 border-primary/30 text-primary hover:bg-primary/10"
+              >
+                <RotateCcw size={16} />
+                Forcer rotation
+              </Button>
+            )}
+          </div>
         </div>
 
         <div className="space-y-4 mb-6">

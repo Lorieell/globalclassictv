@@ -31,6 +31,35 @@ serve(async (req) => {
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
+    // SECURITY: Check if any admin already exists - only allow setup if no admins exist
+    const { data: existingAdmins, error: checkError } = await supabaseAdmin
+      .from('user_roles')
+      .select('id')
+      .eq('role', 'admin')
+      .limit(1);
+
+    if (checkError) {
+      console.error('Error checking existing admins:', checkError);
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Failed to verify admin status' 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (existingAdmins && existingAdmins.length > 0) {
+      console.log('Admin setup blocked: admin already exists');
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Admin setup already completed. Contact existing admin for access.' 
+      }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // Check if user already exists
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
     const existingUser = existingUsers?.users?.find(u => u.email === email);
@@ -61,25 +90,6 @@ serve(async (req) => {
 
       userId = newUser.user.id;
       console.log('User created:', userId);
-    }
-
-    // Check if already admin
-    const { data: existingRole } = await supabaseAdmin
-      .from('user_roles')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('role', 'admin')
-      .maybeSingle();
-
-    if (existingRole) {
-      console.log('User already has admin role');
-      return new Response(JSON.stringify({ 
-        success: true, 
-        message: 'User already has admin role',
-        userId 
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
     }
 
     // Add admin role

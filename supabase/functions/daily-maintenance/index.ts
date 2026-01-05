@@ -6,10 +6,45 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Supabase client
+// Supabase clients
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+// Admin client for database operations (only used after auth check)
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
+// Helper function to verify admin role
+async function verifyAdminAuth(req: Request): Promise<{ isAdmin: boolean; userId?: string; error?: string }> {
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader) {
+    return { isAdmin: false, error: 'Authorization header required' };
+  }
+
+  // Create client with user's token
+  const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: authHeader } }
+  });
+
+  const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+  if (userError || !user) {
+    return { isAdmin: false, error: 'Invalid or expired token' };
+  }
+
+  // Check admin role
+  const { data: roleData, error: roleError } = await supabaseAdmin
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', user.id)
+    .eq('role', 'admin')
+    .maybeSingle();
+
+  if (roleError || !roleData) {
+    return { isAdmin: false, error: 'Admin access required', userId: user.id };
+  }
+
+  return { isAdmin: true, userId: user.id };
+}
 
 // TMDB API config
 const TMDB_API_KEY = Deno.env.get('TMDB_API_KEY') || '';
@@ -144,6 +179,20 @@ serve(async (req) => {
   }
 
   try {
+    // SECURITY: Require admin authentication for maintenance operations
+    const authResult = await verifyAdminAuth(req);
+    if (!authResult.isAdmin) {
+      console.log(`Auth failed for maintenance: ${authResult.error}`);
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: authResult.error || 'Admin access required'
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    console.log(`Admin authenticated for maintenance: ${authResult.userId}`);
+    
     const { action = 'daily' } = await req.json().catch(() => ({}));
     
     console.log(`Daily maintenance started: action=${action}`);
@@ -157,12 +206,12 @@ serve(async (req) => {
     console.log(`Found ${newContent.length} items from TMDB`);
     
     // Get existing tmdb_ids from database
-    const { data: existingMedia } = await supabase
+    const { data: existingMedia } = await supabaseAdmin
       .from('media')
       .select('tmdb_id')
       .not('tmdb_id', 'is', null);
     
-    const existingTmdbIds = new Set((existingMedia || []).map(m => m.tmdb_id));
+    const existingTmdbIds = new Set((existingMedia || []).map((m: { tmdb_id: number }) => m.tmdb_id));
     
     // Insert only new content
     for (const media of newContent) {
@@ -171,7 +220,7 @@ serve(async (req) => {
         continue;
       }
       
-      const { error } = await supabase.from('media').insert(media);
+      const { error } = await supabaseAdmin.from('media').insert(media);
       
       if (error) {
         console.error(`Error inserting ${media.title}:`, error.message);

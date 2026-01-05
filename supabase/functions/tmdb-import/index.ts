@@ -6,10 +6,45 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Supabase client for direct database operations
+// Supabase clients
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+// Admin client for database operations (only used after auth check)
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
+// Helper function to verify admin role
+async function verifyAdminAuth(req: Request): Promise<{ isAdmin: boolean; userId?: string; error?: string }> {
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader) {
+    return { isAdmin: false, error: 'Authorization header required' };
+  }
+
+  // Create client with user's token
+  const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: authHeader } }
+  });
+
+  const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+  if (userError || !user) {
+    return { isAdmin: false, error: 'Invalid or expired token' };
+  }
+
+  // Check admin role using the has_role function via RPC or direct query
+  const { data: roleData, error: roleError } = await supabaseAdmin
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', user.id)
+    .eq('role', 'admin')
+    .maybeSingle();
+
+  if (roleError || !roleData) {
+    return { isAdmin: false, error: 'Admin access required', userId: user.id };
+  }
+
+  return { isAdmin: true, userId: user.id };
+}
 
 // API configurations
 const TMDB_API_KEY = Deno.env.get('TMDB_API_KEY') || '';
@@ -390,6 +425,22 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const { type = 'all', pages = 2, search = '', saveToDb = false } = body;
     
+    // SECURITY: Require admin auth for database write operations
+    if (saveToDb) {
+      const authResult = await verifyAdminAuth(req);
+      if (!authResult.isAdmin) {
+        console.log(`Auth failed for saveToDb: ${authResult.error}`);
+        return new Response(JSON.stringify({ 
+          success: false, 
+          error: authResult.error || 'Admin access required for database operations'
+        }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      console.log(`Admin authenticated: ${authResult.userId}`);
+    }
+    
     console.log(`Importing TMDB content: type=${type}, pages=${pages}, search=${search}`);
     
     const results: any[] = [];
@@ -616,7 +667,7 @@ serve(async (req) => {
       
       for (const media of results) {
         // Check if already exists by tmdb_id
-        const { data: existing } = await supabase
+        const { data: existing } = await supabaseAdmin
           .from('media')
           .select('id, is_featured')
           .eq('tmdb_id', media.tmdbId)
@@ -647,7 +698,7 @@ serve(async (req) => {
           is_featured: false, // New content is not featured by default
         };
         
-        const { error } = await supabase.from('media').insert(dbMedia);
+        const { error } = await supabaseAdmin.from('media').insert(dbMedia);
         
         if (error) {
           console.error(`Error inserting ${media.title}:`, error.message);

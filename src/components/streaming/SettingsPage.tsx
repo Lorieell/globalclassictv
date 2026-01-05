@@ -82,6 +82,11 @@ interface SocialLinks {
 interface AppearanceSettings {
   theme: 'dark' | 'light' | 'system';
   accentColor: string;
+  cardStyle: 'rounded' | 'sharp' | 'pill';
+  animationsEnabled: boolean;
+  compactMode: boolean;
+  showRatings: boolean;
+  autoplayTrailers: boolean;
 }
 
 interface ContentSettings {
@@ -115,6 +120,11 @@ const defaultLinks: SocialLinks = {
 const defaultAppearance: AppearanceSettings = {
   theme: 'dark',
   accentColor: '#E91E8C',
+  cardStyle: 'rounded',
+  animationsEnabled: true,
+  compactMode: false,
+  showRatings: true,
+  autoplayTrailers: false,
 };
 
 const defaultContent: ContentSettings = {
@@ -683,6 +693,78 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
                   </div>
                 </div>
 
+                {/* Card Style */}
+                <div className="bg-card/50 border border-border/50 rounded-xl p-6 space-y-4">
+                  <h3 className="font-semibold text-foreground">Style des cartes</h3>
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { value: 'rounded', label: 'Arrondies', preview: 'rounded-2xl' },
+                      { value: 'sharp', label: 'Carrées', preview: 'rounded-none' },
+                      { value: 'pill', label: 'Pilules', preview: 'rounded-3xl' },
+                    ].map(({ value, label, preview }) => (
+                      <button
+                        key={value}
+                        onClick={() => setAppearance(prev => ({ ...prev, cardStyle: value as 'rounded' | 'sharp' | 'pill' }))}
+                        className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                          appearance.cardStyle === value
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-border/50 text-muted-foreground hover:border-border hover:text-foreground'
+                        }`}
+                      >
+                        <div className={`w-12 h-16 bg-muted/50 ${preview} border border-border`} />
+                        <span className="text-sm font-medium">{label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Toggle Options */}
+                <div className="bg-card/50 border border-border/50 rounded-xl p-6 space-y-4">
+                  <h3 className="font-semibold text-foreground">Options d'affichage</h3>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-foreground">Animations</p>
+                        <p className="text-sm text-muted-foreground">Activer les animations et transitions</p>
+                      </div>
+                      <Switch
+                        checked={appearance.animationsEnabled}
+                        onCheckedChange={(checked) => setAppearance(prev => ({ ...prev, animationsEnabled: checked }))}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-foreground">Mode compact</p>
+                        <p className="text-sm text-muted-foreground">Réduire l'espacement entre les éléments</p>
+                      </div>
+                      <Switch
+                        checked={appearance.compactMode}
+                        onCheckedChange={(checked) => setAppearance(prev => ({ ...prev, compactMode: checked }))}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-foreground">Afficher les notes</p>
+                        <p className="text-sm text-muted-foreground">Montrer les étoiles de notation sur les cartes</p>
+                      </div>
+                      <Switch
+                        checked={appearance.showRatings}
+                        onCheckedChange={(checked) => setAppearance(prev => ({ ...prev, showRatings: checked }))}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-foreground">Lecture auto des bandes-annonces</p>
+                        <p className="text-sm text-muted-foreground">Lire automatiquement les trailers au survol</p>
+                      </div>
+                      <Switch
+                        checked={appearance.autoplayTrailers}
+                        onCheckedChange={(checked) => setAppearance(prev => ({ ...prev, autoplayTrailers: checked }))}
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 <Button onClick={saveAppearance} className="bg-primary text-primary-foreground">
                   Enregistrer l'apparence
                 </Button>
@@ -774,6 +856,43 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
                   <h2 className="text-xl font-semibold text-foreground mb-2">Liste des contenus</h2>
                   <p className="text-muted-foreground text-sm">
                     Gérez tous les contenus et vérifiez ceux qui ont une vidéo uploadée.
+                  </p>
+                </div>
+
+                {/* Actions rapides */}
+                <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/30 rounded-xl p-4">
+                  <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2">
+                    <Zap size={18} className="text-yellow-500" />
+                    Actions rapides
+                  </h3>
+                  <div className="flex flex-wrap gap-3">
+                    <Button
+                      onClick={() => {
+                        // Force refresh by dispatching a custom event
+                        window.dispatchEvent(new Event('gctv-force-popular-sort'));
+                        toast.success('Tri des populaires forcé - rafraîchissez la page pour voir les changements');
+                        setTimeout(() => window.location.reload(), 500);
+                      }}
+                      variant="outline"
+                      className="gap-2 border-yellow-500/30 text-yellow-600 hover:bg-yellow-500/10"
+                    >
+                      <Star size={16} className="fill-yellow-500" />
+                      Forcer tri populaires
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        window.dispatchEvent(new Event('gctv-force-hero-rotation'));
+                        toast.success('Rotation des slides forcée');
+                      }}
+                      variant="outline"
+                      className="gap-2 border-primary/30 text-primary hover:bg-primary/10"
+                    >
+                      <RefreshCw size={16} />
+                      Forcer rotation slides
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Ces actions forcent la mise à jour immédiate du tri et de la rotation.
                   </p>
                 </div>
 

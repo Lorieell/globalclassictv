@@ -437,7 +437,7 @@ export const useSupabaseMedia = () => {
     return !cjkPattern.test(title);
   };
   
-  // Recent popular films (last 2 years, mainstream titles, sorted by popularity)
+  // Recent popular films (last 2 years, mainstream titles, sorted by featured FIRST, then popularity)
   const popularFilms = useMemo(() => {
     return [...films]
       .filter(f => {
@@ -446,10 +446,17 @@ export const useSupabaseMedia = () => {
         const isMainstream = isMainstreamTitle(f.title);
         return isRecent && isMainstream;
       })
-      .sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+      .sort((a, b) => {
+        // Featured items come first
+        const aFeatured = (a as any).isFeatured ? 1 : 0;
+        const bFeatured = (b as any).isFeatured ? 1 : 0;
+        if (bFeatured !== aFeatured) return bFeatured - aFeatured;
+        // Then sort by popularity
+        return (b.popularity || 0) - (a.popularity || 0);
+      });
   }, [films, recentThreshold]);
   
-  // Recent popular series (last 2 years, mainstream titles, sorted by popularity)
+  // Recent popular series (last 2 years, mainstream titles, sorted by featured FIRST, then popularity)
   const popularSeries = useMemo(() => {
     return [...series]
       .filter(s => {
@@ -458,7 +465,14 @@ export const useSupabaseMedia = () => {
         const isMainstream = isMainstreamTitle(s.title);
         return isRecent && isMainstream;
       })
-      .sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+      .sort((a, b) => {
+        // Featured items come first
+        const aFeatured = (a as any).isFeatured ? 1 : 0;
+        const bFeatured = (b as any).isFeatured ? 1 : 0;
+        if (bFeatured !== aFeatured) return bFeatured - aFeatured;
+        // Then sort by popularity
+        return (b.popularity || 0) - (a.popularity || 0);
+      });
   }, [series, recentThreshold]);
   
   // Classic films (older than 10 years, high rating)

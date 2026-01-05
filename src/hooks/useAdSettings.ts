@@ -207,10 +207,27 @@ export const useAdSettings = () => {
     updateLocalSettings(newSettings);
   }, [localSettings, updateLocalSettings]);
 
-  // Save all changes
+  // Save all changes with server-side validation
   const saveAllChanges = useCallback(async () => {
     setSaving(true);
     try {
+      // Validate AdSense codes server-side first
+      const { data: validationResult, error: validationError } = await supabase.functions.invoke('validate-adsense', {
+        body: { settings: localSettings, action: 'validate' }
+      });
+
+      if (validationError) {
+        console.error('Validation error:', validationError);
+        toast.error('Erreur de validation serveur');
+        return;
+      }
+
+      if (!validationResult?.valid) {
+        toast.error(`Code AdSense invalide: ${validationResult?.errors?.join(', ') || 'Erreur inconnue'}`);
+        return;
+      }
+
+      // Save to database
       await saveSettingsToDb(localSettings);
       setSettings(localSettings);
       setHasChanges(false);

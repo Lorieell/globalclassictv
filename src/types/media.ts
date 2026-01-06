@@ -34,6 +34,7 @@ export interface Media {
   tmdbId?: number;
   isManual?: boolean; // True if added manually by admin (protected from auto-updates)
   popularity?: number; // TMDB popularity score
+  isOngoing?: boolean; // True if series is still in production (new episodes expected)
 }
 
 export interface HeroItem {

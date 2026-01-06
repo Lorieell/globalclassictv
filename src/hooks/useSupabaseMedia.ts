@@ -62,6 +62,7 @@ const transformDbMedia = (dbMedia: any): Media => {
     updatedAt: new Date(dbMedia.updated_at).getTime(),
     createdAt: new Date(dbMedia.created_at).getTime(),
     popularity: (dbMedia as any).rating || 0,
+    isOngoing: dbMedia.is_ongoing || false,
   };
   // Add extra properties that might not be in the type
   (media as any).backdrop = dbMedia.backdrop_url;
@@ -283,6 +284,21 @@ export const useSupabaseMedia = () => {
     }
 
     setLibrary(prev => prev.map(m => m.id === id ? { ...m, isFeatured } as any : m));
+  }, []);
+
+  // Toggle ongoing status
+  const toggleOngoing = useCallback(async (id: string, isOngoing: boolean) => {
+    const { error } = await supabase
+      .from('media')
+      .update({ is_ongoing: isOngoing })
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error toggling ongoing:', error);
+      throw error;
+    }
+
+    setLibrary(prev => prev.map(m => m.id === id ? { ...m, isOngoing } as any : m));
   }, []);
 
   // Save hero items
@@ -611,6 +627,11 @@ export const useSupabaseMedia = () => {
     return library.filter(m => (m as any).isFeatured === true);
   }, [library]);
 
+  // Ongoing media (series still in production)
+  const ongoingMedia = useMemo(() => {
+    return library.filter(m => (m as any).isOngoing === true);
+  }, [library]);
+
   const watchlistMedia = useMemo(() => {
     return library.filter(m => watchlist.includes(m.id));
   }, [library, watchlist]);
@@ -642,6 +663,7 @@ export const useSupabaseMedia = () => {
     heroItems,
     resumeList,
     featuredMedia,
+    ongoingMedia,
     watchProgress,
     watchPosition,
     watchlist,
@@ -655,6 +677,7 @@ export const useSupabaseMedia = () => {
     updateMedia,
     deleteMedia,
     toggleFeatured,
+    toggleOngoing,
     saveHeroItems,
     updateProgress,
     updatePosition,

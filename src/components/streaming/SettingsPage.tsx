@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, forwardRef, useMemo } from 'react';
-import { ArrowLeft, Link2, Megaphone, Palette, FolderOpen, Instagram, Youtube, Twitter, Sun, Moon, Monitor, Plus, X, Film, Tv, BookOpen, Music, Gamepad2, Mic, Globe, Sparkles, Heart, Skull, Laugh, Zap, Sword, Ghost, Rocket, Theater, Baby, Search, Mountain, Users, List, Check, Pencil, Play, RefreshCw, Loader2, Trash2, Download, Database, Star, type LucideIcon } from 'lucide-react';
+import { ArrowLeft, Link2, Megaphone, Palette, FolderOpen, Instagram, Youtube, Twitter, Sun, Moon, Monitor, Plus, X, Film, Tv, BookOpen, Music, Gamepad2, Mic, Globe, Sparkles, Heart, Skull, Laugh, Zap, Sword, Ghost, Rocket, Theater, Baby, Search, Mountain, Users, List, Check, Pencil, Play, RefreshCw, Loader2, Trash2, Download, Database, Star, Clock, type LucideIcon } from 'lucide-react';
 import AdvancedAdsEditor from '@/components/streaming/AdvancedAdsEditor';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -102,6 +102,7 @@ interface SettingsPageProps {
   onAddNewMedia?: () => void; // Opens editor for new media
   onDeleteMedia?: (id: string) => void;
   onToggleFeatured?: (id: string, isFeatured: boolean) => void;
+  onToggleOngoing?: (id: string, isOngoing: boolean) => void;
 }
 
 const SOCIAL_STORAGE_KEY = 'gctv-social-links';
@@ -178,7 +179,7 @@ const applyAccentColor = (hexColor: string) => {
   document.documentElement.style.setProperty('--ring', `${hue} ${saturation}% ${lightness}%`);
 };
 
-const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewMedia, onDeleteMedia, onToggleFeatured }: SettingsPageProps) => {
+const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewMedia, onDeleteMedia, onToggleFeatured, onToggleOngoing }: SettingsPageProps) => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('links');
   
   // Links state
@@ -271,7 +272,7 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
   ];
 
   // Liste tab state
-  const [listeFilter, setListeFilter] = useState<'all' | 'with-video' | 'without-video' | 'popular'>('all');
+  const [listeFilter, setListeFilter] = useState<'all' | 'with-video' | 'without-video' | 'popular' | 'ongoing'>('all');
   const [listeSearch, setListeSearch] = useState('');
   const [listeYearFilter, setListeYearFilter] = useState<string>('all');
   const [isRunningMaintenance, setIsRunningMaintenance] = useState(false);
@@ -289,6 +290,7 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
   const ITEMS_PER_PAGE = 50;
 
   const popularCount = library.filter(m => (m as any).isFeatured).length;
+  const ongoingCount = library.filter(m => (m as any).isOngoing).length;
 
   // Get all unique years from library
   const availableYears = useMemo(() => {
@@ -311,6 +313,7 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
       : media.videoUrls && media.videoUrls.trim() !== '';
     
     if (listeFilter === 'popular') return matchesSearch && matchesYear && (media as any).isFeatured;
+    if (listeFilter === 'ongoing') return matchesSearch && matchesYear && (media as any).isOngoing;
     if (listeFilter === 'with-video') return matchesSearch && matchesYear && hasVideo;
     if (listeFilter === 'without-video') return matchesSearch && matchesYear && !hasVideo;
     return matchesSearch && matchesYear;
@@ -393,6 +396,12 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
     }
   };
 
+  // Get auth token for API calls
+  const getAuthToken = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.access_token;
+  };
+
   // Reset library and reimport from TMDB - saves directly to Supabase
   const handleResetAndImport = async () => {
     if (!confirm('Êtes-vous sûr de vouloir importer depuis TMDB ? Les contenus existants seront conservés, seuls les nouveaux seront ajoutés.')) {
@@ -403,11 +412,21 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
     try {
       toast.info('Import en cours... Cela peut prendre quelques minutes.');
       
+      const token = await getAuthToken();
+      if (!token) {
+        toast.error('Vous devez être connecté en tant qu\'admin pour importer');
+        setIsImporting(false);
+        return;
+      }
+      
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tmdb-import`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
           body: JSON.stringify({ type: 'all', pages: 5, saveToDb: true }),
         }
       );
@@ -435,11 +454,21 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
     try {
       toast.info('Recherche de nouveaux contenus TMDB...');
       
+      const token = await getAuthToken();
+      if (!token) {
+        toast.error('Vous devez être connecté en tant qu\'admin pour importer');
+        setIsImporting(false);
+        return;
+      }
+      
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tmdb-import`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
           body: JSON.stringify({ type: 'all', pages: 3, saveToDb: true }),
         }
       );
@@ -466,11 +495,21 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
     try {
       toast.info('Vérification des contenus manquants...');
       
+      const token = await getAuthToken();
+      if (!token) {
+        toast.error('Vous devez être connecté en tant qu\'admin pour vérifier les contenus');
+        setIsCheckingAPI(false);
+        return;
+      }
+      
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tmdb-import`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
           body: JSON.stringify({ type: 'all', pages: 10, saveToDb: true }),
         }
       );
@@ -1038,7 +1077,7 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
                       onClick={() => setListeFilter('all')}
                       size="sm"
                     >
-                      Tous ({filteredLibrary.length})
+                      Tous ({library.length})
                     </Button>
                     <Button
                       variant={listeFilter === 'popular' ? 'default' : 'outline'}
@@ -1047,7 +1086,16 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
                       className="gap-1"
                     >
                       <Star size={14} />
-                      Populaires ({library.filter(m => (m as any).isFeatured && (listeYearFilter === 'all' || String((m as any).year) === listeYearFilter)).length})
+                      Populaires ({popularCount})
+                    </Button>
+                    <Button
+                      variant={listeFilter === 'ongoing' ? 'default' : 'outline'}
+                      onClick={() => setListeFilter('ongoing')}
+                      size="sm"
+                      className="gap-1"
+                    >
+                      <Clock size={14} />
+                      En cours ({ongoingCount})
                     </Button>
                     <Button
                       variant={listeFilter === 'with-video' ? 'default' : 'outline'}
@@ -1157,6 +1205,7 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
                             ? media.seasons?.some(s => s.episodes.some(e => e.videoUrls && e.videoUrls.trim() !== ''))
                             : media.videoUrls && media.videoUrls.trim() !== '';
                           const isFeatured = (media as any).isFeatured || false;
+                          const isOngoing = (media as any).isOngoing || false;
                           const isSelected = selectedMediaIds.has(media.id);
                           
                           return (
@@ -1258,6 +1307,19 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
                                     title={isFeatured ? "Retirer des populaires" : "Marquer comme populaire"}
                                   >
                                     <Star size={14} className={isFeatured ? 'fill-yellow-500' : ''} />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => onToggleOngoing?.(media.id, !isOngoing)}
+                                    className={`h-8 w-8 p-0 ${
+                                      isOngoing 
+                                        ? 'text-cyan-500 hover:text-cyan-400 bg-cyan-500/10' 
+                                        : 'text-muted-foreground hover:text-cyan-500 hover:bg-cyan-500/10'
+                                    }`}
+                                    title={isOngoing ? "Marquer comme terminé" : "Marquer comme en cours"}
+                                  >
+                                    <Clock size={14} className={isOngoing ? '' : ''} />
                                   </Button>
                                 </div>
                               </td>

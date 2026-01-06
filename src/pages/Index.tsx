@@ -54,8 +54,10 @@ const generateAutoHeroItems = (library: Media[], featuredMedia: Media[] = [], ho
   };
   
   // Get featured media with video and backdrop (for hero display)
+  // IMPORTANT: Use backdrop for content with video, poster for others
   const eligibleFeatured = featuredMedia
     .filter(m => hasVideoUploaded(m) && (m as any).backdrop)
+    .map(m => ({ ...m, heroImage: (m as any).backdrop || m.image })) // Always use backdrop for featured
     .sort((a, b) => seededRandom(hourSeed, a.title.charCodeAt(0)) - seededRandom(hourSeed, b.title.charCodeAt(0)));
   
   // Filtrer les médias récents (1 an), mainstream, avec backdrop, bonne note, ET avec vidéo uploadée
@@ -111,6 +113,7 @@ const generateAutoHeroItems = (library: Media[], featuredMedia: Media[] = [], ho
     id: `hero-auto-${m.id}-${hourSeed}`,
     title: m.title.toUpperCase(),
     description: m.description || m.synopsis || '',
+    // ALWAYS use backdrop for hero slides, never poster
     image: (m as any).backdrop || m.image,
     mediaId: m.id,
   }));
@@ -212,6 +215,7 @@ const Index = () => {
     heroItems, 
     watchProgress,
     featuredMedia,
+    ongoingMedia,
     watchPosition,
     watchlistMedia,
     favoritesMedia,
@@ -220,6 +224,7 @@ const Index = () => {
     updateMedia,
     deleteMedia,
     toggleFeatured,
+    toggleOngoing,
     updateProgress,
     updatePosition,
     saveHeroItems,
@@ -543,6 +548,7 @@ const Index = () => {
               onAddNewMedia={handleAddMedia}
               onDeleteMedia={deleteMedia}
               onToggleFeatured={toggleFeatured}
+              onToggleOngoing={toggleOngoing}
             />
         ) : view === 'player' && selectedMedia ? (
           <VideoPlayer 
@@ -655,6 +661,20 @@ const Index = () => {
                       media={sortedPopularSeries.slice(0, 20)}
                       onSelect={handleSelectMedia}
                       onSeeMore={() => openCategoryPage('Séries populaires', m => m.type === 'Série')}
+                      isAdmin={isAdmin}
+                      onEdit={handleEditMedia}
+                      onDelete={deleteMedia}
+                    />
+                  )}
+
+                  {/* En cours - Séries avec nouveaux épisodes prévus */}
+                  {ongoingMedia.length > 0 && (
+                    <MediaRow
+                      title="En cours"
+                      titleIcon={<Clock size={20} className="text-cyan-500" />}
+                      media={ongoingMedia.slice(0, 20)}
+                      onSelect={handleSelectMedia}
+                      onSeeMore={() => openCategoryPage('En cours', m => (m as any).isOngoing === true)}
                       isAdmin={isAdmin}
                       onEdit={handleEditMedia}
                       onDelete={deleteMedia}

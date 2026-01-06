@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Plus, Save, Trash2, Upload, ListPlus, Search, Loader2 } from 'lucide-react';
+import { X, Plus, Save, Trash2, Upload, ListPlus, Search, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -71,6 +71,7 @@ const MediaEditorModal = ({ isOpen, media, onClose, onSave }: MediaEditorModalPr
   const [bulkAddOpen, setBulkAddOpen] = useState(false);
   const [bulkSeasonIndex, setBulkSeasonIndex] = useState<number>(0);
   const [bulkCount, setBulkCount] = useState<number>(10);
+  const [collapsedSeasons, setCollapsedSeasons] = useState<Set<number>>(new Set());
   
   // TMDB search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -591,18 +592,70 @@ const MediaEditorModal = ({ isOpen, media, onClose, onSave }: MediaEditorModalPr
         {/* Seasons & Episodes (always available to add seasons to any media) */}
         {(formData.type === 'Série' || (formData.seasons && formData.seasons.length > 0)) && (
           <div className="pt-6 border-t border-border/50">
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex flex-wrap justify-between items-center gap-2 mb-4">
               <h3 className="font-display text-xl font-bold text-foreground">Saisons & Épisodes</h3>
-              <Button onClick={addSeason} size="sm" className="bg-accent text-accent-foreground gap-2">
-                <Plus size={16} /> Ajouter une saison
-              </Button>
+              <div className="flex gap-2 flex-wrap">
+                {/* Collapse/Expand All Button */}
+                {formData.seasons && formData.seasons.length > 0 && (
+                  <Button
+                    onClick={() => {
+                      if (collapsedSeasons.size === formData.seasons?.length) {
+                        // All collapsed -> expand all
+                        setCollapsedSeasons(new Set());
+                      } else {
+                        // Collapse all
+                        setCollapsedSeasons(new Set(formData.seasons?.map((_, i) => i)));
+                      }
+                    }}
+                    size="sm"
+                    variant="outline"
+                    className="gap-2"
+                  >
+                    {collapsedSeasons.size === formData.seasons?.length ? (
+                      <>
+                        <ChevronDown size={16} /> Tout déplier
+                      </>
+                    ) : (
+                      <>
+                        <ChevronUp size={16} /> Tout rétracter
+                      </>
+                    )}
+                  </Button>
+                )}
+                <Button onClick={addSeason} size="sm" className="bg-accent text-accent-foreground gap-2">
+                  <Plus size={16} /> Ajouter une saison
+                </Button>
+              </div>
             </div>
 
             <div className="space-y-4">
-              {formData.seasons?.map((season, sIdx) => (
+              {formData.seasons?.map((season, sIdx) => {
+                const isCollapsed = collapsedSeasons.has(sIdx);
+                
+                return (
                 <div key={season.id} className="bg-secondary/30 rounded-2xl p-4 border border-border/30">
-                  <div className="flex justify-between items-center mb-4">
-                    <h4 className="font-bold text-foreground">Saison {season.number}</h4>
+                  <div className="flex justify-between items-center mb-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCollapsedSeasons(prev => {
+                          const next = new Set(prev);
+                          if (next.has(sIdx)) {
+                            next.delete(sIdx);
+                          } else {
+                            next.add(sIdx);
+                          }
+                          return next;
+                        });
+                      }}
+                      className="font-bold text-foreground flex items-center gap-2 hover:text-primary transition-colors"
+                    >
+                      {isCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+                      Saison {season.number}
+                      <span className="text-xs text-muted-foreground font-normal">
+                        ({season.episodes?.length || 0} épisode{(season.episodes?.length || 0) > 1 ? 's' : ''})
+                      </span>
+                    </button>
                     <div className="flex gap-2 flex-wrap">
                       <Button
                         size="sm"
@@ -631,44 +684,46 @@ const MediaEditorModal = ({ isOpen, media, onClose, onSave }: MediaEditorModalPr
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    {season.episodes?.map((ep, eIdx) => (
-                      <div key={ep.id} className="bg-background/50 p-3 rounded-xl flex flex-col gap-2">
-                        <div className="flex gap-2 items-center">
-                          <input
-                            type="number"
-                            value={ep.number}
-                            onChange={(e) => updateEpisode(sIdx, eIdx, 'number', parseInt(e.target.value))}
-                            className="w-14 bg-secondary/50 border border-border/50 rounded-lg p-2 text-center text-sm text-foreground"
-                          />
+                  {!isCollapsed && (
+                    <div className="space-y-2 mt-4">
+                      {season.episodes?.map((ep, eIdx) => (
+                        <div key={ep.id} className="bg-background/50 p-3 rounded-xl flex flex-col gap-2">
+                          <div className="flex gap-2 items-center">
+                            <input
+                              type="number"
+                              value={ep.number}
+                              onChange={(e) => updateEpisode(sIdx, eIdx, 'number', parseInt(e.target.value))}
+                              className="w-14 bg-secondary/50 border border-border/50 rounded-lg p-2 text-center text-sm text-foreground"
+                            />
+                            <input
+                              type="text"
+                              value={ep.title}
+                              onChange={(e) => updateEpisode(sIdx, eIdx, 'title', e.target.value)}
+                              placeholder="Titre de l'épisode"
+                              className="flex-1 bg-secondary/50 border border-border/50 rounded-lg p-2 text-sm text-foreground"
+                            />
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => removeEpisode(sIdx, eIdx)}
+                              className="text-destructive hover:bg-destructive/10"
+                            >
+                              <X size={14} />
+                            </Button>
+                          </div>
                           <input
                             type="text"
-                            value={ep.title}
-                            onChange={(e) => updateEpisode(sIdx, eIdx, 'title', e.target.value)}
-                            placeholder="Titre de l'épisode"
-                            className="flex-1 bg-secondary/50 border border-border/50 rounded-lg p-2 text-sm text-foreground"
+                            value={ep.videoUrls}
+                            onChange={(e) => updateEpisode(sIdx, eIdx, 'videoUrls', e.target.value)}
+                            placeholder="Liens vidéo (séparés par virgules)"
+                            className="w-full bg-secondary/50 border border-border/50 rounded-lg p-2 text-xs text-foreground"
                           />
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => removeEpisode(sIdx, eIdx)}
-                            className="text-destructive hover:bg-destructive/10"
-                          >
-                            <X size={14} />
-                          </Button>
                         </div>
-                        <input
-                          type="text"
-                          value={ep.videoUrls}
-                          onChange={(e) => updateEpisode(sIdx, eIdx, 'videoUrls', e.target.value)}
-                          placeholder="Liens vidéo (séparés par virgules)"
-                          className="w-full bg-secondary/50 border border-border/50 rounded-lg p-2 text-xs text-foreground"
-                        />
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              ))}
+              )})}
             </div>
           </div>
         )}

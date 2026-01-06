@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { Play, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
+import { Play, ChevronLeft, ChevronRight, Sparkles, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { EnhancedResumeMedia } from '@/hooks/useResumeProgress';
 
@@ -87,7 +87,7 @@ const ResumeSection = ({ resumeList, onSelect }: ResumeSectionProps) => {
               key={media.id}
               data-resume-item
               onClick={() => onSelect(media, media.nextSeasonId, media.nextEpisodeId)}
-              className="flex-[0_0_calc((100%_-_5rem)/5)] max-w-[calc((100%_-_5rem)/5)] flex-shrink-0 group cursor-pointer"
+              className="flex-[0_0_calc((100%_-_5rem)/5)] max-w-[calc((100%_-_5rem)/5)] sm:flex-[0_0_calc((100%_-_3rem)/3)] sm:max-w-[calc((100%_-_3rem)/3)] md:flex-[0_0_calc((100%_-_4rem)/4)] md:max-w-[calc((100%_-_4rem)/4)] lg:flex-[0_0_calc((100%_-_5rem)/5)] lg:max-w-[calc((100%_-_5rem)/5)] flex-shrink-0 group cursor-pointer"
             >
               <div className="aspect-video bg-card rounded-3xl border border-border/30 overflow-hidden relative hover:border-primary/50 transition-all shadow-card">
                 {/* Image */}
@@ -125,6 +125,11 @@ const ResumeSection = ({ resumeList, onSelect }: ResumeSectionProps) => {
                       <Sparkles size={10} />
                       NEW EP
                     </div>
+                  ) : (media as any).isOngoing && media.isCompleted ? (
+                    <div className="text-[8px] font-black uppercase tracking-widest backdrop-blur-sm px-2 py-1 rounded-lg bg-gradient-to-r from-cyan-500 to-teal-500 text-white flex items-center gap-1">
+                      <Clock size={10} />
+                      EN COURS
+                    </div>
                   ) : media.isCompleted ? (
                     <div className="text-[8px] font-black uppercase tracking-widest backdrop-blur-sm px-2 py-1 rounded-lg bg-green-500/80 text-white">
                       ✓ Terminé
@@ -144,6 +149,7 @@ const ResumeSection = ({ resumeList, onSelect }: ResumeSectionProps) => {
                 <div className="text-[8px] font-bold text-muted-foreground uppercase mt-0.5 tracking-widest italic">
                   {media.hasNewSeason ? 'Nouvelle saison disponible' : 
                    media.hasNewEpisodes ? 'Nouvel épisode disponible' :
+                   (media as any).isOngoing && media.isCompleted ? 'Nouveaux épisodes prévus' :
                    media.isCompleted ? 'Revoir' : 'Continuer la lecture'}
                 </div>
               </div>

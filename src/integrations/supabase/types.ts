@@ -132,6 +132,7 @@ export type Database = {
           id: string
           is_featured: boolean | null
           is_new: boolean | null
+          is_ongoing: boolean | null
           language: string | null
           original_title: string | null
           poster_url: string | null
@@ -156,6 +157,7 @@ export type Database = {
           id?: string
           is_featured?: boolean | null
           is_new?: boolean | null
+          is_ongoing?: boolean | null
           language?: string | null
           original_title?: string | null
           poster_url?: string | null
@@ -180,6 +182,7 @@ export type Database = {
           id?: string
           is_featured?: boolean | null
           is_new?: boolean | null
+          is_ongoing?: boolean | null
           language?: string | null
           original_title?: string | null
           poster_url?: string | null
@@ -194,6 +197,50 @@ export type Database = {
           year?: string | null
         }
         Relationships: []
+      }
+      notifications: {
+        Row: {
+          created_at: string
+          id: string
+          is_read: boolean | null
+          media_id: string | null
+          message: string
+          session_id: string | null
+          title: string
+          type: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_read?: boolean | null
+          media_id?: string | null
+          message: string
+          session_id?: string | null
+          title: string
+          type?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_read?: boolean | null
+          media_id?: string | null
+          message?: string
+          session_id?: string | null
+          title?: string
+          type?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_media_id_fkey"
+            columns: ["media_id"]
+            isOneToOne: false
+            referencedRelation: "media"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       seen: {
         Row: {

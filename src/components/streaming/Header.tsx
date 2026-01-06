@@ -4,6 +4,7 @@ import { Bookmark, Heart } from 'lucide-react';
 import { Search, LayoutGrid, Film, Tv, Settings, LogOut, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import logo from '@/assets/logo.png';
+import NotificationBell from './NotificationBell';
 import type { Media } from '@/types/media';
 
 type ViewType = 'home' | 'films' | 'series' | 'watchlist' | 'favorites' | 'detail' | 'player' | 'settings';
@@ -200,6 +201,9 @@ const Header = ({
               </div>
             )}
           </div>
+
+          {/* Notification Bell */}
+          <NotificationBell />
 
           {/* Admin Button */}
           {isAdmin ? (

@@ -89,10 +89,10 @@ const ResumeSection = ({ resumeList, onSelect }: ResumeSectionProps) => {
               onClick={() => onSelect(media, media.nextSeasonId, media.nextEpisodeId)}
               className="flex-[0_0_calc((100%_-_5rem)/5)] max-w-[calc((100%_-_5rem)/5)] sm:flex-[0_0_calc((100%_-_3rem)/3)] sm:max-w-[calc((100%_-_3rem)/3)] md:flex-[0_0_calc((100%_-_4rem)/4)] md:max-w-[calc((100%_-_4rem)/4)] lg:flex-[0_0_calc((100%_-_5rem)/5)] lg:max-w-[calc((100%_-_5rem)/5)] flex-shrink-0 group cursor-pointer"
             >
-              <div className="aspect-video bg-card rounded-3xl border border-border/30 overflow-hidden relative hover:border-primary/50 transition-all shadow-card">
-                {/* Image */}
+              <div className="aspect-video bg-card rounded-2xl sm:rounded-3xl border border-border/30 overflow-hidden relative hover:border-primary/50 transition-all shadow-card">
+                {/* Image - ALWAYS use backdrop (horizontal) for resume cards */}
                 <img 
-                  src={media.image} 
+                  src={(media as any).backdrop || media.image} 
                   alt={media.title}
                   loading="lazy"
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"

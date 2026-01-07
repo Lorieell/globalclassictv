@@ -43,10 +43,13 @@ const determineContentType = (dbMedia: any): 'Film' | 'Série' | 'Animé' | 'Ém
 const transformDbMedia = (dbMedia: any): Media => {
   const contentType = determineContentType(dbMedia);
   
+  // IMPORTANT: Use backdrop for horizontal displays (hero, resume, cards)
+  // poster_url is vertical, backdrop_url is horizontal
   const media: Media = {
     id: dbMedia.id,
     title: dbMedia.title,
-    image: dbMedia.poster_url || '',
+    // Use backdrop as primary image for cards/resume (horizontal format)
+    image: dbMedia.backdrop_url || dbMedia.poster_url || '',
     type: contentType,
     description: dbMedia.description || '',
     synopsis: dbMedia.description || '',
@@ -65,10 +68,19 @@ const transformDbMedia = (dbMedia: any): Media => {
     isOngoing: dbMedia.is_ongoing || false,
   };
   // Add extra properties that might not be in the type
+  // CRITICAL: backdrop is for horizontal displays (hero section)
   (media as any).backdrop = dbMedia.backdrop_url;
+  // poster is for vertical displays (detail page, posters)
+  (media as any).poster = dbMedia.poster_url;
   (media as any).rating = dbMedia.rating;
   (media as any).year = dbMedia.year;
   (media as any).isFeatured = dbMedia.is_featured || false;
+  (media as any).isFree = dbMedia.is_free || false;
+  (media as any).budget = dbMedia.budget;
+  (media as any).revenue = dbMedia.revenue;
+  (media as any).writers = dbMedia.writers?.join(', ') || '';
+  (media as any).originalLanguage = dbMedia.original_language;
+  (media as any).tagline = dbMedia.tagline;
   return media;
 };
 
@@ -256,8 +268,13 @@ export const useSupabaseMedia = () => {
     setLibrary(prev => prev.map(m => m.id === id ? { ...m, ...updates, updatedAt: Date.now() } : m));
   }, []);
 
-  // Delete media from database
+  // Delete media from database and track TMDB ID to prevent re-import
   const deleteMedia = useCallback(async (id: string) => {
+    // First get the media to save its TMDB ID
+    const mediaToDelete = library.find(m => m.id === id);
+    const tmdbId = mediaToDelete?.tmdbId;
+    const title = mediaToDelete?.title;
+    
     const { error } = await supabase
       .from('media')
       .delete()
@@ -268,8 +285,25 @@ export const useSupabaseMedia = () => {
       throw error;
     }
 
+    // If media had a TMDB ID, save it to prevent re-importing
+    if (tmdbId) {
+      const { error: trackError } = await supabase
+        .from('deleted_tmdb_ids')
+        .insert({
+          tmdb_id: tmdbId,
+          media_type: mediaToDelete?.type === 'Film' ? 'film' : 'serie',
+          title: title,
+        });
+      
+      if (trackError) {
+        console.warn('Could not track deleted TMDB ID:', trackError);
+      } else {
+        console.log(`Tracked deleted TMDB ID ${tmdbId} (${title}) to prevent re-import`);
+      }
+    }
+
     setLibrary(prev => prev.filter(m => m.id !== id));
-  }, []);
+  }, [library]);
 
   // Toggle featured status
   const toggleFeatured = useCallback(async (id: string, isFeatured: boolean) => {

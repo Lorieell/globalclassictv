@@ -32,6 +32,33 @@ export type Database = {
         }
         Relationships: []
       }
+      deleted_tmdb_ids: {
+        Row: {
+          deleted_at: string
+          deleted_by: string | null
+          id: string
+          media_type: string
+          title: string | null
+          tmdb_id: number
+        }
+        Insert: {
+          deleted_at?: string
+          deleted_by?: string | null
+          id?: string
+          media_type?: string
+          title?: string | null
+          tmdb_id: number
+        }
+        Update: {
+          deleted_at?: string
+          deleted_by?: string | null
+          id?: string
+          media_type?: string
+          title?: string | null
+          tmdb_id?: number
+        }
+        Relationships: []
+      }
       favorites: {
         Row: {
           created_at: string
@@ -123,7 +150,9 @@ export type Database = {
       media: {
         Row: {
           backdrop_url: string | null
+          budget: number | null
           cast_members: string[] | null
+          characters: string[] | null
           created_at: string
           description: string | null
           director: string | null
@@ -131,24 +160,32 @@ export type Database = {
           genres: string[] | null
           id: string
           is_featured: boolean | null
+          is_free: boolean | null
           is_new: boolean | null
           is_ongoing: boolean | null
           language: string | null
+          original_language: string | null
           original_title: string | null
           poster_url: string | null
+          production_companies: string[] | null
           quality: string | null
           rating: number | null
+          revenue: number | null
           seasons: Json | null
+          tagline: string | null
           title: string
           tmdb_id: number | null
           type: Database["public"]["Enums"]["media_type"]
           updated_at: string
           video_urls: string[] | null
+          writers: string[] | null
           year: string | null
         }
         Insert: {
           backdrop_url?: string | null
+          budget?: number | null
           cast_members?: string[] | null
+          characters?: string[] | null
           created_at?: string
           description?: string | null
           director?: string | null
@@ -156,24 +193,32 @@ export type Database = {
           genres?: string[] | null
           id?: string
           is_featured?: boolean | null
+          is_free?: boolean | null
           is_new?: boolean | null
           is_ongoing?: boolean | null
           language?: string | null
+          original_language?: string | null
           original_title?: string | null
           poster_url?: string | null
+          production_companies?: string[] | null
           quality?: string | null
           rating?: number | null
+          revenue?: number | null
           seasons?: Json | null
+          tagline?: string | null
           title: string
           tmdb_id?: number | null
           type?: Database["public"]["Enums"]["media_type"]
           updated_at?: string
           video_urls?: string[] | null
+          writers?: string[] | null
           year?: string | null
         }
         Update: {
           backdrop_url?: string | null
+          budget?: number | null
           cast_members?: string[] | null
+          characters?: string[] | null
           created_at?: string
           description?: string | null
           director?: string | null
@@ -181,19 +226,25 @@ export type Database = {
           genres?: string[] | null
           id?: string
           is_featured?: boolean | null
+          is_free?: boolean | null
           is_new?: boolean | null
           is_ongoing?: boolean | null
           language?: string | null
+          original_language?: string | null
           original_title?: string | null
           poster_url?: string | null
+          production_companies?: string[] | null
           quality?: string | null
           rating?: number | null
+          revenue?: number | null
           seasons?: Json | null
+          tagline?: string | null
           title?: string
           tmdb_id?: number | null
           type?: Database["public"]["Enums"]["media_type"]
           updated_at?: string
           video_urls?: string[] | null
+          writers?: string[] | null
           year?: string | null
         }
         Relationships: []

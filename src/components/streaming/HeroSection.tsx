@@ -37,12 +37,15 @@ const HeroSection = ({ heroItems, onPlay, onInfo }: HeroSectionProps) => {
 
   const currentItem = heroItems[currentIndex];
 
+  // Ensure we always use horizontal backdrop image for hero
+  const heroImage = currentItem.image;
+  
   return (
-    <div className="relative h-[280px] sm:h-[320px] md:h-[400px] lg:h-[450px] rounded-2xl sm:rounded-[32px] bg-card border border-border/30 overflow-hidden mb-6 sm:mb-10 shadow-card transition-all duration-700">
-      {/* Background Image */}
+    <div className="relative h-[220px] sm:h-[280px] md:h-[380px] lg:h-[450px] rounded-xl sm:rounded-2xl md:rounded-[32px] bg-card border border-border/30 overflow-hidden mb-4 sm:mb-6 md:mb-10 shadow-card transition-all duration-700">
+      {/* Background Image - MUST be horizontal backdrop */}
       <div 
         className="absolute inset-0 bg-cover bg-center transition-all duration-1000"
-        style={{ backgroundImage: `url(${currentItem.image})` }}
+        style={{ backgroundImage: `url(${heroImage})` }}
       />
       
       {/* Gradient Overlays */}
@@ -52,43 +55,42 @@ const HeroSection = ({ heroItems, onPlay, onInfo }: HeroSectionProps) => {
       {/* Content */}
       <div 
         key={currentIndex}
-        className="relative z-10 h-full flex flex-col justify-end px-4 sm:px-6 md:px-10 pb-6 sm:pb-8 max-w-xl animate-fade-in"
+        className="relative z-10 h-full flex flex-col justify-end px-3 sm:px-6 md:px-10 pb-4 sm:pb-6 md:pb-8 max-w-xl animate-fade-in"
       >
-        <div className="bg-primary w-fit px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[7px] sm:text-[8px] font-black uppercase tracking-widest mb-2 sm:mb-3 text-primary-foreground glow-primary flex items-center gap-1 sm:gap-1.5">
+        <div className="bg-primary w-fit px-2 py-0.5 rounded-full text-[6px] sm:text-[7px] md:text-[8px] font-black uppercase tracking-widest mb-1.5 sm:mb-2 md:mb-3 text-primary-foreground glow-primary flex items-center gap-1">
           <span className="w-1 h-1 bg-primary-foreground rounded-full animate-pulse" />
           RECOMMANDÉ
         </div>
         
-        <h2 className="font-display text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black italic uppercase text-foreground mb-2 sm:mb-3 leading-none tracking-tight line-clamp-2">
+        <h2 className="font-display text-lg sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-black italic uppercase text-foreground mb-1.5 sm:mb-2 md:mb-3 leading-none tracking-tight line-clamp-2">
           {currentItem.title}
         </h2>
         
-        <p className="text-muted-foreground text-[10px] sm:text-xs md:text-sm mb-4 sm:mb-5 italic max-w-md leading-relaxed line-clamp-2 sm:line-clamp-3">
-          {truncateDescription(currentItem.description, 180)}
+        <p className="text-muted-foreground text-[9px] sm:text-[10px] md:text-xs mb-3 sm:mb-4 md:mb-5 italic max-w-md leading-relaxed line-clamp-2 hidden sm:block">
+          {truncateDescription(currentItem.description, 150)}
         </p>
         
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 md:gap-3">
           <Button 
             onClick={() => onPlay(currentItem.mediaId)}
-            className="bg-foreground text-background hover:bg-foreground/90 px-4 sm:px-6 md:px-8 py-3 sm:py-4 md:py-5 rounded-xl font-black text-[10px] sm:text-xs uppercase tracking-wider gap-1.5 sm:gap-2 hover:scale-105 transition-transform"
+            className="bg-foreground text-background hover:bg-foreground/90 px-3 sm:px-5 md:px-8 py-2 sm:py-3 md:py-5 rounded-lg sm:rounded-xl font-black text-[9px] sm:text-[10px] md:text-xs uppercase tracking-wider gap-1 sm:gap-2 hover:scale-105 transition-transform"
           >
-            <Play size={14} fill="currentColor" />
-            Lecture
+            <Play size={12} className="sm:w-3.5 sm:h-3.5 md:w-4 md:h-4" fill="currentColor" />
+            <span className="hidden xs:inline">Lecture</span>
           </Button>
           
           <Button 
             variant="outline"
             onClick={() => onInfo(currentItem.mediaId)}
-            className="bg-secondary/30 backdrop-blur-sm border-border/30 hover:bg-secondary/50 px-3 sm:px-5 py-3 sm:py-4 md:py-5 rounded-xl font-semibold text-[10px] sm:text-xs gap-1.5 sm:gap-2"
+            className="bg-secondary/30 backdrop-blur-sm border-border/30 hover:bg-secondary/50 px-2.5 sm:px-4 md:px-5 py-2 sm:py-3 md:py-5 rounded-lg sm:rounded-xl font-semibold text-[9px] sm:text-[10px] md:text-xs gap-1 sm:gap-2"
           >
-            <Info size={14} />
+            <Info size={12} className="sm:w-3.5 sm:h-3.5 md:w-4 md:h-4" />
             <span className="hidden sm:inline">Plus d'infos</span>
-            <span className="sm:hidden">Info</span>
           </Button>
           
           {/* Indicators */}
           {heroItems.length > 1 && (
-            <div className="flex gap-1 sm:gap-1.5 items-center ml-auto md:ml-4">
+            <div className="flex gap-1 items-center ml-auto md:ml-4">
               {heroItems.map((_, i) => (
                 <button
                   key={i}
@@ -96,7 +98,7 @@ const HeroSection = ({ heroItems, onPlay, onInfo }: HeroSectionProps) => {
                   className={`h-1 rounded-full transition-all duration-300 ${
                     currentIndex === i 
                       ? 'w-4 sm:w-6 bg-primary glow-primary' 
-                      : 'w-2 sm:w-3 bg-foreground/20 hover:bg-foreground/40'
+                      : 'w-1.5 sm:w-2 md:w-3 bg-foreground/20 hover:bg-foreground/40'
                   }`}
                 />
               ))}

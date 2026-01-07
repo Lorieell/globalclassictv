@@ -12,16 +12,20 @@ interface MediaCardProps {
 }
 
 const MediaCard = ({ media, onSelect, isAdmin, onEdit, onDelete, compact, listMode }: MediaCardProps) => {
+  // Get backdrop (horizontal) image for list mode, poster (vertical) for card mode
+  const backdropImage = (media as any).backdrop || media.image;
+  const posterImage = (media as any).poster || media.image;
+  
   if (listMode) {
     return (
       <div 
-        className="group relative rounded-2xl overflow-hidden cursor-pointer bg-card border border-border/30 hover:border-primary/30 transition-all duration-300 flex h-32"
+        className="group relative rounded-xl sm:rounded-2xl overflow-hidden cursor-pointer bg-card border border-border/30 hover:border-primary/30 transition-all duration-300 flex h-24 sm:h-32"
         onClick={() => onSelect(media)}
       >
-        {/* Image */}
-        <div className="w-24 h-full flex-shrink-0 overflow-hidden">
+        {/* Image - Use backdrop (horizontal) for list mode */}
+        <div className="w-20 sm:w-24 h-full flex-shrink-0 overflow-hidden">
           <img 
-            src={media.image} 
+            src={backdropImage} 
             alt={media.title} 
             loading="lazy"
             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
@@ -78,12 +82,13 @@ const MediaCard = ({ media, onSelect, isAdmin, onEdit, onDelete, compact, listMo
 
   return (
     <div 
-      className={`group relative rounded-2xl overflow-hidden cursor-pointer bg-card border border-border/30 hover:border-primary/30 transition-all duration-300 hover-lift ${compact ? 'rounded-xl' : ''}`}
+      className={`group relative rounded-xl sm:rounded-2xl overflow-hidden cursor-pointer bg-card border border-border/30 hover:border-primary/30 transition-all duration-300 hover-lift ${compact ? 'rounded-lg' : ''}`}
       onClick={() => onSelect(media)}
     >
+      {/* Use poster (vertical 2:3) for card display */}
       <div className="aspect-[2/3] overflow-hidden">
         <img 
-          src={media.image} 
+          src={posterImage} 
           alt={media.title} 
           loading="lazy"
           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 

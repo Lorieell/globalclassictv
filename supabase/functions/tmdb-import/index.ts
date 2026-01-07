@@ -316,6 +316,20 @@ async function transformMovieDetails(movie: TMDBMovieDetails, fetchOmdb: boolean
   const actors = omdbData?.Actors || '';
   const awards = omdbData?.Awards || '';
   const boxOffice = omdbData?.BoxOffice || '';
+  const writers = omdbData?.Writer || '';
+  
+  // Fetch additional movie details for budget/revenue
+  let budget = 0;
+  let revenue = 0;
+  let tagline = '';
+  try {
+    const fullDetails = await fetchFromTMDB(`/movie/${movie.id}`);
+    budget = fullDetails.budget || 0;
+    revenue = fullDetails.revenue || 0;
+    tagline = fullDetails.tagline || '';
+  } catch (e) {
+    // Ignore errors, these fields are optional
+  }
   
   return {
     id: `tmdb-movie-${movie.id}`,
@@ -336,6 +350,11 @@ async function transformMovieDetails(movie: TMDBMovieDetails, fetchOmdb: boolean
     actors,
     awards,
     boxOffice,
+    writers,
+    budget,
+    revenue,
+    tagline,
+    originalLanguage: movie.original_language || '',
     videoUrls: '',
   };
 }
@@ -664,8 +683,22 @@ serve(async (req) => {
       console.log('Saving to database...');
       let savedCount = 0;
       let skippedCount = 0;
+      let skippedDeleted = 0;
+      
+      // Get list of deleted TMDB IDs to exclude
+      const { data: deletedTmdbIds } = await supabaseAdmin
+        .from('deleted_tmdb_ids')
+        .select('tmdb_id');
+      const deletedSet = new Set((deletedTmdbIds || []).map(d => d.tmdb_id));
+      console.log(`Found ${deletedSet.size} deleted TMDB IDs to exclude`);
       
       for (const media of results) {
+        // Skip if this TMDB ID was previously deleted by admin
+        if (deletedSet.has(media.tmdbId)) {
+          skippedDeleted++;
+          continue;
+        }
+        
         // Check if already exists by tmdb_id
         const { data: existing } = await supabaseAdmin
           .from('media')
@@ -676,6 +709,14 @@ serve(async (req) => {
         if (existing) {
           skippedCount++;
           continue; // Don't update existing content - preserves is_featured and custom data
+        }
+        
+        // Filter out Quebec French content - only VF (France) and VOSTFR allowed
+        // Skip content that's only in French Canada
+        const lang = media.language || '';
+        if (lang.toLowerCase().includes('canada') || lang.toLowerCase().includes('québec') || lang.toLowerCase().includes('quebec')) {
+          console.log(`Skipping Quebec French content: ${media.title}`);
+          continue;
         }
         
         // Transform and insert - only for NEW content
@@ -696,6 +737,11 @@ serve(async (req) => {
           year: media.year || null,
           seasons: media.seasons || [],
           is_featured: false, // New content is not featured by default
+          budget: media.budget || null,
+          revenue: media.revenue || null,
+          writers: media.writers?.split(',').map((w: string) => w.trim()).filter(Boolean) || [],
+          original_language: media.originalLanguage || null,
+          tagline: media.tagline || null,
         };
         
         const { error } = await supabaseAdmin.from('media').insert(dbMedia);
@@ -707,14 +753,15 @@ serve(async (req) => {
         }
       }
       
-      console.log(`Saved ${savedCount} new items, skipped ${skippedCount} existing (preserving is_featured status)`);
+      console.log(`Saved ${savedCount} new items, skipped ${skippedCount} existing, ${skippedDeleted} previously deleted`);
       
       return new Response(JSON.stringify({ 
         success: true, 
         saved: savedCount,
         skipped: skippedCount,
+        skippedDeleted,
         total: results.length,
-        message: `${savedCount} nouveaux contenus importés, ${skippedCount} déjà existants (popularité préservée)` 
+        message: `${savedCount} nouveaux contenus importés, ${skippedCount} existants, ${skippedDeleted} exclus (supprimés)` 
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

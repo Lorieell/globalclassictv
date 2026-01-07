@@ -280,7 +280,8 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
   const [isCheckingAPI, setIsCheckingAPI] = useState(false);
   const [isRefreshingLayout, setIsRefreshingLayout] = useState(false);
   const [isDeletingAsian, setIsDeletingAsian] = useState(false);
-  
+  const [isDeletingFree, setIsDeletingFree] = useState(false);
+  const [isDeletingQuebec, setIsDeletingQuebec] = useState(false);
   // Multi-select for bulk actions
   const [selectedMediaIds, setSelectedMediaIds] = useState<Set<string>>(new Set());
   const [isSelectMode, setIsSelectMode] = useState(false);
@@ -568,6 +569,92 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
       toast.error('Erreur lors de la suppression');
     } finally {
       setIsDeletingAsian(false);
+    }
+  };
+
+  // Delete free accessible content (documentaries, emissions, etc.)
+  const handleDeleteFreeContent = async () => {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer les contenus gratuits (documentaires, émissions TV) ? Cette action est irréversible.')) {
+      return;
+    }
+    
+    setIsDeletingFree(true);
+    try {
+      // Find free content: documentaries, emissions, reality shows
+      const freeContent = library.filter(m => {
+        const genres = m.genres?.toLowerCase() || '';
+        const type = m.type?.toLowerCase() || '';
+        return (
+          type === 'documentaire' ||
+          type === 'émission' ||
+          genres.includes('document') ||
+          genres.includes('reality') ||
+          genres.includes('talk') ||
+          genres.includes('news') ||
+          genres.includes('game show')
+        );
+      });
+      
+      if (freeContent.length === 0) {
+        toast.info('Aucun contenu gratuit à supprimer');
+        setIsDeletingFree(false);
+        return;
+      }
+      
+      let deleted = 0;
+      for (const media of freeContent) {
+        await onDeleteMedia?.(media.id);
+        deleted++;
+      }
+      
+      toast.success(`${deleted} contenus gratuits supprimés`);
+      window.location.reload();
+    } catch (error) {
+      console.error('Delete free content error:', error);
+      toast.error('Erreur lors de la suppression');
+    } finally {
+      setIsDeletingFree(false);
+    }
+  };
+
+  // Delete Quebec French content
+  const handleDeleteQuebecContent = async () => {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer les contenus en français québécois ? Seuls VF (France) et VOSTFR seront conservés.')) {
+      return;
+    }
+    
+    setIsDeletingQuebec(true);
+    try {
+      // Find Quebec French content
+      const quebecContent = library.filter(m => {
+        const lang = m.language?.toLowerCase() || '';
+        return (
+          lang.includes('canada') ||
+          lang.includes('québec') ||
+          lang.includes('quebec') ||
+          lang === 'fr-ca'
+        );
+      });
+      
+      if (quebecContent.length === 0) {
+        toast.info('Aucun contenu québécois à supprimer');
+        setIsDeletingQuebec(false);
+        return;
+      }
+      
+      let deleted = 0;
+      for (const media of quebecContent) {
+        await onDeleteMedia?.(media.id);
+        deleted++;
+      }
+      
+      toast.success(`${deleted} contenus québécois supprimés`);
+      window.location.reload();
+    } catch (error) {
+      console.error('Delete Quebec content error:', error);
+      toast.error('Erreur lors de la suppression');
+    } finally {
+      setIsDeletingQuebec(false);
     }
   };
 
@@ -1021,12 +1108,58 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
                   </div>
                 </div>
 
+                {/* Delete Free Content Button */}
+                <div className="bg-card/50 border border-purple-500/30 rounded-xl p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-semibold text-foreground">Supprimer contenus gratuits</h3>
+                      <p className="text-sm text-muted-foreground">Supprime les documentaires, émissions TV et séries accessibles gratuitement</p>
+                    </div>
+                    <Button
+                      onClick={handleDeleteFreeContent}
+                      disabled={isDeletingFree}
+                      variant="outline"
+                      className="gap-2 border-purple-500/30 text-purple-500 hover:bg-purple-500/10"
+                    >
+                      {isDeletingFree ? (
+                        <Loader2 size={16} className="animate-spin" />
+                      ) : (
+                        <Trash2 size={16} />
+                      )}
+                      Supprimer
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Delete Quebec French Content Button */}
+                <div className="bg-card/50 border border-cyan-500/30 rounded-xl p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-semibold text-foreground">Supprimer contenus French (Canada)</h3>
+                      <p className="text-sm text-muted-foreground">Supprime les contenus en français québécois (garde VF et VOSTFR uniquement)</p>
+                    </div>
+                    <Button
+                      onClick={handleDeleteQuebecContent}
+                      disabled={isDeletingQuebec}
+                      variant="outline"
+                      className="gap-2 border-cyan-500/30 text-cyan-500 hover:bg-cyan-500/10"
+                    >
+                      {isDeletingQuebec ? (
+                        <Loader2 size={16} className="animate-spin" />
+                      ) : (
+                        <Trash2 size={16} />
+                      )}
+                      Supprimer
+                    </Button>
+                  </div>
+                </div>
+
                 {/* Maintenance Button */}
                 <div className="bg-card/50 border border-border/50 rounded-xl p-4">
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="font-semibold text-foreground">Maintenance quotidienne</h3>
-                      <p className="text-sm text-muted-foreground">Vérifie les langues, qualités et ajoute les nouvelles séries</p>
+                      <p className="text-sm text-muted-foreground">Met à jour toutes les infos: budget, recettes, acteurs, réalisateurs, genres, etc.</p>
                     </div>
                     <Button
                       onClick={runDailyMaintenance}

@@ -43,13 +43,14 @@ const determineContentType = (dbMedia: any): 'Film' | 'Série' | 'Animé' | 'Ém
 const transformDbMedia = (dbMedia: any): Media => {
   const contentType = determineContentType(dbMedia);
   
-  // IMPORTANT: Use backdrop for horizontal displays (hero, resume, cards)
-  // poster_url is vertical, backdrop_url is horizontal
+  // CRITICAL: Keep poster and backdrop separate for correct usage
+  // - poster_url = VERTICAL image (for cards in categories)
+  // - backdrop_url = HORIZONTAL image (for hero slides, resume section)
   const media: Media = {
     id: dbMedia.id,
     title: dbMedia.title,
-    // Use backdrop as primary image for cards/resume (horizontal format)
-    image: dbMedia.backdrop_url || dbMedia.poster_url || '',
+    // Use POSTER (vertical) as main image for category cards
+    image: dbMedia.poster_url || '',
     type: contentType,
     description: dbMedia.description || '',
     synopsis: dbMedia.description || '',

@@ -21,7 +21,6 @@ async function verifyAdminAuth(req: Request): Promise<{ isAdmin: boolean; userId
     return { isAdmin: false, error: 'Authorization header required' };
   }
 
-  // Create client with user's token
   const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
     global: { headers: { Authorization: authHeader } }
   });
@@ -31,7 +30,6 @@ async function verifyAdminAuth(req: Request): Promise<{ isAdmin: boolean; userId
     return { isAdmin: false, error: 'Invalid or expired token' };
   }
 
-  // Check admin role
   const { data: roleData, error: roleError } = await supabaseAdmin
     .from('user_roles')
     .select('role')
@@ -95,44 +93,135 @@ function getQualityLabel(rating: number, year: string): string {
   if (releaseYear >= 2015 && rating >= 6.5) {
     return 'Full HD';
   }
-  if (releaseYear >= 2010) {
-    return 'HD';
-  }
   return 'HD';
 }
 
-// Fetch new movies/series from today's releases
+// Fetch detailed movie info from TMDB and update in database
+async function updateMediaDetails(mediaId: string, tmdbId: number, mediaType: 'film' | 'serie') {
+  try {
+    const endpoint = mediaType === 'film' ? `/movie/${tmdbId}` : `/tv/${tmdbId}`;
+    const creditsEndpoint = mediaType === 'film' ? `/movie/${tmdbId}/credits` : `/tv/${tmdbId}/credits`;
+    
+    const [details, credits] = await Promise.all([
+      fetchFromTMDB(endpoint),
+      fetchFromTMDB(creditsEndpoint).catch(() => null)
+    ]);
+    
+    if (!details) return null;
+    
+    // Extract all the details
+    const genres = details.genres?.map((g: any) => g.name) || [];
+    const year = (details.release_date || details.first_air_date)?.split('-')[0] || '';
+    
+    // Cast and crew
+    const director = credits?.crew?.find((c: any) => c.job === 'Director' || c.job === 'Executive Producer')?.name || null;
+    const writers = credits?.crew?.filter((c: any) => c.department === 'Writing').map((c: any) => c.name).slice(0, 5) || [];
+    const castMembers = credits?.cast?.slice(0, 10).map((c: any) => c.name) || [];
+    const characters = credits?.cast?.slice(0, 10).map((c: any) => c.character) || [];
+    const productionCompanies = details.production_companies?.map((c: any) => c.name) || [];
+    
+    const updateData: any = {
+      genres,
+      year,
+      rating: details.vote_average || null,
+      director,
+      cast_members: castMembers,
+      characters,
+      writers,
+      original_language: details.original_language || null,
+      original_title: details.original_title || details.original_name || null,
+      tagline: details.tagline || null,
+      production_companies: productionCompanies,
+      quality: getQualityLabel(details.vote_average || 0, year),
+      language: getLanguageLabel(details.original_language, details.spoken_languages),
+      updated_at: new Date().toISOString(),
+    };
+    
+    // Only for movies
+    if (mediaType === 'film') {
+      updateData.budget = details.budget || null;
+      updateData.revenue = details.revenue || null;
+      updateData.duration = details.runtime ? `${details.runtime} min` : null;
+    }
+    
+    // CRITICAL: Update backdrop_url if it's missing or wrong
+    if (details.backdrop_path) {
+      updateData.backdrop_url = `${TMDB_BACKDROP_BASE}${details.backdrop_path}`;
+    }
+    
+    // Update poster_url if needed
+    if (details.poster_path) {
+      updateData.poster_url = `${TMDB_IMAGE_BASE}${details.poster_path}`;
+    }
+    
+    const { error } = await supabaseAdmin
+      .from('media')
+      .update(updateData)
+      .eq('id', mediaId);
+    
+    if (error) {
+      console.error(`Error updating media ${mediaId}:`, error.message);
+      return null;
+    }
+    
+    return updateData;
+  } catch (error) {
+    console.error(`Error fetching TMDB details for ${tmdbId}:`, error);
+    return null;
+  }
+}
+
+// Fetch new content from TMDB
 async function fetchTodayContent(): Promise<any[]> {
-  const today = new Date().toISOString().split('T')[0];
   const results: any[] = [];
   
   try {
-    console.log(`Fetching content released on or after ${today}...`);
+    console.log('Fetching new content from TMDB...');
     
     // Fetch recently released movies
     const moviesResponse = await fetchFromTMDB('/movie/now_playing', { page: '1' });
     
     for (const movie of moviesResponse.results.slice(0, 20)) {
-      if (!movie.poster_path) continue;
+      if (!movie.poster_path || !movie.backdrop_path) continue;
       
-      const details = await fetchFromTMDB(`/movie/${movie.id}`);
+      const [details, credits] = await Promise.all([
+        fetchFromTMDB(`/movie/${movie.id}`),
+        fetchFromTMDB(`/movie/${movie.id}/credits`).catch(() => null)
+      ]);
+      
       const genres = details.genres?.map((g: any) => g.name) || [];
       const year = details.release_date?.split('-')[0] || '';
+      const director = credits?.crew?.find((c: any) => c.job === 'Director')?.name || null;
+      const castMembers = credits?.cast?.slice(0, 10).map((c: any) => c.name) || [];
+      const characters = credits?.cast?.slice(0, 10).map((c: any) => c.character) || [];
+      const writers = credits?.crew?.filter((c: any) => c.department === 'Writing').map((c: any) => c.name).slice(0, 5) || [];
+      const productionCompanies = details.production_companies?.map((c: any) => c.name) || [];
       
       results.push({
         title: details.title,
+        original_title: details.original_title || null,
         description: details.overview || 'Aucune description disponible.',
         type: 'film',
         poster_url: `${TMDB_IMAGE_BASE}${details.poster_path}`,
-        backdrop_url: details.backdrop_path ? `${TMDB_BACKDROP_BASE}${details.backdrop_path}` : null,
+        backdrop_url: `${TMDB_BACKDROP_BASE}${details.backdrop_path}`,
         genres,
         quality: getQualityLabel(details.vote_average, year),
         language: getLanguageLabel(details.original_language, details.spoken_languages),
         rating: details.vote_average,
         year,
         tmdb_id: movie.id,
+        director,
+        cast_members: castMembers,
+        characters,
+        writers,
+        budget: details.budget || null,
+        revenue: details.revenue || null,
+        tagline: details.tagline || null,
+        original_language: details.original_language || null,
+        production_companies: productionCompanies,
         video_urls: [],
         seasons: [],
+        is_featured: false,
       });
       
       await new Promise(resolve => setTimeout(resolve, 50));
@@ -142,26 +231,44 @@ async function fetchTodayContent(): Promise<any[]> {
     const seriesResponse = await fetchFromTMDB('/tv/airing_today', { page: '1' });
     
     for (const series of seriesResponse.results.slice(0, 20)) {
-      if (!series.poster_path) continue;
+      if (!series.poster_path || !series.backdrop_path) continue;
       
-      const details = await fetchFromTMDB(`/tv/${series.id}`);
+      const [details, credits] = await Promise.all([
+        fetchFromTMDB(`/tv/${series.id}`),
+        fetchFromTMDB(`/tv/${series.id}/credits`).catch(() => null)
+      ]);
+      
       const genres = details.genres?.map((g: any) => g.name) || [];
       const year = details.first_air_date?.split('-')[0] || '';
+      const director = credits?.crew?.find((c: any) => c.job === 'Director' || c.job === 'Executive Producer')?.name || null;
+      const castMembers = credits?.cast?.slice(0, 10).map((c: any) => c.name) || [];
+      const characters = credits?.cast?.slice(0, 10).map((c: any) => c.character) || [];
+      const writers = credits?.crew?.filter((c: any) => c.department === 'Writing').map((c: any) => c.name).slice(0, 5) || [];
+      const productionCompanies = details.production_companies?.map((c: any) => c.name) || [];
       
       results.push({
         title: details.name,
+        original_title: details.original_name || null,
         description: details.overview || 'Aucune description disponible.',
         type: 'serie',
         poster_url: `${TMDB_IMAGE_BASE}${details.poster_path}`,
-        backdrop_url: details.backdrop_path ? `${TMDB_BACKDROP_BASE}${details.backdrop_path}` : null,
+        backdrop_url: `${TMDB_BACKDROP_BASE}${details.backdrop_path}`,
         genres,
         quality: getQualityLabel(details.vote_average, year),
         language: getLanguageLabel(details.original_language, details.spoken_languages),
         rating: details.vote_average,
         year,
         tmdb_id: series.id,
+        director,
+        cast_members: castMembers,
+        characters,
+        writers,
+        tagline: details.tagline || null,
+        original_language: details.original_language || null,
+        production_companies: productionCompanies,
         video_urls: [],
         seasons: [],
+        is_featured: false,
       });
       
       await new Promise(resolve => setTimeout(resolve, 50));
@@ -179,7 +286,7 @@ serve(async (req) => {
   }
 
   try {
-    // SECURITY: Require admin authentication for maintenance operations
+    // SECURITY: Require admin authentication
     const authResult = await verifyAdminAuth(req);
     if (!authResult.isAdmin) {
       console.log(`Auth failed for maintenance: ${authResult.error}`);
@@ -199,23 +306,70 @@ serve(async (req) => {
     
     let newContentAdded = 0;
     let skippedExisting = 0;
+    let updatedExisting = 0;
     const errors: string[] = [];
     
-    // Fetch today's new content from TMDB
+    // Get deleted TMDB IDs to exclude
+    const { data: deletedTmdbIds } = await supabaseAdmin
+      .from('deleted_tmdb_ids')
+      .select('tmdb_id');
+    const deletedSet = new Set((deletedTmdbIds || []).map(d => d.tmdb_id));
+    
+    // STEP 1: Update existing media with missing details (budget, revenue, backdrop, etc.)
+    console.log('Updating existing media with full details from TMDB...');
+    const { data: existingMedia } = await supabaseAdmin
+      .from('media')
+      .select('id, tmdb_id, type, backdrop_url')
+      .not('tmdb_id', 'is', null);
+    
+    // Only update media that needs updating (missing backdrop, budget, etc.)
+    const mediaToUpdate = (existingMedia || []).filter(m => 
+      !m.backdrop_url // Missing backdrop
+    ).slice(0, 50); // Limit to 50 per run to avoid timeout
+    
+    for (const media of mediaToUpdate) {
+      const result = await updateMediaDetails(
+        media.id, 
+        media.tmdb_id, 
+        media.type as 'film' | 'serie'
+      );
+      if (result) {
+        updatedExisting++;
+        console.log(`Updated: ${media.id}`);
+      }
+      await new Promise(resolve => setTimeout(resolve, 100)); // Rate limit
+    }
+    
+    // STEP 2: Fetch new content from TMDB
     const newContent = await fetchTodayContent();
     console.log(`Found ${newContent.length} items from TMDB`);
     
-    // Get existing tmdb_ids from database
-    const { data: existingMedia } = await supabaseAdmin
+    // Get existing tmdb_ids and titles
+    const { data: allMedia } = await supabaseAdmin
       .from('media')
-      .select('tmdb_id')
-      .not('tmdb_id', 'is', null);
+      .select('tmdb_id, title');
     
-    const existingTmdbIds = new Set((existingMedia || []).map((m: { tmdb_id: number }) => m.tmdb_id));
+    const existingTmdbIds = new Set((allMedia || []).map(m => m.tmdb_id).filter(Boolean));
+    const existingTitles = new Set((allMedia || []).map(m => m.title?.toLowerCase().trim()).filter(Boolean));
     
     // Insert only new content
     for (const media of newContent) {
+      // Skip deleted TMDB IDs
+      if (deletedSet.has(media.tmdb_id)) {
+        skippedExisting++;
+        continue;
+      }
+      
+      // Skip existing TMDB IDs
       if (existingTmdbIds.has(media.tmdb_id)) {
+        skippedExisting++;
+        continue;
+      }
+      
+      // Skip duplicate titles
+      const normalizedTitle = media.title?.toLowerCase().trim();
+      if (normalizedTitle && existingTitles.has(normalizedTitle)) {
+        console.log(`Skipping duplicate title: ${media.title}`);
         skippedExisting++;
         continue;
       }
@@ -227,6 +381,7 @@ serve(async (req) => {
         errors.push(`${media.title}: ${error.message}`);
       } else {
         newContentAdded++;
+        existingTitles.add(normalizedTitle);
         console.log(`Added: ${media.title}`);
       }
     }
@@ -234,16 +389,17 @@ serve(async (req) => {
     const result = {
       newContentAdded,
       skippedExisting,
+      updatedExisting,
       errors,
       timestamp: new Date().toISOString(),
     };
     
-    console.log(`Maintenance complete: ${newContentAdded} new items, ${skippedExisting} skipped`);
+    console.log(`Maintenance complete: ${newContentAdded} new, ${updatedExisting} updated, ${skippedExisting} skipped`);
     
     return new Response(JSON.stringify({
       success: true,
       result,
-      message: `Maintenance quotidienne: ${newContentAdded} nouveaux contenus ajoutés, ${skippedExisting} déjà existants`,
+      message: `Maintenance: ${newContentAdded} nouveaux, ${updatedExisting} mis à jour, ${skippedExisting} existants`,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

@@ -993,22 +993,102 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
                   </h3>
                   <div className="flex flex-wrap gap-3">
                     <Button
-                      onClick={() => {
-                        // Force refresh by dispatching a custom event
+                      onClick={async () => {
+                        // Force popular sort - reorder featured media first in all categories
+                        const featuredMedia = library.filter((m: any) => m.isFeatured);
+                        if (featuredMedia.length === 0) {
+                          toast.error('Aucun contenu marqué comme populaire');
+                          return;
+                        }
+                        
+                        // Dispatch event for Index.tsx to reorder
                         window.dispatchEvent(new Event('gctv-force-popular-sort'));
-                        toast.success('Tri des populaires forcé - rafraîchissez la page pour voir les changements');
+                        toast.success(`${featuredMedia.length} contenus populaires triés en premier`);
                         setTimeout(() => window.location.reload(), 500);
                       }}
                       variant="outline"
                       className="gap-2 border-yellow-500/30 text-yellow-600 hover:bg-yellow-500/10"
                     >
                       <Star size={16} className="fill-yellow-500" />
-                      Forcer tri populaires
+                      Forcer tri populaires ({popularCount})
                     </Button>
                     <Button
-                      onClick={() => {
-                        window.dispatchEvent(new Event('gctv-force-hero-rotation'));
-                        toast.success('Rotation des slides forcée');
+                      onClick={async () => {
+                        // Force regenerate hero slides: half popular (featured), half random
+                        const token = await getAuthToken();
+                        if (!token) {
+                          toast.error('Vous devez être connecté en tant qu\'admin');
+                          return;
+                        }
+                        
+                        // Get media with video and backdrop for hero
+                        const eligibleMedia = library.filter(m => {
+                          const hasVideo = m.type === 'Série' 
+                            ? m.seasons?.some(s => s.episodes?.some(e => e.videoUrls?.trim()))
+                            : !!(m.videoUrls?.trim());
+                          const hasBackdrop = !!(m as any).backdrop;
+                          return hasVideo && hasBackdrop;
+                        });
+                        
+                        if (eligibleMedia.length < 3) {
+                          toast.error('Pas assez de contenus avec vidéo et image horizontale pour les hero slides');
+                          return;
+                        }
+                        
+                        // Get featured (popular) media with video
+                        const featuredEligible = eligibleMedia.filter((m: any) => m.isFeatured);
+                        const nonFeaturedEligible = eligibleMedia.filter((m: any) => !m.isFeatured);
+                        
+                        // Take half featured, half random
+                        const numFeatured = Math.min(3, featuredEligible.length);
+                        const numRandom = 6 - numFeatured;
+                        
+                        const selectedFeatured = featuredEligible.slice(0, numFeatured);
+                        const shuffledRandom = [...nonFeaturedEligible]
+                          .sort(() => Math.random() - 0.5)
+                          .slice(0, numRandom);
+                        
+                        // Interleave: featured, random, featured, random...
+                        const heroMediaList: Media[] = [];
+                        for (let i = 0; i < Math.max(selectedFeatured.length, shuffledRandom.length); i++) {
+                          if (i < selectedFeatured.length) heroMediaList.push(selectedFeatured[i]);
+                          if (i < shuffledRandom.length) heroMediaList.push(shuffledRandom[i]);
+                        }
+                        
+                        // Delete existing hero items and insert new ones
+                        const { error: deleteError } = await supabase
+                          .from('hero_items')
+                          .delete()
+                          .neq('id', '00000000-0000-0000-0000-000000000000');
+                        
+                        if (deleteError) {
+                          console.error('Error deleting hero items:', deleteError);
+                        }
+                        
+                        // Insert new hero items using BACKDROP (horizontal) image
+                        const newHeroItems = heroMediaList.slice(0, 6).map((m, index) => ({
+                          media_id: m.id,
+                          title: m.title.toUpperCase(),
+                          description: m.description || m.synopsis || '',
+                          // CRITICAL: Use backdrop_url (horizontal) NOT poster_url (vertical)
+                          image_url: (m as any).backdrop || m.image,
+                          sort_order: index,
+                          is_active: true,
+                          duration: 30,
+                        }));
+                        
+                        const { error: insertError } = await supabase
+                          .from('hero_items')
+                          .insert(newHeroItems);
+                        
+                        if (insertError) {
+                          toast.error('Erreur lors de la mise à jour des slides');
+                          console.error('Error inserting hero items:', insertError);
+                        } else {
+                          toast.success(`${newHeroItems.length} hero slides générés (${numFeatured} populaires, ${numRandom} aléatoires)`);
+                          window.dispatchEvent(new Event('gctv-force-hero-rotation'));
+                          setTimeout(() => window.location.reload(), 1000);
+                        }
                       }}
                       variant="outline"
                       className="gap-2 border-primary/30 text-primary hover:bg-primary/10"

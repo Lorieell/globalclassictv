@@ -70,9 +70,10 @@ const transformDbMedia = (dbMedia: any): Media => {
   };
   // Add extra properties that might not be in the type
   // CRITICAL: backdrop is for horizontal displays (hero section)
-  (media as any).backdrop = dbMedia.backdrop_url;
+  // Use backdrop_url if available, otherwise fallback to poster
+  (media as any).backdrop = dbMedia.backdrop_url || dbMedia.poster_url || '';
   // poster is for vertical displays (detail page, posters)
-  (media as any).poster = dbMedia.poster_url;
+  (media as any).poster = dbMedia.poster_url || '';
   (media as any).rating = dbMedia.rating;
   (media as any).year = dbMedia.year;
   (media as any).isFeatured = dbMedia.is_featured || false;
@@ -80,8 +81,11 @@ const transformDbMedia = (dbMedia: any): Media => {
   (media as any).budget = dbMedia.budget;
   (media as any).revenue = dbMedia.revenue;
   (media as any).writers = dbMedia.writers?.join(', ') || '';
+  (media as any).characters = dbMedia.characters?.join(', ') || '';
   (media as any).originalLanguage = dbMedia.original_language;
   (media as any).tagline = dbMedia.tagline;
+  (media as any).productionCompanies = dbMedia.production_companies?.join(', ') || '';
+  (media as any).originalTitle = dbMedia.original_title;
   return media;
 };
 

@@ -109,16 +109,19 @@ const MediaDetailPageRoute = () => {
 
   // Get images - poster for vertical display, backdrop for horizontal
   const posterImage = (media as any).poster || media.image;
-  const backdropImage = (media as any).backdrop || media.image;
+  const backdropImage = (media as any).backdrop || (media as any).poster || media.image;
   
-  // Extended media info
+  // Extended media info from DB
   const year = (media as any).year;
   const budget = (media as any).budget;
   const revenue = (media as any).revenue;
   const writers = (media as any).writers;
+  const characters = (media as any).characters;
   const originalLanguage = (media as any).originalLanguage;
+  const originalTitle = (media as any).originalTitle;
   const tagline = (media as any).tagline;
   const rating = (media as any).rating;
+  const productionCompanies = (media as any).productionCompanies;
   const allGenres = media.genres;
 
   return (
@@ -285,7 +288,7 @@ const MediaDetailPageRoute = () => {
                   </div>
                 )}
 
-                {/* Director, Writers, Actors */}
+                {/* Director, Writers, Actors, Characters */}
                 <div className="space-y-2 text-xs sm:text-sm">
                   {media.director && (
                     <div className="flex items-start gap-2">
@@ -311,6 +314,33 @@ const MediaDetailPageRoute = () => {
                       <div>
                         <span className="text-muted-foreground">Acteurs: </span>
                         <span className="text-foreground">{media.actors}</span>
+                      </div>
+                    </div>
+                  )}
+                  {characters && (
+                    <div className="flex items-start gap-2">
+                      <Users size={14} className="text-purple-400 mt-0.5 shrink-0" />
+                      <div>
+                        <span className="text-muted-foreground">Personnages: </span>
+                        <span className="text-foreground">{characters}</span>
+                      </div>
+                    </div>
+                  )}
+                  {productionCompanies && (
+                    <div className="flex items-start gap-2">
+                      <Film size={14} className="text-blue-400 mt-0.5 shrink-0" />
+                      <div>
+                        <span className="text-muted-foreground">Production: </span>
+                        <span className="text-foreground">{productionCompanies}</span>
+                      </div>
+                    </div>
+                  )}
+                  {originalTitle && originalTitle !== media.title && (
+                    <div className="flex items-start gap-2">
+                      <Globe size={14} className="text-muted-foreground mt-0.5 shrink-0" />
+                      <div>
+                        <span className="text-muted-foreground">Titre original: </span>
+                        <span className="text-foreground italic">{originalTitle}</span>
                       </div>
                     </div>
                   )}

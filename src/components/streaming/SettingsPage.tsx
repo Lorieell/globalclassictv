@@ -179,6 +179,104 @@ const applyAccentColor = (hexColor: string) => {
   document.documentElement.style.setProperty('--ring', `${hue} ${saturation}% ${lightness}%`);
 };
 
+// Notification Creator Component
+const NotificationCreator = () => {
+  const [notifTitle, setNotifTitle] = useState('');
+  const [notifMessage, setNotifMessage] = useState('');
+  const [notifType, setNotifType] = useState<'update' | 'bugfix' | 'new_content' | 'new_video'>('update');
+  const [isSending, setIsSending] = useState(false);
+
+  const sendNotification = async () => {
+    if (!notifTitle.trim() || !notifMessage.trim()) {
+      toast.error('Titre et message requis');
+      return;
+    }
+
+    setIsSending(true);
+    try {
+      const { error } = await supabase.from('notifications').insert({
+        title: notifTitle,
+        message: notifMessage,
+        type: notifType,
+        session_id: null,
+        user_id: null,
+        is_read: false,
+      });
+
+      if (error) {
+        console.error('Error creating notification:', error);
+        toast.error('Erreur lors de la création');
+        return;
+      }
+
+      toast.success('Notification envoyée à tous les utilisateurs !');
+      setNotifTitle('');
+      setNotifMessage('');
+    } catch (err) {
+      console.error('Error:', err);
+      toast.error('Erreur lors de l\'envoi');
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <Label className="text-xs text-muted-foreground">Titre</Label>
+          <Input
+            value={notifTitle}
+            onChange={(e) => setNotifTitle(e.target.value)}
+            placeholder="Ex: Nouveaux films ajoutés !"
+            className="bg-muted/50"
+          />
+        </div>
+        <div>
+          <Label className="text-xs text-muted-foreground">Type</Label>
+          <select
+            value={notifType}
+            onChange={(e) => setNotifType(e.target.value as any)}
+            className="w-full h-10 px-3 rounded-lg bg-muted/50 border border-border text-foreground text-sm"
+          >
+            <option value="update">📢 Mise à jour</option>
+            <option value="new_content">✨ Nouveau contenu</option>
+            <option value="new_video">🎬 Nouvelle vidéo</option>
+            <option value="bugfix">🐛 Correction de bug</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <Label className="text-xs text-muted-foreground">Message</Label>
+        <Input
+          value={notifMessage}
+          onChange={(e) => setNotifMessage(e.target.value)}
+          placeholder="Ex: 50 nouveaux films et séries ont été ajoutés cette semaine !"
+          className="bg-muted/50"
+        />
+      </div>
+      <Button
+        onClick={sendNotification}
+        disabled={isSending || !notifTitle.trim() || !notifMessage.trim()}
+        size="sm"
+        className="gap-2"
+      >
+        {isSending ? (
+          <>
+            <Loader2 size={14} className="animate-spin" />
+            Envoi...
+          </>
+        ) : (
+          <>
+            <Megaphone size={14} />
+            Envoyer la notification
+          </>
+        )}
+      </Button>
+    </div>
+  );
+};
+
 const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewMedia, onDeleteMedia, onToggleFeatured, onToggleOngoing }: SettingsPageProps) => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('links');
   
@@ -1615,7 +1713,10 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
                               return;
                             }
                             
-                            toast.success('Hero slides supprimés ! Régénération automatique en cours...');
+                            // Dispatch event to trigger refresh in Index
+                            window.dispatchEvent(new Event('gctv-force-hero-rotation'));
+                            
+                            toast.success('Hero slides régénérés ! Les images horizontales (backdrop) seront utilisées.');
                             
                             // Wait a moment then reload to apply changes
                             setTimeout(() => {
@@ -1638,7 +1739,7 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
                         ) : (
                           <>
                             <RefreshCw size={16} />
-                            Mettre à jour maintenant
+                            Forcer rotation des slides
                           </>
                         )}
                       </Button>
@@ -1658,13 +1759,29 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
                       </li>
                       <li className="flex items-center gap-2">
                         <Check size={14} className="text-green-400" />
-                        Hero slides - régénérés avec les blockbusters récents
+                        Hero slides - régénérés avec images horizontales (backdrop)
                       </li>
                       <li className="flex items-center gap-2">
                         <Check size={14} className="text-green-400" />
                         Catégories de niche - Kdramas, Animes, Bollywood triés par popularité
                       </li>
                     </ul>
+                  </div>
+                </div>
+
+                {/* Notifications Section */}
+                <div className="bg-card/50 rounded-2xl border border-border/50 p-6 space-y-4">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                      <Megaphone size={24} className="text-blue-400" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-medium text-foreground mb-1">Créer une notification</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Envoie une notification à tous les utilisateurs (visible dans la cloche).
+                      </p>
+                      <NotificationCreator />
+                    </div>
                   </div>
                 </div>
 

@@ -37,7 +37,8 @@ const HeroSection = ({ heroItems, onPlay, onInfo }: HeroSectionProps) => {
 
   const currentItem = heroItems[currentIndex];
 
-  // Ensure we always use horizontal backdrop image for hero
+  // CRITICAL: Always use the image provided in heroItem (should be backdrop)
+  // If no image, this is a problem - the hero generator should always provide backdrop
   const heroImage = currentItem.image;
   
   return (

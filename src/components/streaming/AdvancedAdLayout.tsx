@@ -65,6 +65,53 @@ const isValidAdSenseCode = (code: string): boolean => {
   return true;
 };
 
+// Component to render PropellerAds
+const PropellerAdSlot = ({ zoneId, format }: { zoneId: string; format: 'banner' | 'native' | 'push' }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!containerRef.current || !zoneId) return;
+
+    // Clear previous content
+    containerRef.current.innerHTML = '';
+
+    // PropellerAds script injection based on format
+    const script = document.createElement('script');
+    script.async = true;
+    
+    if (format === 'banner') {
+      // Banner ads script
+      script.src = `//pl18795430.highcpmgate.com/${zoneId}/invoke.js`;
+      script.setAttribute('data-cfasync', 'false');
+      
+      const container = document.createElement('div');
+      container.id = `container-${zoneId}`;
+      containerRef.current.appendChild(container);
+      containerRef.current.appendChild(script);
+    } else if (format === 'native') {
+      // Native ads
+      script.src = `//pl18795430.highcpmgate.com/${zoneId}/invoke.js`;
+      script.setAttribute('data-cfasync', 'false');
+      containerRef.current.appendChild(script);
+    } else if (format === 'push') {
+      // Push notification setup (initial prompt only)
+      script.src = `//pl18795430.highcpmgate.com/${zoneId}/invoke.js`;
+      script.setAttribute('data-cfasync', 'false');
+      containerRef.current.appendChild(script);
+    }
+
+    return () => {
+      if (containerRef.current) {
+        containerRef.current.innerHTML = '';
+      }
+    };
+  }, [zoneId, format]);
+
+  return (
+    <div ref={containerRef} className="propellerads-container min-h-[50px]" />
+  );
+};
+
 // Component to render AdSense code safely
 const AdSenseSlot = ({ code }: { code: string }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -174,6 +221,10 @@ const SlideAdBanner = ({
 
 // Static Ad Component
 const StaticAdBanner = ({ ad }: { ad: StaticAd }) => {
+  if (ad.adType === 'propellerads' && ad.propellerZoneId) {
+    return <PropellerAdSlot zoneId={ad.propellerZoneId} format={ad.propellerFormat || 'banner'} />;
+  }
+
   if (ad.adType === 'adsense' && ad.adsenseCode) {
     return <AdSenseSlot code={ad.adsenseCode} />;
   }
@@ -213,7 +264,11 @@ const AdColumn = ({
     .filter(ad => ad.enabled)
     .filter(ad => {
       if (ad.type === 'slide') return ad.images.length > 0;
-      if (ad.type === 'static') return ad.adType === 'adsense' ? !!ad.adsenseCode : !!ad.imageUrl;
+      if (ad.type === 'static') {
+        if (ad.adType === 'adsense') return !!ad.adsenseCode;
+        if (ad.adType === 'propellerads') return !!ad.propellerZoneId;
+        return !!ad.imageUrl;
+      }
       return false;
     })
     .sort((a, b) => a.order - b.order);
@@ -255,14 +310,22 @@ const AdvancedAdLayout = ({
   const hasLeftAds = settings.left.ads.some(ad => {
     if (!ad.enabled) return false;
     if (ad.type === 'slide') return ad.images.length > 0;
-    if (ad.type === 'static') return ad.adType === 'adsense' ? !!ad.adsenseCode : !!ad.imageUrl;
+    if (ad.type === 'static') {
+      if (ad.adType === 'adsense') return !!ad.adsenseCode;
+      if (ad.adType === 'propellerads') return !!ad.propellerZoneId;
+      return !!ad.imageUrl;
+    }
     return false;
   });
 
   const hasRightAds = settings.right.ads.some(ad => {
     if (!ad.enabled) return false;
     if (ad.type === 'slide') return ad.images.length > 0;
-    if (ad.type === 'static') return ad.adType === 'adsense' ? !!ad.adsenseCode : !!ad.imageUrl;
+    if (ad.type === 'static') {
+      if (ad.adType === 'adsense') return !!ad.adsenseCode;
+      if (ad.adType === 'propellerads') return !!ad.propellerZoneId;
+      return !!ad.imageUrl;
+    }
     return false;
   });
 

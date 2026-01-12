@@ -75,14 +75,15 @@ const PropellerAdSlot = ({ zoneId, format }: { zoneId: string; format: 'banner' 
     // Clear previous content
     containerRef.current.innerHTML = '';
 
-    // PropellerAds script injection based on format
+    // PropellerAds script injection using the domain from sw.js
+    const propellerDomain = '3nbf4.com';
     const script = document.createElement('script');
     script.async = true;
+    script.setAttribute('data-cfasync', 'false');
     
     if (format === 'banner') {
       // Banner ads script
-      script.src = `//pl18795430.highcpmgate.com/${zoneId}/invoke.js`;
-      script.setAttribute('data-cfasync', 'false');
+      script.src = `//${propellerDomain}/act/files/tag.min.js?z=${zoneId}`;
       
       const container = document.createElement('div');
       container.id = `container-${zoneId}`;
@@ -90,13 +91,11 @@ const PropellerAdSlot = ({ zoneId, format }: { zoneId: string; format: 'banner' 
       containerRef.current.appendChild(script);
     } else if (format === 'native') {
       // Native ads
-      script.src = `//pl18795430.highcpmgate.com/${zoneId}/invoke.js`;
-      script.setAttribute('data-cfasync', 'false');
+      script.src = `//${propellerDomain}/act/files/tag.min.js?z=${zoneId}`;
       containerRef.current.appendChild(script);
     } else if (format === 'push') {
-      // Push notification setup (initial prompt only)
-      script.src = `//pl18795430.highcpmgate.com/${zoneId}/invoke.js`;
-      script.setAttribute('data-cfasync', 'false');
+      // Push notification - uses the service worker
+      script.src = `//${propellerDomain}/act/files/tag.min.js?z=${zoneId}`;
       containerRef.current.appendChild(script);
     }
 
@@ -164,7 +163,12 @@ const SlideAdBanner = ({
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
 
+  // Check if this is a PropellerAds slide
+  const slideType = ad.slideType || 'images';
+
   useEffect(() => {
+    if (slideType === 'propellerads') return;
+    
     // If synced with hero, use hero's index
     if (syncIndex !== undefined) {
       setCurrentIndex(syncIndex % ad.images.length);
@@ -179,7 +183,12 @@ const SlideAdBanner = ({
     }, ad.interval * 1000);
 
     return () => clearInterval(timer);
-  }, [ad.images.length, ad.interval, syncIndex]);
+  }, [ad.images.length, ad.interval, syncIndex, slideType]);
+
+  // If PropellerAds type, render PropellerAds component
+  if (slideType === 'propellerads' && ad.propellerZoneId) {
+    return <PropellerAdSlot zoneId={ad.propellerZoneId} format={ad.propellerFormat || 'banner'} />;
+  }
 
   if (ad.images.length === 0) return null;
 
@@ -263,7 +272,11 @@ const AdColumn = ({
   const sortedAds = [...ads]
     .filter(ad => ad.enabled)
     .filter(ad => {
-      if (ad.type === 'slide') return ad.images.length > 0;
+      if (ad.type === 'slide') {
+        const slideType = ad.slideType || 'images';
+        if (slideType === 'propellerads') return !!ad.propellerZoneId;
+        return ad.images.length > 0;
+      }
       if (ad.type === 'static') {
         if (ad.adType === 'adsense') return !!ad.adsenseCode;
         if (ad.adType === 'propellerads') return !!ad.propellerZoneId;
@@ -309,7 +322,11 @@ const AdvancedAdLayout = ({
   // Check if there are any active ads
   const hasLeftAds = settings.left.ads.some(ad => {
     if (!ad.enabled) return false;
-    if (ad.type === 'slide') return ad.images.length > 0;
+    if (ad.type === 'slide') {
+      const slideType = ad.slideType || 'images';
+      if (slideType === 'propellerads') return !!ad.propellerZoneId;
+      return ad.images.length > 0;
+    }
     if (ad.type === 'static') {
       if (ad.adType === 'adsense') return !!ad.adsenseCode;
       if (ad.adType === 'propellerads') return !!ad.propellerZoneId;
@@ -320,7 +337,11 @@ const AdvancedAdLayout = ({
 
   const hasRightAds = settings.right.ads.some(ad => {
     if (!ad.enabled) return false;
-    if (ad.type === 'slide') return ad.images.length > 0;
+    if (ad.type === 'slide') {
+      const slideType = ad.slideType || 'images';
+      if (slideType === 'propellerads') return !!ad.propellerZoneId;
+      return ad.images.length > 0;
+    }
     if (ad.type === 'static') {
       if (ad.adType === 'adsense') return !!ad.adsenseCode;
       if (ad.adType === 'propellerads') return !!ad.propellerZoneId;

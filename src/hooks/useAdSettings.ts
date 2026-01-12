@@ -70,9 +70,12 @@ export const useAdSettings = () => {
           id: Math.random().toString(36).substring(2, 9),
           type: 'slide',
           enabled: true,
+          slideType: 'images',
           images: oldSettings.left.slideAd.images,
           interval: oldSettings.left.slideAd.interval || 30,
           order: 0,
+          propellerZoneId: '',
+          propellerFormat: 'banner',
         });
       }
       if (oldSettings.left?.staticAd?.enabled) {
@@ -94,9 +97,12 @@ export const useAdSettings = () => {
           id: Math.random().toString(36).substring(2, 9),
           type: 'slide',
           enabled: true,
+          slideType: 'images',
           images: oldSettings.right.slideAd.images,
           interval: oldSettings.right.slideAd.interval || 30,
           order: 0,
+          propellerZoneId: '',
+          propellerFormat: 'banner',
         });
       }
       if (oldSettings.right?.staticAd?.enabled) {

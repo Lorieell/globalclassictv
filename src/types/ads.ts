@@ -10,9 +10,12 @@ export interface SlideAd {
   id: string;
   type: 'slide';
   enabled: boolean;
+  slideType: 'images' | 'propellerads'; // Type of slide content
   images: SlideImage[]; // Max 3 images
   interval: number; // Interval in seconds
   order: number; // Position order
+  propellerZoneId: string; // PropellerAds Zone ID for slide
+  propellerFormat: 'banner' | 'native' | 'push'; // PropellerAds format
 }
 
 export interface StaticAd {
@@ -48,9 +51,12 @@ export const createSlideAd = (order: number): SlideAd => ({
   id: generateAdId(),
   type: 'slide',
   enabled: true,
+  slideType: 'images',
   images: [],
   interval: 30,
   order,
+  propellerZoneId: '',
+  propellerFormat: 'banner',
 });
 
 // Create new static ad

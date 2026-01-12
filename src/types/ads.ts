@@ -19,10 +19,12 @@ export interface StaticAd {
   id: string;
   type: 'static';
   enabled: boolean;
-  adType: 'image' | 'adsense';
+  adType: 'image' | 'adsense' | 'propellerads';
   imageUrl: string;
   linkUrl: string;
   adsenseCode: string;
+  propellerZoneId: string; // PropellerAds Zone ID
+  propellerFormat: 'banner' | 'native' | 'push'; // PropellerAds format
   order: number; // Position order
 }
 
@@ -60,6 +62,8 @@ export const createStaticAd = (order: number): StaticAd => ({
   imageUrl: '',
   linkUrl: '',
   adsenseCode: '',
+  propellerZoneId: '',
+  propellerFormat: 'banner',
   order,
 });
 

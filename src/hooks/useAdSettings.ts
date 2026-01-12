@@ -84,6 +84,8 @@ export const useAdSettings = () => {
           imageUrl: oldSettings.left.staticAd.imageUrl || '',
           linkUrl: oldSettings.left.staticAd.linkUrl || '',
           adsenseCode: oldSettings.left.staticAd.adsenseCode || '',
+          propellerZoneId: '',
+          propellerFormat: 'banner',
           order: 1,
         });
       }
@@ -106,6 +108,8 @@ export const useAdSettings = () => {
           imageUrl: oldSettings.right.staticAd.imageUrl || '',
           linkUrl: oldSettings.right.staticAd.linkUrl || '',
           adsenseCode: oldSettings.right.staticAd.adsenseCode || '',
+          propellerZoneId: '',
+          propellerFormat: 'banner',
           order: 1,
         });
       }

@@ -68,46 +68,63 @@ const isValidAdSenseCode = (code: string): boolean => {
 // Component to render PropellerAds
 const PropellerAdSlot = ({ zoneId, format }: { zoneId: string; format: 'banner' | 'native' | 'push' }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const scriptLoadedRef = useRef(false);
 
   useEffect(() => {
-    if (!containerRef.current || !zoneId) return;
+    if (!containerRef.current || !zoneId || scriptLoadedRef.current) return;
 
     // Clear previous content
     containerRef.current.innerHTML = '';
+    scriptLoadedRef.current = true;
 
-    // PropellerAds script injection using the domain from sw.js
-    const propellerDomain = '3nbf4.com';
+    // Create container for the ad
+    const adContainer = document.createElement('div');
+    adContainer.id = `container-${zoneId}-${Date.now()}`;
+    containerRef.current.appendChild(adContainer);
+
+    // PropellerAds uses different script patterns
+    // Method 1: Direct script tag with zone ID
     const script = document.createElement('script');
     script.async = true;
     script.setAttribute('data-cfasync', 'false');
     
-    if (format === 'banner') {
-      // Banner ads script
-      script.src = `//${propellerDomain}/act/files/tag.min.js?z=${zoneId}`;
-      
-      const container = document.createElement('div');
-      container.id = `container-${zoneId}`;
-      containerRef.current.appendChild(container);
-      containerRef.current.appendChild(script);
-    } else if (format === 'native') {
-      // Native ads
-      script.src = `//${propellerDomain}/act/files/tag.min.js?z=${zoneId}`;
-      containerRef.current.appendChild(script);
-    } else if (format === 'push') {
-      // Push notification - uses the service worker
-      script.src = `//${propellerDomain}/act/files/tag.min.js?z=${zoneId}`;
-      containerRef.current.appendChild(script);
+    // Use the correct PropellerAds script URL format
+    if (format === 'banner' || format === 'native') {
+      // Banner/Native format - uses tag.min.js
+      script.src = `https://3nbf4.com/act/files/tag.min.js?z=${zoneId}`;
+    } else {
+      // Push notification format
+      script.src = `https://3nbf4.com/pfe/current/tag.min.js?z=${zoneId}`;
     }
+    
+    script.onerror = () => {
+      console.log('PropellerAds script load error, trying alternative method');
+      // Fallback: Try inline script method
+      const inlineScript = document.createElement('script');
+      inlineScript.type = 'text/javascript';
+      inlineScript.innerHTML = `
+        (function(d,z,s){
+          s.src='https://'+d+'/401/'+z;
+          try{(document.body||document.documentElement).appendChild(s)}catch(e){}
+        })('vemtoutcheeg.com','${zoneId}',document.createElement('script'));
+      `;
+      containerRef.current?.appendChild(inlineScript);
+    };
+
+    containerRef.current.appendChild(script);
 
     return () => {
-      if (containerRef.current) {
-        containerRef.current.innerHTML = '';
-      }
+      scriptLoadedRef.current = false;
     };
   }, [zoneId, format]);
 
   return (
-    <div ref={containerRef} className="propellerads-container min-h-[50px]" />
+    <div 
+      ref={containerRef} 
+      className="propellerads-container min-h-[90px] w-full flex items-center justify-center bg-muted/20 rounded-lg border border-border/30"
+    >
+      <span className="text-xs text-muted-foreground">Chargement pub...</span>
+    </div>
   );
 };
 

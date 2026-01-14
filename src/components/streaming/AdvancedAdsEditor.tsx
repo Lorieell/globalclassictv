@@ -91,8 +91,19 @@ const SlideAdEditor = ({ ad, onUpdate, onRemove, onMove, isFirst, isLast }: Slid
 
   const slideType = ad.slideType || 'images';
 
+  // Check if ad has valid content
+  const hasValidContent = slideType === 'propellerads' 
+    ? !!ad.propellerZoneId 
+    : ad.images.length > 0;
+
   return (
-    <div className="bg-muted/30 border border-border/50 rounded-lg p-4 space-y-4">
+    <div className={`border rounded-lg p-4 space-y-4 transition-all ${
+      ad.enabled 
+        ? hasValidContent 
+          ? 'bg-green-500/10 border-green-500/50' 
+          : 'bg-yellow-500/10 border-yellow-500/50'
+        : 'bg-muted/30 border-border/50'
+    }`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <GripVertical className="text-muted-foreground" size={18} />
@@ -100,6 +111,22 @@ const SlideAdEditor = ({ ad, onUpdate, onRemove, onMove, isFirst, isLast }: Slid
             <h5 className="font-medium text-foreground flex items-center gap-2">
               <RotateCcw size={14} />
               Pub en Slide
+              {/* Status indicator */}
+              {ad.enabled ? (
+                hasValidContent ? (
+                  <span className="px-1.5 py-0.5 text-[10px] bg-green-500/20 text-green-500 rounded-full font-medium">
+                    ✓ Active
+                  </span>
+                ) : (
+                  <span className="px-1.5 py-0.5 text-[10px] bg-yellow-500/20 text-yellow-500 rounded-full font-medium">
+                    ⚠ Config manquante
+                  </span>
+                )
+              ) : (
+                <span className="px-1.5 py-0.5 text-[10px] bg-muted text-muted-foreground rounded-full font-medium">
+                  Désactivée
+                </span>
+              )}
             </h5>
             <p className="text-xs text-muted-foreground">Images ou PropellerAds</p>
           </div>
@@ -352,8 +379,21 @@ const StaticAdEditor = ({ ad, onUpdate, onRemove, onMove, isFirst, isLast, side 
     }
   };
 
+  // Check if ad has valid content
+  const hasValidContent = ad.adType === 'propellerads' 
+    ? !!ad.propellerZoneId 
+    : ad.adType === 'adsense' 
+      ? !!ad.adsenseCode 
+      : !!ad.imageUrl;
+
   return (
-    <div className="bg-muted/30 border border-border/50 rounded-lg p-4 space-y-4">
+    <div className={`border rounded-lg p-4 space-y-4 transition-all ${
+      ad.enabled 
+        ? hasValidContent 
+          ? 'bg-green-500/10 border-green-500/50' 
+          : 'bg-yellow-500/10 border-yellow-500/50'
+        : 'bg-muted/30 border-border/50'
+    }`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <GripVertical className="text-muted-foreground" size={18} />
@@ -361,6 +401,22 @@ const StaticAdEditor = ({ ad, onUpdate, onRemove, onMove, isFirst, isLast, side 
             <h5 className="font-medium text-foreground flex items-center gap-2">
               <ImageIcon size={14} />
               Pub Statique
+              {/* Status indicator */}
+              {ad.enabled ? (
+                hasValidContent ? (
+                  <span className="px-1.5 py-0.5 text-[10px] bg-green-500/20 text-green-500 rounded-full font-medium">
+                    ✓ Active
+                  </span>
+                ) : (
+                  <span className="px-1.5 py-0.5 text-[10px] bg-yellow-500/20 text-yellow-500 rounded-full font-medium">
+                    ⚠ Config manquante
+                  </span>
+                )
+              ) : (
+                <span className="px-1.5 py-0.5 text-[10px] bg-muted text-muted-foreground rounded-full font-medium">
+                  Désactivée
+                </span>
+              )}
             </h5>
             <p className="text-xs text-muted-foreground">Image, AdSense ou PropellerAds</p>
           </div>

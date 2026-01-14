@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { Upload, X, Plus, ArrowUp, ArrowDown, Link2, Image as ImageIcon, Code, Loader2, Save, Trash2, GripVertical, RotateCcw } from 'lucide-react';
+import { Upload, X, Plus, ArrowUp, ArrowDown, Link2, Image as ImageIcon, Code, Loader2, Save, Trash2, GripVertical, RotateCcw, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -712,7 +712,150 @@ const SideAdsEditor = ({ side, ads, onAddSlide, onAddStatic, onUpdateAd, onRemov
   );
 };
 
+// Preview component showing ad placement mockup
+const AdPreviewMockup = ({ settings }: { settings: { left: { ads: Ad[] }; right: { ads: Ad[] }; heroSyncEnabled: boolean } }) => {
+  const getActiveAdsCount = (ads: Ad[]) => ads.filter(ad => {
+    if (!ad.enabled) return false;
+    if (ad.type === 'slide') {
+      const slideType = ad.slideType || 'images';
+      return slideType === 'propellerads' ? !!ad.propellerZoneId : ad.images.length > 0;
+    }
+    if (ad.type === 'static') {
+      if (ad.adType === 'adsense') return !!ad.adsenseCode;
+      if (ad.adType === 'propellerads') return !!ad.propellerZoneId;
+      return !!ad.imageUrl;
+    }
+    return false;
+  }).length;
+
+  const leftActiveCount = getActiveAdsCount(settings.left.ads);
+  const rightActiveCount = getActiveAdsCount(settings.right.ads);
+
+  const renderAdPlaceholder = (ad: Ad, index: number) => {
+    const isActive = ad.enabled;
+    const hasContent = ad.type === 'slide' 
+      ? (ad.slideType === 'propellerads' ? !!ad.propellerZoneId : ad.images.length > 0)
+      : (ad.adType === 'propellerads' ? !!ad.propellerZoneId : ad.adType === 'adsense' ? !!ad.adsenseCode : !!ad.imageUrl);
+    
+    const adType = ad.type === 'slide' 
+      ? (ad.slideType === 'propellerads' ? 'Propeller' : 'Slide')
+      : (ad.adType === 'propellerads' ? 'Propeller' : ad.adType === 'adsense' ? 'AdSense' : 'Image');
+
+    return (
+      <div
+        key={ad.id}
+        className={`rounded border-2 border-dashed p-2 text-center transition-all ${
+          isActive && hasContent
+            ? 'border-green-500 bg-green-500/20'
+            : isActive && !hasContent
+              ? 'border-yellow-500 bg-yellow-500/20'
+              : 'border-muted-foreground/30 bg-muted/30'
+        }`}
+      >
+        <span className={`text-[9px] font-medium ${
+          isActive && hasContent ? 'text-green-500' : isActive ? 'text-yellow-500' : 'text-muted-foreground'
+        }`}>
+          {adType} {index + 1}
+        </span>
+        {isActive && hasContent && (
+          <div className="text-[8px] text-green-400 mt-0.5">✓ Active</div>
+        )}
+        {isActive && !hasContent && (
+          <div className="text-[8px] text-yellow-400 mt-0.5">⚠ Config</div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold text-foreground text-sm flex items-center gap-2">
+          <Eye size={16} />
+          Aperçu du placement
+        </h3>
+        <div className="flex gap-2 text-xs">
+          <span className="px-2 py-0.5 bg-green-500/20 text-green-500 rounded-full">
+            {leftActiveCount + rightActiveCount} active(s)
+          </span>
+        </div>
+      </div>
+
+      {/* Mockup Layout */}
+      <div className="bg-background rounded-lg border border-border overflow-hidden">
+        {/* Header mockup */}
+        <div className="h-8 bg-muted/50 border-b border-border flex items-center px-3">
+          <div className="w-16 h-3 bg-primary/30 rounded" />
+          <div className="flex-1" />
+          <div className="flex gap-2">
+            <div className="w-8 h-3 bg-muted rounded" />
+            <div className="w-8 h-3 bg-muted rounded" />
+          </div>
+        </div>
+
+        {/* Main content with side ads */}
+        <div className="flex min-h-[200px]">
+          {/* Left ads column */}
+          <div className="w-20 p-1.5 bg-muted/20 border-r border-border/50 space-y-1.5">
+            <div className="text-[8px] text-muted-foreground text-center font-medium mb-1">GAUCHE</div>
+            {settings.left.ads.length > 0 ? (
+              [...settings.left.ads].sort((a, b) => a.order - b.order).map((ad, i) => renderAdPlaceholder(ad, i))
+            ) : (
+              <div className="h-12 rounded border border-dashed border-muted-foreground/20 flex items-center justify-center">
+                <span className="text-[8px] text-muted-foreground">Vide</span>
+              </div>
+            )}
+          </div>
+
+          {/* Main content mockup */}
+          <div className="flex-1 p-3 space-y-2">
+            {/* Hero mockup */}
+            <div className="h-16 bg-gradient-to-r from-primary/20 to-primary/10 rounded-lg flex items-center justify-center border border-primary/20">
+              <span className="text-xs text-primary/60 font-medium">Hero Slider</span>
+            </div>
+            {/* Content grid mockup */}
+            <div className="grid grid-cols-4 gap-1.5">
+              {[...Array(8)].map((_, i) => (
+                <div key={i} className="h-8 bg-muted/40 rounded" />
+              ))}
+            </div>
+          </div>
+
+          {/* Right ads column */}
+          <div className="w-20 p-1.5 bg-muted/20 border-l border-border/50 space-y-1.5">
+            <div className="text-[8px] text-muted-foreground text-center font-medium mb-1">DROITE</div>
+            {settings.right.ads.length > 0 ? (
+              [...settings.right.ads].sort((a, b) => a.order - b.order).map((ad, i) => renderAdPlaceholder(ad, i))
+            ) : (
+              <div className="h-12 rounded border border-dashed border-muted-foreground/20 flex items-center justify-center">
+                <span className="text-[8px] text-muted-foreground">Vide</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Legend */}
+      <div className="flex items-center justify-center gap-4 text-[10px]">
+        <div className="flex items-center gap-1">
+          <div className="w-3 h-3 rounded border-2 border-dashed border-green-500 bg-green-500/20" />
+          <span className="text-muted-foreground">Active</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="w-3 h-3 rounded border-2 border-dashed border-yellow-500 bg-yellow-500/20" />
+          <span className="text-muted-foreground">Config manquante</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="w-3 h-3 rounded border-2 border-dashed border-muted-foreground/30 bg-muted/30" />
+          <span className="text-muted-foreground">Désactivée</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const AdvancedAdsEditor = () => {
+  const [showPreview, setShowPreview] = useState(true);
   const { 
     localSettings, 
     saving, 
@@ -741,8 +884,17 @@ const AdvancedAdsEditor = () => {
           </p>
         </div>
         
-        {/* Save button */}
+        {/* Actions */}
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowPreview(!showPreview)}
+            className="gap-1.5"
+          >
+            {showPreview ? <EyeOff size={14} /> : <Eye size={14} />}
+            {showPreview ? 'Masquer aperçu' : 'Aperçu'}
+          </Button>
           {hasChanges && (
             <Button
               variant="outline"
@@ -767,6 +919,11 @@ const AdvancedAdsEditor = () => {
         </div>
       </div>
 
+      {/* Preview Mockup */}
+      {showPreview && (
+        <AdPreviewMockup settings={localSettings} />
+      )}
+
       {/* Unsaved changes indicator */}
       {hasChanges && (
         <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-2 text-sm text-amber-600 dark:text-amber-400">
@@ -778,10 +935,12 @@ const AdvancedAdsEditor = () => {
       <div className="bg-muted/30 border border-border/30 rounded-lg p-4 text-sm text-muted-foreground">
         <p className="mb-2 font-medium text-foreground">Comment ça marche ?</p>
         <ul className="space-y-1">
-          <li><strong>Pubs en slide</strong> : Jusqu'à 3 images en rotation automatique</li>
-          <li><strong>Pubs statiques</strong> : Image fixe ou code AdSense</li>
+          <li><strong>Pubs en slide</strong> : Jusqu'à 3 images en rotation automatique ou PropellerAds</li>
+          <li><strong>Pubs statiques</strong> : Image fixe, AdSense ou PropellerAds</li>
           <li>Ajoutez autant de pubs que vous voulez sur chaque côté</li>
           <li>Réorganisez-les avec les flèches haut/bas</li>
+          <li className="text-green-500">🟢 Vert = Pub active et configurée</li>
+          <li className="text-yellow-500">🟡 Jaune = Pub active mais configuration manquante</li>
         </ul>
       </div>
 

@@ -66,45 +66,53 @@ const isValidAdSenseCode = (code: string): boolean => {
 };
 
 // Component to render PropellerAds
-const PropellerAdSlot = ({ zoneId, format }: { zoneId: string; format: 'banner' | 'native' | 'push' }) => {
+const PropellerAdSlot = ({ zoneId, format }: { zoneId: string; format: 'banner' | 'native' | 'push' | 'popunder' | 'interstitial' }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const scriptLoadedRef = useRef(false);
 
   useEffect(() => {
-    if (!containerRef.current || !zoneId || scriptLoadedRef.current) return;
+    if (!zoneId || scriptLoadedRef.current) return;
+
+    scriptLoadedRef.current = true;
+
+    // For popunder and interstitial, inject globally (not in container)
+    if (format === 'popunder' || format === 'interstitial') {
+      const script = document.createElement('script');
+      script.async = true;
+      script.setAttribute('data-cfasync', 'false');
+      script.src = `https://alwingulla.com/88/tag.min.js`;
+      script.setAttribute('data-zone', zoneId);
+      document.body.appendChild(script);
+      return;
+    }
+
+    if (!containerRef.current) return;
 
     // Clear previous content
     containerRef.current.innerHTML = '';
-    scriptLoadedRef.current = true;
 
     // Create container for the ad
     const adContainer = document.createElement('div');
     adContainer.id = `container-${zoneId}-${Date.now()}`;
+    adContainer.style.width = '100%';
+    adContainer.style.minHeight = '250px';
     containerRef.current.appendChild(adContainer);
 
-    // PropellerAds uses different script patterns
-    // Method 1: Direct script tag with zone ID
+    // PropellerAds banner/native script
     const script = document.createElement('script');
     script.async = true;
     script.setAttribute('data-cfasync', 'false');
-    
-    // Use the correct PropellerAds script URL format
-    if (format === 'banner' || format === 'native') {
-      // Banner/Native format - uses tag.min.js
-      script.src = `https://3nbf4.com/act/files/tag.min.js?z=${zoneId}`;
-    } else {
-      // Push notification format
-      script.src = `https://3nbf4.com/pfe/current/tag.min.js?z=${zoneId}`;
-    }
+    script.src = `https://alwingulla.com/88/tag.min.js`;
+    script.setAttribute('data-zone', zoneId);
     
     script.onerror = () => {
       console.log('PropellerAds script load error, trying alternative method');
-      // Fallback: Try inline script method
+      // Fallback method
       const inlineScript = document.createElement('script');
       inlineScript.type = 'text/javascript';
       inlineScript.innerHTML = `
         (function(d,z,s){
-          s.src='https://'+d+'/401/'+z;
+          s.src='https://vemtoutcheeg.com/401/'+z;
           try{(document.body||document.documentElement).appendChild(s)}catch(e){}
         })('vemtoutcheeg.com','${zoneId}',document.createElement('script'));
       `;
@@ -118,12 +126,18 @@ const PropellerAdSlot = ({ zoneId, format }: { zoneId: string; format: 'banner' 
     };
   }, [zoneId, format]);
 
+  // Pop-under and interstitial don't need a visible container
+  if (format === 'popunder' || format === 'interstitial') {
+    return null;
+  }
+
   return (
     <div 
       ref={containerRef} 
-      className="propellerads-container min-h-[90px] w-full flex items-center justify-center bg-muted/20 rounded-lg border border-border/30"
+      className="propellerads-container w-full flex items-center justify-center bg-muted/10 rounded-lg overflow-hidden"
+      style={{ minWidth: '160px', minHeight: '250px' }}
     >
-      <span className="text-xs text-muted-foreground">Chargement pub...</span>
+      <span className="text-xs text-muted-foreground animate-pulse">Chargement...</span>
     </div>
   );
 };
@@ -306,7 +320,7 @@ const AdColumn = ({
   if (sortedAds.length === 0) return null;
 
   return (
-    <div className="sticky top-24 space-y-4 max-h-[calc(100vh-120px)] overflow-y-auto scrollbar-hide">
+    <div className="flex flex-col items-center justify-center h-full w-full space-y-4">
       {sortedAds.map((ad) => (
         ad.type === 'slide' ? (
           <SlideAdBanner
@@ -372,9 +386,9 @@ const AdvancedAdLayout = ({
   }
 
   return (
-    <div className="flex w-full">
-      {/* Left ad space */}
-      <div className="hidden lg:flex w-[160px] flex-shrink-0 p-3 justify-center">
+    <div className="flex w-full min-h-screen">
+      {/* Left ad space - Centered vertically */}
+      <div className="hidden xl:flex w-[200px] flex-shrink-0 p-4 items-center justify-center sticky top-0 h-screen">
         {hasLeftAds && (
           <AdColumn
             ads={settings.left.ads}
@@ -389,8 +403,8 @@ const AdvancedAdLayout = ({
         {children}
       </div>
 
-      {/* Right ad space */}
-      <div className="hidden lg:flex w-[160px] flex-shrink-0 p-3 justify-center">
+      {/* Right ad space - Centered vertically */}
+      <div className="hidden xl:flex w-[200px] flex-shrink-0 p-4 items-center justify-center sticky top-0 h-screen">
         {hasRightAds && (
           <AdColumn
             ads={settings.right.ads}

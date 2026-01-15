@@ -15,7 +15,7 @@ export interface SlideAd {
   interval: number; // Interval in seconds
   order: number; // Position order
   propellerZoneId: string; // PropellerAds Zone ID for slide
-  propellerFormat: 'banner' | 'native' | 'push'; // PropellerAds format
+  propellerFormat: 'banner' | 'native' | 'push' | 'popunder' | 'interstitial'; // PropellerAds format
 }
 
 export interface StaticAd {
@@ -27,7 +27,7 @@ export interface StaticAd {
   linkUrl: string;
   adsenseCode: string;
   propellerZoneId: string; // PropellerAds Zone ID
-  propellerFormat: 'banner' | 'native' | 'push'; // PropellerAds format
+  propellerFormat: 'banner' | 'native' | 'push' | 'popunder' | 'interstitial'; // PropellerAds format
   order: number; // Position order
 }
 

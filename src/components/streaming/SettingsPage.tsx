@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, forwardRef, useMemo } from 'react';
-import { ArrowLeft, Link2, Megaphone, Palette, FolderOpen, Instagram, Youtube, Twitter, Sun, Moon, Monitor, Plus, X, Film, Tv, BookOpen, Music, Gamepad2, Mic, Globe, Sparkles, Heart, Skull, Laugh, Zap, Sword, Ghost, Rocket, Theater, Baby, Search, Mountain, Users, List, Check, Pencil, Play, RefreshCw, Loader2, Trash2, Download, Database, Star, Clock, type LucideIcon } from 'lucide-react';
+import { ArrowLeft, Link2, Megaphone, Palette, FolderOpen, Instagram, Youtube, Twitter, Sun, Moon, Monitor, Plus, X, Film, Tv, BookOpen, Music, Gamepad2, Mic, Globe, Sparkles, Heart, Skull, Laugh, Zap, Sword, Ghost, Rocket, Theater, Baby, Search, Mountain, Users, List, Check, Pencil, Play, RefreshCw, Loader2, Trash2, Download, Database, Star, Clock, BarChart3, type LucideIcon } from 'lucide-react';
 import AdvancedAdsEditor from '@/components/streaming/AdvancedAdsEditor';
+import AdStatsPanel from '@/components/streaming/AdStatsPanel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -133,7 +134,7 @@ const defaultContent: ContentSettings = {
   genres: ['Action', 'Comédie', 'Drame', 'Horreur', 'Romance', 'Sci-Fi', 'Thriller'],
 };
 
-type SettingsTab = 'links' | 'ads' | 'appearance' | 'content' | 'liste' | 'update';
+type SettingsTab = 'links' | 'ads' | 'stats' | 'appearance' | 'content' | 'liste' | 'update';
 
 
 // Apply theme to document
@@ -363,6 +364,7 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
   const menuItems = [
     { key: 'links', icon: Link2, label: 'Liens' },
     { key: 'ads', icon: Megaphone, label: 'Pubs' },
+    { key: 'stats', icon: BarChart3, label: 'Stats' },
     { key: 'appearance', icon: Palette, label: 'Apparence' },
     { key: 'content', icon: FolderOpen, label: 'Contenu' },
     { key: 'liste', icon: List, label: 'Liste' },
@@ -867,6 +869,9 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
 
             {/* PUBS - New Advanced Editor */}
             {activeTab === 'ads' && <AdvancedAdsEditor />}
+
+            {/* STATS - Ad Performance Statistics */}
+            {activeTab === 'stats' && <AdStatsPanel />}
             {activeTab === 'appearance' && (
               <div className="space-y-6">
                 <div>

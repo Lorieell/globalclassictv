@@ -1,18 +1,46 @@
-import { useState, useEffect, useRef, ReactNode } from 'react';
+import { useState, useEffect, useRef, ReactNode, useCallback } from 'react';
 import { useAdSettings } from '@/hooks/useAdSettings';
+import { supabase } from '@/integrations/supabase/client';
 import type { SlideAd, StaticAd, Ad, SlideImage } from '@/types/ads';
 
 interface AdvancedAdLayoutProps {
   children: ReactNode;
   showAds?: boolean;
-  heroSlideIndex?: number; // Sync with hero slider
+  heroSlideIndex?: number;
 }
+
+// Track impression
+const trackImpression = async (adId: string, zoneId: string | null, adType: string) => {
+  try {
+    await supabase.from('ad_stats').insert({
+      ad_id: adId,
+      zone_id: zoneId,
+      ad_type: adType,
+      event_type: 'impression'
+    });
+  } catch (e) {
+    // Silently fail - don't break the ad display
+  }
+};
+
+// Track click
+const trackClick = async (adId: string, zoneId: string | null, adType: string) => {
+  try {
+    await supabase.from('ad_stats').insert({
+      ad_id: adId,
+      zone_id: zoneId,
+      ad_type: adType,
+      event_type: 'click'
+    });
+  } catch (e) {
+    // Silently fail
+  }
+};
 
 // Validate that AdSense code only contains legitimate Google AdSense scripts
 const isValidAdSenseCode = (code: string): boolean => {
   if (!code || typeof code !== 'string') return false;
   
-  // Only allow Google AdSense domains
   const allowedDomains = [
     'pagead2.googlesyndication.com',
     'adsbygoogle.js',
@@ -20,7 +48,6 @@ const isValidAdSenseCode = (code: string): boolean => {
     'googlesyndication.com'
   ];
   
-  // Check for script src attributes - only allow Google domains
   const scriptSrcPattern = /<script[^>]*src\s*=\s*["']([^"']+)["'][^>]*>/gi;
   let match;
   while ((match = scriptSrcPattern.exec(code)) !== null) {
@@ -31,32 +58,26 @@ const isValidAdSenseCode = (code: string): boolean => {
     }
   }
   
-  // Check for inline scripts with actual code (not just closing tags)
-  // This pattern matches scripts that have content between opening and closing tags
   const inlineScriptPattern = /<script[^>]*>([^<]+)<\/script>/gi;
   while ((match = inlineScriptPattern.exec(code)) !== null) {
     const scriptContent = match[1].trim();
-    // Only allow the standard adsbygoogle.push call or empty content
     if (scriptContent && !scriptContent.match(/^\s*\(adsbygoogle\s*=\s*window\.adsbygoogle\s*\|\|\s*\[\]\)\.push\s*\(\s*\{\s*\}\s*\)\s*;?\s*$/)) {
       console.warn('AdSense validation failed: unauthorized inline script content');
       return false;
     }
   }
   
-  // Check for event handlers (onclick, onerror, onload, etc.)
   const eventHandlerPattern = /\bon\w+\s*=/i;
   if (eventHandlerPattern.test(code)) {
     console.warn('AdSense validation failed: event handlers not allowed');
     return false;
   }
   
-  // Check for javascript: URLs
   if (/javascript:/i.test(code)) {
     console.warn('AdSense validation failed: javascript: URLs not allowed');
     return false;
   }
   
-  // Check for data: URLs (can be used for XSS)
   if (/data:/i.test(code)) {
     console.warn('AdSense validation failed: data: URLs not allowed');
     return false;
@@ -65,23 +86,40 @@ const isValidAdSenseCode = (code: string): boolean => {
   return true;
 };
 
-// Component to render PropellerAds
-const PropellerAdSlot = ({ zoneId, format }: { zoneId: string; format: 'banner' | 'native' | 'push' | 'popunder' | 'interstitial' }) => {
+// PropellerAds Component - Fixed implementation
+const PropellerAdSlot = ({ 
+  zoneId, 
+  format,
+  adId 
+}: { 
+  zoneId: string; 
+  format: 'banner' | 'native' | 'push' | 'popunder' | 'interstitial';
+  adId: string;
+}) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const scriptLoadedRef = useRef(false);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [hasError, setHasError] = useState(false);
 
   useEffect(() => {
-    if (!zoneId || scriptLoadedRef.current) return;
+    if (!zoneId) return;
 
-    scriptLoadedRef.current = true;
+    // Track impression
+    trackImpression(adId, zoneId, `propeller-${format}`);
 
-    // For popunder and interstitial, inject globally (not in container)
+    // For popunder and interstitial, inject globally
     if (format === 'popunder' || format === 'interstitial') {
+      const existingScript = document.querySelector(`script[data-zone="${zoneId}"]`);
+      if (existingScript) return;
+
       const script = document.createElement('script');
       script.async = true;
       script.setAttribute('data-cfasync', 'false');
-      script.src = `https://alwingulla.com/88/tag.min.js`;
       script.setAttribute('data-zone', zoneId);
+      
+      // Use the correct PropellerAds onclick script
+      script.innerHTML = `
+        (function(d,z,s){s.src='https://'+d+'/400/'+z;try{(document.body||document.documentElement).appendChild(s)}catch(e){}})('vemtoutcheeg.com','${zoneId}',document.createElement('script'));
+      `;
       document.body.appendChild(script);
       return;
     }
@@ -91,42 +129,51 @@ const PropellerAdSlot = ({ zoneId, format }: { zoneId: string; format: 'banner' 
     // Clear previous content
     containerRef.current.innerHTML = '';
 
-    // Create container for the ad
+    // Create ad container with proper sizing
     const adContainer = document.createElement('div');
-    adContainer.id = `container-${zoneId}-${Date.now()}`;
-    adContainer.style.width = '100%';
-    adContainer.style.minHeight = '250px';
+    adContainer.id = `ad-container-${zoneId}`;
+    adContainer.style.cssText = 'width:160px;height:600px;margin:0 auto;';
     containerRef.current.appendChild(adContainer);
 
-    // PropellerAds banner/native script
+    // Method 1: Standard PropellerAds script injection
     const script = document.createElement('script');
-    script.async = true;
-    script.setAttribute('data-cfasync', 'false');
-    script.src = `https://alwingulla.com/88/tag.min.js`;
-    script.setAttribute('data-zone', zoneId);
-    
-    script.onerror = () => {
-      console.log('PropellerAds script load error, trying alternative method');
-      // Fallback method
-      const inlineScript = document.createElement('script');
-      inlineScript.type = 'text/javascript';
-      inlineScript.innerHTML = `
+    script.type = 'text/javascript';
+    script.innerHTML = `
+      atOptions = {
+        'key' : '${zoneId}',
+        'format' : 'iframe',
+        'height' : 600,
+        'width' : 160,
+        'params' : {}
+      };
+    `;
+    adContainer.appendChild(script);
+
+    const script2 = document.createElement('script');
+    script2.type = 'text/javascript';
+    script2.src = `https://www.topcreativeformat.com/${zoneId}/invoke.js`;
+    script2.async = true;
+    script2.onerror = () => {
+      console.log('PropellerAds invoke.js failed, trying alternative');
+      setHasError(true);
+      
+      // Alternative method
+      const altScript = document.createElement('script');
+      altScript.type = 'text/javascript';
+      altScript.innerHTML = `
         (function(d,z,s){
           s.src='https://vemtoutcheeg.com/401/'+z;
           try{(document.body||document.documentElement).appendChild(s)}catch(e){}
         })('vemtoutcheeg.com','${zoneId}',document.createElement('script'));
       `;
-      containerRef.current?.appendChild(inlineScript);
+      adContainer.appendChild(altScript);
     };
+    script2.onload = () => setIsLoaded(true);
+    adContainer.appendChild(script2);
 
-    containerRef.current.appendChild(script);
+  }, [zoneId, format, adId]);
 
-    return () => {
-      scriptLoadedRef.current = false;
-    };
-  }, [zoneId, format]);
-
-  // Pop-under and interstitial don't need a visible container
+  // Popunder/interstitial don't show visually
   if (format === 'popunder' || format === 'interstitial') {
     return null;
   }
@@ -134,26 +181,38 @@ const PropellerAdSlot = ({ zoneId, format }: { zoneId: string; format: 'banner' 
   return (
     <div 
       ref={containerRef} 
-      className="propellerads-container w-full flex items-center justify-center bg-muted/10 rounded-lg overflow-hidden"
-      style={{ minWidth: '160px', minHeight: '250px' }}
+      className="propellerads-container flex items-center justify-center rounded-lg overflow-hidden"
+      style={{ 
+        width: '160px', 
+        minHeight: '300px',
+        maxHeight: '600px',
+        backgroundColor: hasError ? 'transparent' : 'rgba(0,0,0,0.1)'
+      }}
     >
-      <span className="text-xs text-muted-foreground animate-pulse">Chargement...</span>
+      {!isLoaded && !hasError && (
+        <div className="flex flex-col items-center gap-2 p-4">
+          <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <span className="text-xs text-muted-foreground">Pub</span>
+        </div>
+      )}
     </div>
   );
 };
 
-// Component to render AdSense code safely
-const AdSenseSlot = ({ code }: { code: string }) => {
+// AdSense Component
+const AdSenseSlot = ({ code, adId }: { code: string; adId: string }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!containerRef.current || !code) return;
     
-    // SECURITY: Validate AdSense code before rendering
     if (!isValidAdSenseCode(code)) {
       console.error('Invalid AdSense code detected - refusing to render');
       return;
     }
+
+    // Track impression
+    trackImpression(adId, null, 'adsense');
     
     containerRef.current.innerHTML = '';
     
@@ -179,9 +238,9 @@ const AdSenseSlot = ({ code }: { code: string }) => {
     } catch (e) {
       console.log('AdSense push error:', e);
     }
-  }, [code]);
+  }, [code, adId]);
 
-  return <div ref={containerRef} className="adsense-container" />;
+  return <div ref={containerRef} className="adsense-container" style={{ minHeight: '250px' }} />;
 };
 
 // Slide Ad Component with auto-rotation
@@ -193,20 +252,16 @@ const SlideAdBanner = ({
   syncIndex?: number;
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
-
-  // Check if this is a PropellerAds slide
   const slideType = ad.slideType || 'images';
 
   useEffect(() => {
     if (slideType === 'propellerads') return;
     
-    // If synced with hero, use hero's index
-    if (syncIndex !== undefined) {
+    if (syncIndex !== undefined && ad.images.length > 0) {
       setCurrentIndex(syncIndex % ad.images.length);
       return;
     }
 
-    // Otherwise, auto-rotate
     if (ad.images.length <= 1) return;
     
     const timer = setInterval(() => {
@@ -216,9 +271,9 @@ const SlideAdBanner = ({
     return () => clearInterval(timer);
   }, [ad.images.length, ad.interval, syncIndex, slideType]);
 
-  // If PropellerAds type, render PropellerAds component
+  // PropellerAds type
   if (slideType === 'propellerads' && ad.propellerZoneId) {
-    return <PropellerAdSlot zoneId={ad.propellerZoneId} format={ad.propellerFormat || 'banner'} />;
+    return <PropellerAdSlot zoneId={ad.propellerZoneId} format={ad.propellerFormat || 'banner'} adId={ad.id} />;
   }
 
   if (ad.images.length === 0) return null;
@@ -226,21 +281,25 @@ const SlideAdBanner = ({
   const currentImage = ad.images[currentIndex];
   if (!currentImage) return null;
 
+  const handleClick = () => {
+    trackClick(ad.id, null, 'slide-image');
+  };
+
   return (
-    <div className="relative w-full">
+    <div className="relative w-full max-w-[160px]">
       <a
         href={currentImage.linkUrl || '#'}
         target="_blank"
         rel="noopener noreferrer"
         className="block transition-opacity duration-500"
+        onClick={handleClick}
       >
         <img
           src={currentImage.imageUrl}
           alt="Publicité"
-          className="w-full max-h-[300px] object-contain rounded-lg hover:opacity-90 transition-opacity shadow-lg"
+          className="w-full max-h-[400px] object-contain rounded-lg hover:opacity-90 transition-opacity shadow-lg"
         />
       </a>
-      {/* Indicators */}
       {ad.images.length > 1 && (
         <div className="flex justify-center gap-1.5 mt-2">
           {ad.images.map((_, i) => (
@@ -261,12 +320,16 @@ const SlideAdBanner = ({
 
 // Static Ad Component
 const StaticAdBanner = ({ ad }: { ad: StaticAd }) => {
+  const handleClick = () => {
+    trackClick(ad.id, ad.propellerZoneId || null, ad.adType);
+  };
+
   if (ad.adType === 'propellerads' && ad.propellerZoneId) {
-    return <PropellerAdSlot zoneId={ad.propellerZoneId} format={ad.propellerFormat || 'banner'} />;
+    return <PropellerAdSlot zoneId={ad.propellerZoneId} format={ad.propellerFormat || 'banner'} adId={ad.id} />;
   }
 
   if (ad.adType === 'adsense' && ad.adsenseCode) {
-    return <AdSenseSlot code={ad.adsenseCode} />;
+    return <AdSenseSlot code={ad.adsenseCode} adId={ad.id} />;
   }
 
   if (ad.adType === 'image' && ad.imageUrl) {
@@ -275,12 +338,13 @@ const StaticAdBanner = ({ ad }: { ad: StaticAd }) => {
         href={ad.linkUrl || '#'}
         target="_blank"
         rel="noopener noreferrer"
-        className="block"
+        className="block max-w-[160px]"
+        onClick={handleClick}
       >
         <img
           src={ad.imageUrl}
           alt="Publicité"
-          className="w-full max-h-[300px] object-contain rounded-lg hover:opacity-90 transition-opacity shadow-lg"
+          className="w-full max-h-[400px] object-contain rounded-lg hover:opacity-90 transition-opacity shadow-lg"
         />
       </a>
     );
@@ -299,7 +363,6 @@ const AdColumn = ({
   heroSyncEnabled: boolean;
   heroSlideIndex?: number;
 }) => {
-  // Sort by order and filter enabled ads
   const sortedAds = [...ads]
     .filter(ad => ad.enabled)
     .filter(ad => {
@@ -320,7 +383,7 @@ const AdColumn = ({
   if (sortedAds.length === 0) return null;
 
   return (
-    <div className="flex flex-col items-center justify-center h-full w-full space-y-4">
+    <div className="flex flex-col items-center justify-center gap-4 w-full">
       {sortedAds.map((ad) => (
         ad.type === 'slide' ? (
           <SlideAdBanner
@@ -350,7 +413,7 @@ const AdvancedAdLayout = ({
     return <>{children}</>;
   }
 
-  // Check if there are any active ads
+  // Check for active ads
   const hasLeftAds = settings.left.ads.some(ad => {
     if (!ad.enabled) return false;
     if (ad.type === 'slide') {
@@ -386,33 +449,33 @@ const AdvancedAdLayout = ({
   }
 
   return (
-    <div className="flex w-full min-h-screen">
-      {/* Left ad space - Centered vertically */}
-      <div className="hidden xl:flex w-[200px] flex-shrink-0 p-4 items-center justify-center sticky top-0 h-screen">
-        {hasLeftAds && (
+    <div className="flex w-full">
+      {/* Left ad column - centered vertically */}
+      {hasLeftAds && (
+        <div className="hidden xl:flex w-[180px] flex-shrink-0 items-center justify-center sticky top-20 self-start h-[calc(100vh-80px)] py-4">
           <AdColumn
             ads={settings.left.ads}
             heroSyncEnabled={settings.heroSyncEnabled}
             heroSlideIndex={heroSlideIndex}
           />
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Main content */}
       <div className="flex-1 min-w-0">
         {children}
       </div>
 
-      {/* Right ad space - Centered vertically */}
-      <div className="hidden xl:flex w-[200px] flex-shrink-0 p-4 items-center justify-center sticky top-0 h-screen">
-        {hasRightAds && (
+      {/* Right ad column - centered vertically */}
+      {hasRightAds && (
+        <div className="hidden xl:flex w-[180px] flex-shrink-0 items-center justify-center sticky top-20 self-start h-[calc(100vh-80px)] py-4">
           <AdColumn
             ads={settings.right.ads}
             heroSyncEnabled={settings.heroSyncEnabled}
             heroSlideIndex={heroSlideIndex}
           />
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

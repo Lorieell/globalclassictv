@@ -307,7 +307,7 @@ const SlideAdEditor = ({ ad, onUpdate, onRemove, onMove, isFirst, isLast }: Slid
 
               <div className="space-y-1">
                 <Label className="text-xs">Format de publicité</Label>
-                <div className="grid grid-cols-3 gap-1">
+                <div className="grid grid-cols-2 gap-1">
                   <button
                     type="button"
                     onClick={() => onUpdate({ propellerFormat: 'banner' })}
@@ -332,16 +332,32 @@ const SlideAdEditor = ({ ad, onUpdate, onRemove, onMove, isFirst, isLast }: Slid
                   </button>
                   <button
                     type="button"
-                    onClick={() => onUpdate({ propellerFormat: 'push' })}
+                    onClick={() => onUpdate({ propellerFormat: 'popunder' })}
                     className={`py-1.5 px-2 rounded text-xs border transition-all ${
-                      ad.propellerFormat === 'push'
-                        ? 'border-orange-500 bg-orange-500/20 text-orange-400'
+                      ad.propellerFormat === 'popunder'
+                        ? 'border-purple-500 bg-purple-500/20 text-purple-400'
                         : 'border-border text-muted-foreground hover:border-muted-foreground'
                     }`}
                   >
-                    Push
+                    Pop-under
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onUpdate({ propellerFormat: 'interstitial' })}
+                    className={`py-1.5 px-2 rounded text-xs border transition-all ${
+                      ad.propellerFormat === 'interstitial'
+                        ? 'border-purple-500 bg-purple-500/20 text-purple-400'
+                        : 'border-border text-muted-foreground hover:border-muted-foreground'
+                    }`}
+                  >
+                    Interstitiel
                   </button>
                 </div>
+                {(ad.propellerFormat === 'popunder' || ad.propellerFormat === 'interstitial') && (
+                  <p className="text-[10px] text-purple-400 mt-1">
+                    ⚡ Ce format s'affiche en plein écran ou dans un nouvel onglet
+                  </p>
+                )}
               </div>
 
               <p className="text-[10px] text-muted-foreground">
@@ -590,7 +606,7 @@ const StaticAdEditor = ({ ad, onUpdate, onRemove, onMove, isFirst, isLast, side 
 
               <div className="space-y-1">
                 <Label className="text-xs">Format de publicité</Label>
-                <div className="grid grid-cols-3 gap-1">
+                <div className="grid grid-cols-2 gap-1">
                   <button
                     type="button"
                     onClick={() => onUpdate({ propellerFormat: 'banner' })}
@@ -615,16 +631,32 @@ const StaticAdEditor = ({ ad, onUpdate, onRemove, onMove, isFirst, isLast, side 
                   </button>
                   <button
                     type="button"
-                    onClick={() => onUpdate({ propellerFormat: 'push' })}
+                    onClick={() => onUpdate({ propellerFormat: 'popunder' })}
                     className={`py-1.5 px-2 rounded text-xs border transition-all ${
-                      ad.propellerFormat === 'push'
-                        ? 'border-orange-500 bg-orange-500/20 text-orange-400'
+                      ad.propellerFormat === 'popunder'
+                        ? 'border-purple-500 bg-purple-500/20 text-purple-400'
                         : 'border-border text-muted-foreground hover:border-muted-foreground'
                     }`}
                   >
-                    Push
+                    Pop-under
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onUpdate({ propellerFormat: 'interstitial' })}
+                    className={`py-1.5 px-2 rounded text-xs border transition-all ${
+                      ad.propellerFormat === 'interstitial'
+                        ? 'border-purple-500 bg-purple-500/20 text-purple-400'
+                        : 'border-border text-muted-foreground hover:border-muted-foreground'
+                    }`}
+                  >
+                    Interstitiel
                   </button>
                 </div>
+                {(ad.propellerFormat === 'popunder' || ad.propellerFormat === 'interstitial') && (
+                  <p className="text-[10px] text-purple-400 mt-1">
+                    ⚡ Ce format s'affiche en plein écran ou dans un nouvel onglet
+                  </p>
+                )}
               </div>
 
               <p className="text-[10px] text-muted-foreground">

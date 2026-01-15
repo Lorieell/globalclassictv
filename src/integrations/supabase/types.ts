@@ -32,6 +32,33 @@ export type Database = {
         }
         Relationships: []
       }
+      ad_stats: {
+        Row: {
+          ad_id: string
+          ad_type: string
+          created_at: string
+          event_type: string
+          id: string
+          zone_id: string | null
+        }
+        Insert: {
+          ad_id: string
+          ad_type: string
+          created_at?: string
+          event_type: string
+          id?: string
+          zone_id?: string | null
+        }
+        Update: {
+          ad_id?: string
+          ad_type?: string
+          created_at?: string
+          event_type?: string
+          id?: string
+          zone_id?: string | null
+        }
+        Relationships: []
+      }
       deleted_tmdb_ids: {
         Row: {
           deleted_at: string

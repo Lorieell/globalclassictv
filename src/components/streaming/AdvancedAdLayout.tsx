@@ -86,7 +86,26 @@ const isValidAdSenseCode = (code: string): boolean => {
   return true;
 };
 
-// PropellerAds Component - Fixed implementation with safe cleanup
+// Fallback ad images
+const FALLBACK_ADS = [
+  {
+    imageUrl: 'https://images.unsplash.com/photo-1611532736597-de2d4265fba3?w=160&h=600&fit=crop',
+    linkUrl: '#',
+    alt: 'Publicité'
+  },
+  {
+    imageUrl: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=160&h=600&fit=crop',
+    linkUrl: '#',
+    alt: 'Publicité'
+  },
+  {
+    imageUrl: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=160&h=600&fit=crop',
+    linkUrl: '#',
+    alt: 'Publicité'
+  }
+];
+
+// PropellerAds Component - Fixed implementation with safe cleanup and fallback
 const PropellerAdSlot = ({ 
   zoneId, 
   format,
@@ -100,12 +119,25 @@ const PropellerAdSlot = ({
   const iframeContainerRef = useRef<HTMLDivElement | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const [showFallback, setShowFallback] = useState(false);
   const mountedRef = useRef(true);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Get a random fallback ad
+  const fallbackAd = FALLBACK_ADS[Math.floor(Math.random() * FALLBACK_ADS.length)];
 
   useEffect(() => {
     mountedRef.current = true;
     
     if (!zoneId) return;
+
+    // Set a 5-second timeout for fallback
+    timeoutRef.current = setTimeout(() => {
+      if (mountedRef.current && !isLoaded) {
+        console.log('PropellerAds timeout - showing fallback');
+        setShowFallback(true);
+      }
+    }, 5000);
 
     // Track impression
     trackImpression(adId, zoneId, `propeller-${format}`);
@@ -150,6 +182,7 @@ const PropellerAdSlot = ({
         const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
         if (!iframeDoc) {
           setHasError(true);
+          setShowFallback(true);
           return;
         }
         
@@ -180,11 +213,15 @@ const PropellerAdSlot = ({
         
         if (mountedRef.current) {
           setIsLoaded(true);
+          if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+          }
         }
       } catch (e) {
         console.log('PropellerAds iframe error:', e);
         if (mountedRef.current) {
           setHasError(true);
+          setShowFallback(true);
         }
       }
     };
@@ -192,6 +229,7 @@ const PropellerAdSlot = ({
     iframe.onerror = () => {
       if (mountedRef.current) {
         setHasError(true);
+        setShowFallback(true);
       }
     };
     
@@ -201,6 +239,9 @@ const PropellerAdSlot = ({
     // Cleanup function that safely removes elements
     return () => {
       mountedRef.current = false;
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
       // Don't try to remove children - just clear the reference
       // React will handle the container removal
       if (iframeContainerRef.current) {
@@ -221,6 +262,28 @@ const PropellerAdSlot = ({
   // Popunder/interstitial don't show visually
   if (format === 'popunder' || format === 'interstitial') {
     return null;
+  }
+
+  // Show fallback image
+  if (showFallback) {
+    return (
+      <div className="fallback-ad flex items-center justify-center rounded-lg overflow-hidden" style={{ width: '160px' }}>
+        <a
+          href={fallbackAd.linkUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block"
+          onClick={() => trackClick(adId, zoneId, 'fallback')}
+        >
+          <img
+            src={fallbackAd.imageUrl}
+            alt={fallbackAd.alt}
+            className="w-full max-h-[400px] object-cover rounded-lg hover:opacity-90 transition-opacity shadow-lg"
+            style={{ width: '160px', height: 'auto' }}
+          />
+        </a>
+      </div>
+    );
   }
 
   return (

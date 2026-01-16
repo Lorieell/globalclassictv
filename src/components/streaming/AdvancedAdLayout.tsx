@@ -86,7 +86,7 @@ const isValidAdSenseCode = (code: string): boolean => {
   return true;
 };
 
-// PropellerAds Component - Fixed implementation
+// PropellerAds Component - Fixed implementation with safe cleanup
 const PropellerAdSlot = ({ 
   zoneId, 
   format,
@@ -97,10 +97,14 @@ const PropellerAdSlot = ({
   adId: string;
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const iframeContainerRef = useRef<HTMLDivElement | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const mountedRef = useRef(true);
 
   useEffect(() => {
+    mountedRef.current = true;
+    
     if (!zoneId) return;
 
     // Track impression
@@ -116,7 +120,6 @@ const PropellerAdSlot = ({
       script.setAttribute('data-cfasync', 'false');
       script.setAttribute('data-zone', zoneId);
       
-      // Use the correct PropellerAds onclick script
       script.innerHTML = `
         (function(d,z,s){s.src='https://'+d+'/400/'+z;try{(document.body||document.documentElement).appendChild(s)}catch(e){}})('vemtoutcheeg.com','${zoneId}',document.createElement('script'));
       `;
@@ -126,51 +129,93 @@ const PropellerAdSlot = ({
 
     if (!containerRef.current) return;
 
-    // Clear previous content
-    containerRef.current.innerHTML = '';
-
-    // Create ad container with proper sizing
-    const adContainer = document.createElement('div');
-    adContainer.id = `ad-container-${zoneId}`;
-    adContainer.style.cssText = 'width:160px;height:600px;margin:0 auto;';
-    containerRef.current.appendChild(adContainer);
-
-    // Method 1: Standard PropellerAds script injection
-    const script = document.createElement('script');
-    script.type = 'text/javascript';
-    script.innerHTML = `
-      atOptions = {
-        'key' : '${zoneId}',
-        'format' : 'iframe',
-        'height' : 600,
-        'width' : 160,
-        'params' : {}
-      };
-    `;
-    adContainer.appendChild(script);
-
-    const script2 = document.createElement('script');
-    script2.type = 'text/javascript';
-    script2.src = `https://www.topcreativeformat.com/${zoneId}/invoke.js`;
-    script2.async = true;
-    script2.onerror = () => {
-      console.log('PropellerAds invoke.js failed, trying alternative');
-      setHasError(true);
+    // Create a separate container for ad content that we manage manually
+    const adWrapper = document.createElement('div');
+    adWrapper.id = `ad-wrapper-${zoneId}-${Date.now()}`;
+    adWrapper.style.cssText = 'width:160px;min-height:300px;margin:0 auto;display:flex;align-items:center;justify-content:center;';
+    
+    // Store reference for cleanup
+    iframeContainerRef.current = adWrapper;
+    
+    // Use an iframe approach to isolate ad scripts from React DOM
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'width:160px;height:600px;border:none;overflow:hidden;';
+    iframe.scrolling = 'no';
+    iframe.setAttribute('frameborder', '0');
+    
+    iframe.onload = () => {
+      if (!mountedRef.current) return;
       
-      // Alternative method
-      const altScript = document.createElement('script');
-      altScript.type = 'text/javascript';
-      altScript.innerHTML = `
-        (function(d,z,s){
-          s.src='https://vemtoutcheeg.com/401/'+z;
-          try{(document.body||document.documentElement).appendChild(s)}catch(e){}
-        })('vemtoutcheeg.com','${zoneId}',document.createElement('script'));
-      `;
-      adContainer.appendChild(altScript);
+      try {
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+        if (!iframeDoc) {
+          setHasError(true);
+          return;
+        }
+        
+        iframeDoc.open();
+        iframeDoc.write(`
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <style>
+              body { margin: 0; padding: 0; overflow: hidden; background: transparent; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+            </style>
+          </head>
+          <body>
+            <script type="text/javascript">
+              atOptions = {
+                'key' : '${zoneId}',
+                'format' : 'iframe',
+                'height' : 600,
+                'width' : 160,
+                'params' : {}
+              };
+            </script>
+            <script type="text/javascript" src="https://www.topcreativeformat.com/${zoneId}/invoke.js" async></script>
+          </body>
+          </html>
+        `);
+        iframeDoc.close();
+        
+        if (mountedRef.current) {
+          setIsLoaded(true);
+        }
+      } catch (e) {
+        console.log('PropellerAds iframe error:', e);
+        if (mountedRef.current) {
+          setHasError(true);
+        }
+      }
     };
-    script2.onload = () => setIsLoaded(true);
-    adContainer.appendChild(script2);
+    
+    iframe.onerror = () => {
+      if (mountedRef.current) {
+        setHasError(true);
+      }
+    };
+    
+    adWrapper.appendChild(iframe);
+    containerRef.current.appendChild(adWrapper);
 
+    // Cleanup function that safely removes elements
+    return () => {
+      mountedRef.current = false;
+      // Don't try to remove children - just clear the reference
+      // React will handle the container removal
+      if (iframeContainerRef.current) {
+        try {
+          // Remove iframe src to stop any pending loads
+          const iframes = iframeContainerRef.current.querySelectorAll('iframe');
+          iframes.forEach(f => {
+            f.src = 'about:blank';
+          });
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+        iframeContainerRef.current = null;
+      }
+    };
   }, [zoneId, format, adId]);
 
   // Popunder/interstitial don't show visually

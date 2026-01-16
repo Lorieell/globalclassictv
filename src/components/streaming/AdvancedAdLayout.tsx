@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef, ReactNode, useCallback } from 'react';
+import { useState, useEffect, useRef, ReactNode, useCallback, createContext, useContext } from 'react';
 import { useAdSettings } from '@/hooks/useAdSettings';
+import { useAdNetworkDetection } from '@/hooks/useAdNetworkDetection';
 import { supabase } from '@/integrations/supabase/client';
 import type { SlideAd, StaticAd, Ad, SlideImage } from '@/types/ads';
 
@@ -8,6 +9,19 @@ interface AdvancedAdLayoutProps {
   showAds?: boolean;
   heroSlideIndex?: number;
 }
+
+// Context for ad network detection
+const AdNetworkContext = createContext<{
+  preferredNetwork: 'propellerads' | 'adsense' | 'fallback';
+  isTestingComplete: boolean;
+  status: { propellerads: boolean | null; adsense: boolean | null };
+}>({
+  preferredNetwork: 'fallback',
+  isTestingComplete: false,
+  status: { propellerads: null, adsense: null },
+});
+
+export const useAdNetworkContext = () => useContext(AdNetworkContext);
 
 // Track impression
 const trackImpression = async (adId: string, zoneId: string | null, adType: string) => {
@@ -105,7 +119,39 @@ const FALLBACK_ADS = [
   }
 ];
 
-// PropellerAds Component - Shows fallback immediately since PropellerAds often blocked
+// Fallback Ad Component
+const FallbackAdSlot = ({ adId, zoneId }: { adId: string; zoneId?: string }) => {
+  const fallbackIndex = adId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % FALLBACK_ADS.length;
+  const fallbackAd = FALLBACK_ADS[fallbackIndex];
+
+  useEffect(() => {
+    trackImpression(adId, zoneId || null, 'fallback');
+  }, [adId, zoneId]);
+
+  return (
+    <div className="fallback-ad flex items-center justify-center rounded-lg overflow-hidden" style={{ width: '160px' }}>
+      <a
+        href={fallbackAd.linkUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block relative group"
+        onClick={() => trackClick(adId, zoneId || null, 'fallback')}
+      >
+        <img
+          src={fallbackAd.imageUrl}
+          alt={fallbackAd.alt}
+          className="w-full h-auto object-cover rounded-lg shadow-lg transition-transform group-hover:scale-105"
+          style={{ width: '160px', minHeight: '200px', maxHeight: '400px' }}
+        />
+        <div className="absolute bottom-2 left-2 bg-black/70 text-white text-[10px] px-2 py-0.5 rounded">
+          Publicité
+        </div>
+      </a>
+    </div>
+  );
+};
+
+// PropellerAds Component - Uses network detection to decide behavior
 const PropellerAdSlot = ({ 
   zoneId, 
   format,
@@ -115,15 +161,34 @@ const PropellerAdSlot = ({
   format: 'banner' | 'native' | 'push' | 'popunder' | 'interstitial';
   adId: string;
 }) => {
-  // Get a stable fallback ad based on adId
-  const fallbackIndex = adId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % FALLBACK_ADS.length;
-  const fallbackAd = FALLBACK_ADS[fallbackIndex];
+  const { preferredNetwork, isTestingComplete, status } = useAdNetworkContext();
+  const [showFallback, setShowFallback] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
+    // Wait for testing to complete
+    if (!isTestingComplete) return;
+
+    // If PropellerAds is blocked, show fallback
+    if (status.propellerads === false) {
+      setShowFallback(true);
+      return;
+    }
+
     // Track impression
     trackImpression(adId, zoneId, `propeller-${format}`);
 
-    // For popunder and interstitial, still try to inject
+    // For visual formats, try to load PropellerAds
+    if (format !== 'popunder' && format !== 'interstitial') {
+      // Set a timeout - if ad doesn't load in 5s, show fallback
+      const timeout = setTimeout(() => {
+        setShowFallback(true);
+      }, 5000);
+
+      return () => clearTimeout(timeout);
+    }
+
+    // For popunder and interstitial, inject script
     if (format === 'popunder' || format === 'interstitial') {
       const existingScript = document.querySelector(`script[data-zone="${zoneId}"]`);
       if (existingScript) return;
@@ -138,33 +203,65 @@ const PropellerAdSlot = ({
       `;
       document.body.appendChild(script);
     }
-  }, [zoneId, format, adId]);
+  }, [zoneId, format, adId, isTestingComplete, status.propellerads]);
 
   // Popunder/interstitial don't show visually
   if (format === 'popunder' || format === 'interstitial') {
     return null;
   }
 
-  // Always show fallback image - PropellerAds scripts are typically blocked
+  // Show fallback if PropellerAds is blocked or loading timeout
+  if (showFallback || status.propellerads === false) {
+    return <FallbackAdSlot adId={adId} zoneId={zoneId} />;
+  }
+
+  // Still testing or waiting for ad to load
+  if (!isTestingComplete) {
+    return (
+      <div className="flex items-center justify-center rounded-lg bg-muted/20 animate-pulse" style={{ width: '160px', height: '300px' }}>
+        <span className="text-xs text-muted-foreground">Chargement...</span>
+      </div>
+    );
+  }
+
+  // Try to render PropellerAds in iframe
   return (
-    <div className="fallback-ad flex items-center justify-center rounded-lg overflow-hidden" style={{ width: '160px' }}>
-      <a
-        href={fallbackAd.linkUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="block relative group"
-        onClick={() => trackClick(adId, zoneId, 'fallback')}
-      >
-        <img
-          src={fallbackAd.imageUrl}
-          alt={fallbackAd.alt}
-          className="w-full h-auto object-cover rounded-lg shadow-lg transition-transform group-hover:scale-105"
-          style={{ width: '160px', minHeight: '200px', maxHeight: '400px' }}
-        />
-        <div className="absolute bottom-2 left-2 bg-black/70 text-white text-[10px] px-2 py-0.5 rounded">
-          Publicité
-        </div>
-      </a>
+    <div className="propeller-ad-container" style={{ width: '160px', minHeight: '200px' }}>
+      <iframe
+        ref={iframeRef}
+        title="Ad"
+        className="w-full border-0 rounded-lg"
+        style={{ minHeight: '300px' }}
+        sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+        srcDoc={`
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <style>body{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:transparent;}</style>
+          </head>
+          <body>
+            <script>(function(d,z,s){s.src='https://'+d+'/400/'+z;try{(document.body||document.documentElement).appendChild(s)}catch(e){}})('vemtoutcheeg.com','${zoneId}',document.createElement('script'));</script>
+          </body>
+          </html>
+        `}
+        onLoad={() => {
+          // Check if iframe has content after a delay
+          setTimeout(() => {
+            try {
+              const iframe = iframeRef.current;
+              if (iframe && iframe.contentDocument) {
+                const body = iframe.contentDocument.body;
+                if (!body || body.children.length <= 1) {
+                  setShowFallback(true);
+                }
+              }
+            } catch (e) {
+              // Cross-origin - can't check, assume it's working
+            }
+          }, 3000);
+        }}
+        onError={() => setShowFallback(true)}
+      />
     </div>
   );
 };
@@ -378,6 +475,18 @@ const AdvancedAdLayout = ({
   heroSlideIndex 
 }: AdvancedAdLayoutProps) => {
   const { settings, loading } = useAdSettings();
+  const { status, preferredNetwork, isTestingComplete, retestNetworks } = useAdNetworkDetection();
+
+  // Log network detection status for debugging
+  useEffect(() => {
+    if (isTestingComplete) {
+      console.log('[AdNetwork] Detection complete:', {
+        propellerads: status.propellerads ? 'available' : 'blocked',
+        adsense: status.adsense ? 'available' : 'blocked',
+        preferred: preferredNetwork,
+      });
+    }
+  }, [isTestingComplete, status, preferredNetwork]);
 
   if (loading || !showAds) {
     return <>{children}</>;
@@ -419,34 +528,36 @@ const AdvancedAdLayout = ({
   }
 
   return (
-    <div className="flex w-full">
-      {/* Left ad column - centered vertically */}
-      {hasLeftAds && (
-        <div className="hidden xl:flex w-[180px] flex-shrink-0 items-center justify-center sticky top-20 self-start h-[calc(100vh-80px)] py-4">
-          <AdColumn
-            ads={settings.left.ads}
-            heroSyncEnabled={settings.heroSyncEnabled}
-            heroSlideIndex={heroSlideIndex}
-          />
-        </div>
-      )}
+    <AdNetworkContext.Provider value={{ preferredNetwork, isTestingComplete, status }}>
+      <div className="flex w-full">
+        {/* Left ad column - centered vertically */}
+        {hasLeftAds && (
+          <div className="hidden xl:flex w-[180px] flex-shrink-0 items-center justify-center sticky top-20 self-start h-[calc(100vh-80px)] py-4">
+            <AdColumn
+              ads={settings.left.ads}
+              heroSyncEnabled={settings.heroSyncEnabled}
+              heroSlideIndex={heroSlideIndex}
+            />
+          </div>
+        )}
 
-      {/* Main content */}
-      <div className="flex-1 min-w-0">
-        {children}
+        {/* Main content */}
+        <div className="flex-1 min-w-0">
+          {children}
+        </div>
+
+        {/* Right ad column - centered vertically */}
+        {hasRightAds && (
+          <div className="hidden xl:flex w-[180px] flex-shrink-0 items-center justify-center sticky top-20 self-start h-[calc(100vh-80px)] py-4">
+            <AdColumn
+              ads={settings.right.ads}
+              heroSyncEnabled={settings.heroSyncEnabled}
+              heroSlideIndex={heroSlideIndex}
+            />
+          </div>
+        )}
       </div>
-
-      {/* Right ad column - centered vertically */}
-      {hasRightAds && (
-        <div className="hidden xl:flex w-[180px] flex-shrink-0 items-center justify-center sticky top-20 self-start h-[calc(100vh-80px)] py-4">
-          <AdColumn
-            ads={settings.right.ads}
-            heroSyncEnabled={settings.heroSyncEnabled}
-            heroSlideIndex={heroSlideIndex}
-          />
-        </div>
-      )}
-    </div>
+    </AdNetworkContext.Provider>
   );
 };
 

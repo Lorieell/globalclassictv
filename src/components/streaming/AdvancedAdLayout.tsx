@@ -86,26 +86,26 @@ const isValidAdSenseCode = (code: string): boolean => {
   return true;
 };
 
-// Fallback ad images
+// Fallback ad images - streaming/entertainment themed
 const FALLBACK_ADS = [
   {
-    imageUrl: 'https://images.unsplash.com/photo-1611532736597-de2d4265fba3?w=160&h=600&fit=crop',
+    imageUrl: 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=160&h=600&fit=crop&q=80',
     linkUrl: '#',
-    alt: 'Publicité'
+    alt: 'Cinema'
   },
   {
-    imageUrl: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=160&h=600&fit=crop',
+    imageUrl: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=160&h=600&fit=crop&q=80',
     linkUrl: '#',
-    alt: 'Publicité'
+    alt: 'Movie Theater'
   },
   {
-    imageUrl: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=160&h=600&fit=crop',
+    imageUrl: 'https://images.unsplash.com/photo-1440404653325-ab127d49abc1?w=160&h=600&fit=crop&q=80',
     linkUrl: '#',
-    alt: 'Publicité'
+    alt: 'Film Reel'
   }
 ];
 
-// PropellerAds Component - Fixed implementation with safe cleanup and fallback
+// PropellerAds Component - Shows fallback immediately since PropellerAds often blocked
 const PropellerAdSlot = ({ 
   zoneId, 
   format,
@@ -115,34 +115,15 @@ const PropellerAdSlot = ({
   format: 'banner' | 'native' | 'push' | 'popunder' | 'interstitial';
   adId: string;
 }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const iframeContainerRef = useRef<HTMLDivElement | null>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [hasError, setHasError] = useState(false);
-  const [showFallback, setShowFallback] = useState(false);
-  const mountedRef = useRef(true);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Get a random fallback ad
-  const fallbackAd = FALLBACK_ADS[Math.floor(Math.random() * FALLBACK_ADS.length)];
+  // Get a stable fallback ad based on adId
+  const fallbackIndex = adId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % FALLBACK_ADS.length;
+  const fallbackAd = FALLBACK_ADS[fallbackIndex];
 
   useEffect(() => {
-    mountedRef.current = true;
-    
-    if (!zoneId) return;
-
-    // Set a 5-second timeout for fallback
-    timeoutRef.current = setTimeout(() => {
-      if (mountedRef.current && !isLoaded) {
-        console.log('PropellerAds timeout - showing fallback');
-        setShowFallback(true);
-      }
-    }, 5000);
-
     // Track impression
     trackImpression(adId, zoneId, `propeller-${format}`);
 
-    // For popunder and interstitial, inject globally
+    // For popunder and interstitial, still try to inject
     if (format === 'popunder' || format === 'interstitial') {
       const existingScript = document.querySelector(`script[data-zone="${zoneId}"]`);
       if (existingScript) return;
@@ -156,107 +137,7 @@ const PropellerAdSlot = ({
         (function(d,z,s){s.src='https://'+d+'/400/'+z;try{(document.body||document.documentElement).appendChild(s)}catch(e){}})('vemtoutcheeg.com','${zoneId}',document.createElement('script'));
       `;
       document.body.appendChild(script);
-      return;
     }
-
-    if (!containerRef.current) return;
-
-    // Create a separate container for ad content that we manage manually
-    const adWrapper = document.createElement('div');
-    adWrapper.id = `ad-wrapper-${zoneId}-${Date.now()}`;
-    adWrapper.style.cssText = 'width:160px;min-height:300px;margin:0 auto;display:flex;align-items:center;justify-content:center;';
-    
-    // Store reference for cleanup
-    iframeContainerRef.current = adWrapper;
-    
-    // Use an iframe approach to isolate ad scripts from React DOM
-    const iframe = document.createElement('iframe');
-    iframe.style.cssText = 'width:160px;height:600px;border:none;overflow:hidden;';
-    iframe.scrolling = 'no';
-    iframe.setAttribute('frameborder', '0');
-    
-    iframe.onload = () => {
-      if (!mountedRef.current) return;
-      
-      try {
-        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-        if (!iframeDoc) {
-          setHasError(true);
-          setShowFallback(true);
-          return;
-        }
-        
-        iframeDoc.open();
-        iframeDoc.write(`
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <style>
-              body { margin: 0; padding: 0; overflow: hidden; background: transparent; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
-            </style>
-          </head>
-          <body>
-            <script type="text/javascript">
-              atOptions = {
-                'key' : '${zoneId}',
-                'format' : 'iframe',
-                'height' : 600,
-                'width' : 160,
-                'params' : {}
-              };
-            </script>
-            <script type="text/javascript" src="https://www.topcreativeformat.com/${zoneId}/invoke.js" async></script>
-          </body>
-          </html>
-        `);
-        iframeDoc.close();
-        
-        if (mountedRef.current) {
-          setIsLoaded(true);
-          if (timeoutRef.current) {
-            clearTimeout(timeoutRef.current);
-          }
-        }
-      } catch (e) {
-        console.log('PropellerAds iframe error:', e);
-        if (mountedRef.current) {
-          setHasError(true);
-          setShowFallback(true);
-        }
-      }
-    };
-    
-    iframe.onerror = () => {
-      if (mountedRef.current) {
-        setHasError(true);
-        setShowFallback(true);
-      }
-    };
-    
-    adWrapper.appendChild(iframe);
-    containerRef.current.appendChild(adWrapper);
-
-    // Cleanup function that safely removes elements
-    return () => {
-      mountedRef.current = false;
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-      // Don't try to remove children - just clear the reference
-      // React will handle the container removal
-      if (iframeContainerRef.current) {
-        try {
-          // Remove iframe src to stop any pending loads
-          const iframes = iframeContainerRef.current.querySelectorAll('iframe');
-          iframes.forEach(f => {
-            f.src = 'about:blank';
-          });
-        } catch (e) {
-          // Ignore cleanup errors
-        }
-        iframeContainerRef.current = null;
-      }
-    };
   }, [zoneId, format, adId]);
 
   // Popunder/interstitial don't show visually
@@ -264,45 +145,26 @@ const PropellerAdSlot = ({
     return null;
   }
 
-  // Show fallback image
-  if (showFallback) {
-    return (
-      <div className="fallback-ad flex items-center justify-center rounded-lg overflow-hidden" style={{ width: '160px' }}>
-        <a
-          href={fallbackAd.linkUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="block"
-          onClick={() => trackClick(adId, zoneId, 'fallback')}
-        >
-          <img
-            src={fallbackAd.imageUrl}
-            alt={fallbackAd.alt}
-            className="w-full max-h-[400px] object-cover rounded-lg hover:opacity-90 transition-opacity shadow-lg"
-            style={{ width: '160px', height: 'auto' }}
-          />
-        </a>
-      </div>
-    );
-  }
-
+  // Always show fallback image - PropellerAds scripts are typically blocked
   return (
-    <div 
-      ref={containerRef} 
-      className="propellerads-container flex items-center justify-center rounded-lg overflow-hidden"
-      style={{ 
-        width: '160px', 
-        minHeight: '300px',
-        maxHeight: '600px',
-        backgroundColor: hasError ? 'transparent' : 'rgba(0,0,0,0.1)'
-      }}
-    >
-      {!isLoaded && !hasError && (
-        <div className="flex flex-col items-center gap-2 p-4">
-          <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          <span className="text-xs text-muted-foreground">Pub</span>
+    <div className="fallback-ad flex items-center justify-center rounded-lg overflow-hidden" style={{ width: '160px' }}>
+      <a
+        href={fallbackAd.linkUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block relative group"
+        onClick={() => trackClick(adId, zoneId, 'fallback')}
+      >
+        <img
+          src={fallbackAd.imageUrl}
+          alt={fallbackAd.alt}
+          className="w-full h-auto object-cover rounded-lg shadow-lg transition-transform group-hover:scale-105"
+          style={{ width: '160px', minHeight: '200px', maxHeight: '400px' }}
+        />
+        <div className="absolute bottom-2 left-2 bg-black/70 text-white text-[10px] px-2 py-0.5 rounded">
+          Publicité
         </div>
-      )}
+      </a>
     </div>
   );
 };

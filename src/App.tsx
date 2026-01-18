@@ -20,7 +20,6 @@ const Index = lazy(() => import("./pages/Index"));
 const CataloguePage = lazy(() => import("./pages/CataloguePage"));
 const MediaDetailPageRoute = lazy(() => import("./pages/MediaDetailPageRoute"));
 const PlayerPageRoute = lazy(() => import("./pages/PlayerPageRoute"));
-const PlayerRedirect = lazy(() => import("./pages/PlayerRedirect"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Optimized QueryClient configuration
@@ -64,7 +63,7 @@ const App = () => {
               <Route path="/favorites" element={<Index />} />
               <Route path="/settings" element={<Index />} />
               <Route path="/detail" element={<Index />} />
-              <Route path="/player" element={<PlayerRedirect />} />
+              <Route path="/player" element={<Index />} />
               <Route path="/catalogue" element={<CataloguePage />} />
               <Route path="/catalogue/:slug" element={<MediaDetailPageRoute />} />
               <Route path="/catalogue/:slug/player" element={<PlayerPageRoute />} />

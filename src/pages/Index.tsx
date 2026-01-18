@@ -11,6 +11,7 @@ import MediaRow from '@/components/streaming/MediaRow';
 import ToggleSlideRow from '@/components/streaming/ToggleSlideRow';
 import CategoryPage from '@/components/streaming/CategoryPage';
 import MediaDetailPage from '@/components/streaming/MediaDetailPage';
+import VideoPlayer from '@/components/streaming/VideoPlayer';
 import AdminLoginModal from '@/components/streaming/AdminLoginModal';
 import MediaEditorModal from '@/components/streaming/MediaEditorModal';
 import HeroEditorModal from '@/components/streaming/HeroEditorModal';
@@ -21,7 +22,6 @@ import CookieConsent from '@/components/streaming/CookieConsent';
 import { useSupabaseMedia } from '@/hooks/useSupabaseMedia';
 import { useEnhancedResumeList, type EnhancedResumeMedia } from '@/hooks/useResumeProgress';
 import { useAdmin } from '@/hooks/useAdmin';
-import { generateSlug } from '@/pages/CataloguePage';
 import type { Media, HeroItem } from '@/types/media';
 
 // Helper: Check if media has video uploaded
@@ -119,7 +119,7 @@ const generateAutoHeroItems = (library: Media[], featuredMedia: Media[] = [], ho
   }));
 };
 
-type ViewType = 'home' | 'films' | 'series' | 'watchlist' | 'favorites' | 'detail' | 'settings' | 'category';
+type ViewType = 'home' | 'films' | 'series' | 'watchlist' | 'favorites' | 'detail' | 'player' | 'settings' | 'category';
 
 interface CategoryView {
   title: string;
@@ -141,6 +141,7 @@ const Index = () => {
       '/favorites': 'favorites',
       '/settings': 'settings',
       '/detail': 'detail',
+      '/player': 'player',
     };
     return pathMap[pathname] || 'home';
   };
@@ -166,6 +167,7 @@ const Index = () => {
       favorites: '/favorites',
       settings: '/settings',
       detail: '/detail',
+      player: '/player',
       category: '/',
     };
 
@@ -187,6 +189,8 @@ const Index = () => {
 
   const [categoryView, setCategoryView] = useState<CategoryView | null>(null);
   const [selectedMedia, setSelectedMedia] = useState<Media | null>(null);
+  const [playerSeasonId, setPlayerSeasonId] = useState<string | undefined>();
+  const [playerEpisodeId, setPlayerEpisodeId] = useState<string | undefined>();
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [showEditor, setShowEditor] = useState(false);
   const [showHeroEditor, setShowHeroEditor] = useState(false);
@@ -243,10 +247,12 @@ const Index = () => {
       return;
     }
 
-    if (nextView === 'detail') {
+    if (nextView === 'detail' || nextView === 'player') {
       const id = searchParams.get('id');
       if (!id) {
         setSelectedMedia(null);
+        setPlayerSeasonId(undefined);
+        setPlayerEpisodeId(undefined);
         navigate('/', { replace: true });
         return;
       }
@@ -254,6 +260,10 @@ const Index = () => {
       const media = library.find(m => m.id === id);
       if (media) {
         setSelectedMedia(media);
+        if (nextView === 'player') {
+          setPlayerSeasonId(searchParams.get('s') ?? undefined);
+          setPlayerEpisodeId(searchParams.get('e') ?? undefined);
+        }
         setViewState(nextView);
         return;
       }
@@ -261,6 +271,8 @@ const Index = () => {
       // If the library finished loading and we still can't find it, go home
       if (!loading) {
         setSelectedMedia(null);
+        setPlayerSeasonId(undefined);
+        setPlayerEpisodeId(undefined);
         navigate('/', { replace: true });
       }
       return;
@@ -358,35 +370,8 @@ const Index = () => {
     setView('detail', { mediaId: media.id });
   };
 
-  // Helper to build player URL
-  const getPlayerUrl = (media: Media, seasonId?: string, episodeId?: string) => {
-    const slug = generateSlug(media.title);
-    
-    if (media.type === 'Série' || media.type === 'Animé' || media.type === 'Émission') {
-      // Find season/episode numbers from IDs
-      if (seasonId && episodeId && media.seasons) {
-        const season = media.seasons.find(s => s.id === seasonId);
-        if (season) {
-          const episode = season.episodes?.find(e => e.id === episodeId);
-          if (episode) {
-            return `/catalogue/${slug}/saison-${season.number}/episode-${episode.number}`;
-          }
-        }
-      }
-      // Default to first episode
-      const firstSeason = media.seasons?.[0];
-      if (firstSeason?.episodes?.[0]) {
-        return `/catalogue/${slug}/saison-${firstSeason.number}/episode-${firstSeason.episodes[0].number}`;
-      }
-    }
-    
-    return `/catalogue/${slug}/player`;
-  };
-
   const getResumeParams = (media: Media) => {
-    if (media.type !== 'Série' && media.type !== 'Animé' && media.type !== 'Émission') {
-      return { seasonId: undefined, episodeId: undefined };
-    }
+    if (media.type !== 'Série') return { seasonId: undefined, episodeId: undefined };
     const pos = watchPosition[media.id];
     return { seasonId: pos?.seasonId, episodeId: pos?.episodeId };
   };
@@ -398,7 +383,10 @@ const Index = () => {
     console.log('Found media:', media?.title || 'NOT FOUND', 'Library size:', library.length);
     if (media) {
       const { seasonId, episodeId } = getResumeParams(media);
-      navigate(getPlayerUrl(media, seasonId, episodeId));
+      setSelectedMedia(media);
+      setPlayerSeasonId(seasonId);
+      setPlayerEpisodeId(episodeId);
+      setView('player', { mediaId: media.id, seasonId, episodeId });
     } else {
       toast.error('Média introuvable');
     }
@@ -419,7 +407,10 @@ const Index = () => {
 
   // Play from detail page
   const handlePlayFromDetail = (media: Media, seasonId?: string, episodeId?: string) => {
-    navigate(getPlayerUrl(media, seasonId, episodeId));
+    setSelectedMedia(media);
+    setPlayerSeasonId(seasonId);
+    setPlayerEpisodeId(episodeId);
+    setView('player', { mediaId: media.id, seasonId, episodeId });
   };
 
   // Resume playing (use next episode/season if new content available, else saved position)
@@ -427,11 +418,22 @@ const Index = () => {
     // Use the override (new content) if provided, otherwise fall back to saved position
     const seasonId = overrideSeasonId || watchPosition[media.id]?.seasonId;
     const episodeId = overrideEpisodeId || watchPosition[media.id]?.episodeId;
-    navigate(getPlayerUrl(media, seasonId, episodeId));
+    setSelectedMedia(media);
+    setPlayerSeasonId(seasonId);
+    setPlayerEpisodeId(episodeId);
+    setView('player', { mediaId: media.id, seasonId, episodeId });
   };
 
   const handleBack = () => {
-    if (view === 'category') {
+    if (view === 'player') {
+      // Best-effort progress for films (no real playback tracking with iframe)
+      if (selectedMedia?.type === 'Film') {
+        updateProgress(selectedMedia.id, 100);
+      }
+      setView('detail', { replace: true, mediaId: selectedMedia?.id });
+      setPlayerSeasonId(undefined);
+      setPlayerEpisodeId(undefined);
+    } else if (view === 'category') {
       setCategoryView(null);
       setView('home', { replace: true });
     } else {
@@ -548,6 +550,15 @@ const Index = () => {
               onToggleFeatured={toggleFeatured}
               onToggleOngoing={toggleOngoing}
             />
+        ) : view === 'player' && selectedMedia ? (
+          <VideoPlayer 
+            media={selectedMedia}
+            initialSeasonId={playerSeasonId}
+            initialEpisodeId={playerEpisodeId}
+            onBack={handleBack}
+            onProgress={handleProgress}
+            onPosition={handlePosition}
+          />
         ) : view === 'detail' && selectedMedia ? (
           <MediaDetailPage
             media={selectedMedia}

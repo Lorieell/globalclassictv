@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, forwardRef, useMemo } from 'react';
-import { ArrowLeft, Link2, Megaphone, Palette, FolderOpen, Instagram, Youtube, Twitter, Sun, Moon, Monitor, Plus, X, Film, Tv, BookOpen, Music, Gamepad2, Mic, Globe, Sparkles, Heart, Skull, Laugh, Zap, Sword, Ghost, Rocket, Theater, Baby, Search, Mountain, Users, List, Check, Pencil, Play, RefreshCw, Loader2, Trash2, Download, Database, Star, Clock, BarChart3, type LucideIcon } from 'lucide-react';
+import { ArrowLeft, Link2, Megaphone, Palette, FolderOpen, Instagram, Youtube, Twitter, Sun, Moon, Monitor, Plus, X, Film, Tv, BookOpen, Music, Gamepad2, Mic, Globe, Sparkles, Heart, Skull, Laugh, Zap, Sword, Ghost, Rocket, Theater, Baby, Search, Mountain, Users, List, Check, Pencil, Play, RefreshCw, Loader2, Trash2, Download, Database, Star, Clock, BarChart3, Bell, type LucideIcon } from 'lucide-react';
 import AdvancedAdsEditor from '@/components/streaming/AdvancedAdsEditor';
 import AdStatsPanel from '@/components/streaming/AdStatsPanel';
 import { Button } from '@/components/ui/button';
@@ -180,12 +180,40 @@ const applyAccentColor = (hexColor: string) => {
   document.documentElement.style.setProperty('--ring', `${hue} ${saturation}% ${lightness}%`);
 };
 
-// Notification Creator Component
-const NotificationCreator = () => {
+// Notification Manager Component (Create + History + Delete)
+const NotificationManager = () => {
   const [notifTitle, setNotifTitle] = useState('');
   const [notifMessage, setNotifMessage] = useState('');
   const [notifType, setNotifType] = useState<'update' | 'bugfix' | 'new_content' | 'new_video'>('update');
   const [isSending, setIsSending] = useState(false);
+  const [sentNotifications, setSentNotifications] = useState<Array<{
+    id: string;
+    title: string;
+    message: string;
+    type: string;
+    created_at: string;
+  }>>([]);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+
+  // Fetch sent notifications
+  const fetchSentNotifications = async () => {
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('id, title, message, type, created_at')
+      .is('session_id', null)
+      .is('user_id', null)
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (!error && data) {
+      setSentNotifications(data);
+    }
+  };
+
+  useEffect(() => {
+    fetchSentNotifications();
+  }, []);
 
   const sendNotification = async () => {
     if (!notifTitle.trim() || !notifMessage.trim()) {
@@ -213,6 +241,7 @@ const NotificationCreator = () => {
       toast.success('Notification envoyée à tous les utilisateurs !');
       setNotifTitle('');
       setNotifMessage('');
+      fetchSentNotifications();
     } catch (err) {
       console.error('Error:', err);
       toast.error('Erreur lors de l\'envoi');
@@ -221,59 +250,159 @@ const NotificationCreator = () => {
     }
   };
 
+  const deleteNotification = async (id: string) => {
+    setDeletingId(id);
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('Error deleting notification:', error);
+        toast.error('Erreur lors de la suppression');
+        return;
+      }
+
+      toast.success('Notification supprimée');
+      setSentNotifications(prev => prev.filter(n => n.id !== id));
+    } catch (err) {
+      console.error('Error:', err);
+      toast.error('Erreur lors de la suppression');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const getTypeLabel = (type: string) => {
+    switch (type) {
+      case 'update': return '📢 Mise à jour';
+      case 'bugfix': return '🐛 Bug fix';
+      case 'new_content': return '✨ Nouveau contenu';
+      case 'new_video': return '🎬 Nouvelle vidéo';
+      default: return type;
+    }
+  };
+
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString('fr-FR', {
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
   return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+    <div className="space-y-4">
+      {/* Create notification form */}
+      <div className="space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <Label className="text-xs text-muted-foreground">Titre</Label>
+            <Input
+              value={notifTitle}
+              onChange={(e) => setNotifTitle(e.target.value)}
+              placeholder="Ex: Nouveaux films ajoutés !"
+              className="bg-muted/50"
+            />
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground">Type</Label>
+            <select
+              value={notifType}
+              onChange={(e) => setNotifType(e.target.value as any)}
+              className="w-full h-10 px-3 rounded-lg bg-muted/50 border border-border text-foreground text-sm"
+            >
+              <option value="update">📢 Mise à jour</option>
+              <option value="new_content">✨ Nouveau contenu</option>
+              <option value="new_video">🎬 Nouvelle vidéo</option>
+              <option value="bugfix">🐛 Correction de bug</option>
+            </select>
+          </div>
+        </div>
         <div>
-          <Label className="text-xs text-muted-foreground">Titre</Label>
-          <Input
-            value={notifTitle}
-            onChange={(e) => setNotifTitle(e.target.value)}
-            placeholder="Ex: Nouveaux films ajoutés !"
-            className="bg-muted/50"
+          <Label className="text-xs text-muted-foreground">Message</Label>
+          <textarea
+            value={notifMessage}
+            onChange={(e) => setNotifMessage(e.target.value)}
+            placeholder="Ex: 50 nouveaux films et séries ont été ajoutés cette semaine ! Découvrez les dernières nouveautés..."
+            className="w-full min-h-[80px] px-3 py-2 rounded-lg bg-muted/50 border border-border text-foreground text-sm resize-y"
+            rows={3}
           />
         </div>
-        <div>
-          <Label className="text-xs text-muted-foreground">Type</Label>
-          <select
-            value={notifType}
-            onChange={(e) => setNotifType(e.target.value as any)}
-            className="w-full h-10 px-3 rounded-lg bg-muted/50 border border-border text-foreground text-sm"
+        <div className="flex gap-2">
+          <Button
+            onClick={sendNotification}
+            disabled={isSending || !notifTitle.trim() || !notifMessage.trim()}
+            size="sm"
+            className="gap-2"
           >
-            <option value="update">📢 Mise à jour</option>
-            <option value="new_content">✨ Nouveau contenu</option>
-            <option value="new_video">🎬 Nouvelle vidéo</option>
-            <option value="bugfix">🐛 Correction de bug</option>
-          </select>
+            {isSending ? (
+              <>
+                <Loader2 size={14} className="animate-spin" />
+                Envoi...
+              </>
+            ) : (
+              <>
+                <Megaphone size={14} />
+                Envoyer la notification
+              </>
+            )}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowHistory(!showHistory)}
+            className="gap-2"
+          >
+            <Bell size={14} />
+            {showHistory ? 'Masquer historique' : `Historique (${sentNotifications.length})`}
+          </Button>
         </div>
       </div>
-      <div>
-        <Label className="text-xs text-muted-foreground">Message</Label>
-        <Input
-          value={notifMessage}
-          onChange={(e) => setNotifMessage(e.target.value)}
-          placeholder="Ex: 50 nouveaux films et séries ont été ajoutés cette semaine !"
-          className="bg-muted/50"
-        />
-      </div>
-      <Button
-        onClick={sendNotification}
-        disabled={isSending || !notifTitle.trim() || !notifMessage.trim()}
-        size="sm"
-        className="gap-2"
-      >
-        {isSending ? (
-          <>
-            <Loader2 size={14} className="animate-spin" />
-            Envoi...
-          </>
-        ) : (
-          <>
-            <Megaphone size={14} />
-            Envoyer la notification
-          </>
-        )}
-      </Button>
+
+      {/* Notification History */}
+      {showHistory && sentNotifications.length > 0 && (
+        <div className="border border-border/50 rounded-xl overflow-hidden">
+          <div className="bg-secondary/30 px-4 py-2 border-b border-border/30">
+            <h4 className="text-sm font-medium text-foreground">Notifications envoyées</h4>
+          </div>
+          <div className="max-h-[300px] overflow-y-auto divide-y divide-border/20">
+            {sentNotifications.map((notif) => (
+              <div key={notif.id} className="p-3 hover:bg-secondary/20 transition-colors">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs px-2 py-0.5 rounded bg-secondary text-muted-foreground">
+                        {getTypeLabel(notif.type)}
+                      </span>
+                      <span className="text-xs text-muted-foreground/60">
+                        {formatDate(notif.created_at)}
+                      </span>
+                    </div>
+                    <h5 className="text-sm font-medium text-foreground truncate">{notif.title}</h5>
+                    <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{notif.message}</p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="shrink-0 h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => deleteNotification(notif.id)}
+                    disabled={deletingId === notif.id}
+                  >
+                    {deletingId === notif.id ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <Trash2 size={14} />
+                    )}
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -1785,7 +1914,7 @@ const SettingsPage = ({ onBack, library = [], onEditMedia, onAddMedia, onAddNewM
                       <p className="text-sm text-muted-foreground mb-4">
                         Envoie une notification à tous les utilisateurs (visible dans la cloche).
                       </p>
-                      <NotificationCreator />
+                      <NotificationManager />
                     </div>
                   </div>
                 </div>

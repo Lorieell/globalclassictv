@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, forwardRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, forwardRef, useMemo, useRef } from 'react';
 import { ArrowLeft, Link2, Megaphone, Palette, FolderOpen, Instagram, Youtube, Twitter, Sun, Moon, Monitor, Plus, X, Film, Tv, BookOpen, Music, Gamepad2, Mic, Globe, Sparkles, Heart, Skull, Laugh, Zap, Sword, Ghost, Rocket, Theater, Baby, Search, Mountain, Users, List, Check, Pencil, Play, RefreshCw, Loader2, Trash2, Download, Database, Star, Clock, BarChart3, Bell, type LucideIcon } from 'lucide-react';
 import AdvancedAdsEditor from '@/components/streaming/AdvancedAdsEditor';
 import AdStatsPanel from '@/components/streaming/AdStatsPanel';
@@ -180,27 +180,31 @@ const applyAccentColor = (hexColor: string) => {
   document.documentElement.style.setProperty('--ring', `${hue} ${saturation}% ${lightness}%`);
 };
 
-// Notification Manager Component (Create + History + Delete)
+// Notification Manager Component (Create + History + Delete + Images)
 const NotificationManager = () => {
   const [notifTitle, setNotifTitle] = useState('');
   const [notifMessage, setNotifMessage] = useState('');
   const [notifType, setNotifType] = useState<'update' | 'bugfix' | 'new_content' | 'new_video'>('update');
+  const [notifImage, setNotifImage] = useState<File | null>(null);
+  const [notifImagePreview, setNotifImagePreview] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [sentNotifications, setSentNotifications] = useState<Array<{
     id: string;
     title: string;
     message: string;
     type: string;
+    image_url: string | null;
     created_at: string;
   }>>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch sent notifications
   const fetchSentNotifications = async () => {
     const { data, error } = await supabase
       .from('notifications')
-      .select('id, title, message, type, created_at')
+      .select('id, title, message, type, image_url, created_at')
       .is('session_id', null)
       .is('user_id', null)
       .order('created_at', { ascending: false })
@@ -215,6 +219,31 @@ const NotificationManager = () => {
     fetchSentNotifications();
   }, []);
 
+  // Handle image selection
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('Image trop grande (max 5 Mo)');
+        return;
+      }
+      setNotifImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setNotifImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const clearImage = () => {
+    setNotifImage(null);
+    setNotifImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const sendNotification = async () => {
     if (!notifTitle.trim() || !notifMessage.trim()) {
       toast.error('Titre et message requis');
@@ -223,10 +252,36 @@ const NotificationManager = () => {
 
     setIsSending(true);
     try {
+      let imageUrl: string | null = null;
+
+      // Upload image if present
+      if (notifImage) {
+        const fileExt = notifImage.name.split('.').pop();
+        const fileName = `${crypto.randomUUID()}.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('notification-images')
+          .upload(fileName, notifImage);
+
+        if (uploadError) {
+          console.error('Error uploading image:', uploadError);
+          toast.error('Erreur lors de l\'upload de l\'image');
+          setIsSending(false);
+          return;
+        }
+
+        const { data: urlData } = supabase.storage
+          .from('notification-images')
+          .getPublicUrl(fileName);
+
+        imageUrl = urlData.publicUrl;
+      }
+
       const { error } = await supabase.from('notifications').insert({
         title: notifTitle,
         message: notifMessage,
         type: notifType,
+        image_url: imageUrl,
         session_id: null,
         user_id: null,
         is_read: false,
@@ -241,6 +296,7 @@ const NotificationManager = () => {
       toast.success('Notification envoyée à tous les utilisateurs !');
       setNotifTitle('');
       setNotifMessage('');
+      clearImage();
       fetchSentNotifications();
     } catch (err) {
       console.error('Error:', err);
@@ -250,9 +306,17 @@ const NotificationManager = () => {
     }
   };
 
-  const deleteNotification = async (id: string) => {
+  const deleteNotification = async (id: string, imageUrl: string | null) => {
     setDeletingId(id);
     try {
+      // Delete image from storage if exists
+      if (imageUrl) {
+        const fileName = imageUrl.split('/').pop();
+        if (fileName) {
+          await supabase.storage.from('notification-images').remove([fileName]);
+        }
+      }
+
       const { error } = await supabase
         .from('notifications')
         .delete()
@@ -331,6 +395,47 @@ const NotificationManager = () => {
             rows={3}
           />
         </div>
+        
+        {/* Image upload */}
+        <div>
+          <Label className="text-xs text-muted-foreground">Image (optionnel)</Label>
+          <div className="flex items-center gap-3 mt-1">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/gif,image/webp"
+              onChange={handleImageSelect}
+              className="hidden"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              className="gap-2"
+            >
+              <Plus size={14} />
+              Ajouter une image
+            </Button>
+            {notifImagePreview && (
+              <div className="relative">
+                <img 
+                  src={notifImagePreview} 
+                  alt="Preview" 
+                  className="h-10 w-16 object-cover rounded border border-border"
+                />
+                <button
+                  type="button"
+                  onClick={clearImage}
+                  className="absolute -top-1 -right-1 w-4 h-4 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center"
+                >
+                  <X size={10} />
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
         <div className="flex gap-2">
           <Button
             onClick={sendNotification}
@@ -372,23 +477,32 @@ const NotificationManager = () => {
             {sentNotifications.map((notif) => (
               <div key={notif.id} className="p-3 hover:bg-secondary/20 transition-colors">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs px-2 py-0.5 rounded bg-secondary text-muted-foreground">
-                        {getTypeLabel(notif.type)}
-                      </span>
-                      <span className="text-xs text-muted-foreground/60">
-                        {formatDate(notif.created_at)}
-                      </span>
+                  <div className="flex gap-3 flex-1 min-w-0">
+                    {notif.image_url && (
+                      <img 
+                        src={notif.image_url} 
+                        alt="" 
+                        className="w-12 h-12 object-cover rounded shrink-0"
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs px-2 py-0.5 rounded bg-secondary text-muted-foreground">
+                          {getTypeLabel(notif.type)}
+                        </span>
+                        <span className="text-xs text-muted-foreground/60">
+                          {formatDate(notif.created_at)}
+                        </span>
+                      </div>
+                      <h5 className="text-sm font-medium text-foreground truncate">{notif.title}</h5>
+                      <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{notif.message}</p>
                     </div>
-                    <h5 className="text-sm font-medium text-foreground truncate">{notif.title}</h5>
-                    <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{notif.message}</p>
                   </div>
                   <Button
                     variant="ghost"
                     size="icon"
                     className="shrink-0 h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                    onClick={() => deleteNotification(notif.id)}
+                    onClick={() => deleteNotification(notif.id, notif.image_url)}
                     disabled={deletingId === notif.id}
                   >
                     {deletingId === notif.id ? (

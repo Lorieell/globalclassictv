@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import { Bell, X, Sparkles, Bug, Megaphone, Film, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface Notification {
   id: string;
@@ -10,6 +9,7 @@ interface Notification {
   message: string;
   type: 'update' | 'bugfix' | 'new_content' | 'new_video';
   media_id?: string;
+  image_url?: string;
   is_read: boolean;
   created_at: string;
 }
@@ -180,6 +180,9 @@ const NotificationBell = () => {
     });
   };
 
+  // Fixed height for dropdown (approximately 3 notifications height)
+  const DROPDOWN_HEIGHT = 280;
+
   return (
     <div className="relative" ref={dropdownRef}>
       <Button
@@ -235,10 +238,13 @@ const NotificationBell = () => {
             </div>
           </div>
 
-          {/* Content - either detail view or list */}
-          {selectedNotification ? (
-            // Detail View
-            <ScrollArea className="max-h-[450px]">
+          {/* Content - Fixed height with scroll */}
+          <div 
+            className="overflow-y-auto"
+            style={{ height: `${DROPDOWN_HEIGHT}px` }}
+          >
+            {selectedNotification ? (
+              // Detail View
               <div className="p-4 space-y-4">
                 {/* Type badge and icon */}
                 <div className="flex items-center gap-3">
@@ -255,6 +261,17 @@ const NotificationBell = () => {
                   {selectedNotification.title}
                 </h2>
 
+                {/* Image if present */}
+                {selectedNotification.image_url && (
+                  <div className="rounded-xl overflow-hidden border border-border/30">
+                    <img 
+                      src={selectedNotification.image_url} 
+                      alt={selectedNotification.title}
+                      className="w-full h-auto max-h-40 object-cover"
+                    />
+                  </div>
+                )}
+
                 {/* Full message */}
                 <div className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
                   {selectedNotification.message}
@@ -265,50 +282,61 @@ const NotificationBell = () => {
                   {formatFullDate(selectedNotification.created_at)}
                 </p>
               </div>
-            </ScrollArea>
-          ) : (
-            // List View
-            <div className="max-h-[400px] overflow-y-auto">
-              {notifications.length === 0 ? (
-                <div className="p-8 text-center text-muted-foreground text-sm">
-                  <Bell size={32} className="mx-auto mb-3 opacity-30" />
-                  <p>Aucune notification</p>
-                </div>
-              ) : (
-                notifications.map((notification) => (
-                  <div
-                    key={notification.id}
-                    onClick={() => handleNotificationClick(notification)}
-                    className={`p-4 border-b border-border/20 cursor-pointer transition-colors ${
-                      notification.is_read ? 'bg-transparent' : 'bg-primary/5'
-                    } hover:bg-secondary/50`}
-                  >
-                    <div className="flex gap-3">
-                      <div className="w-8 h-8 rounded-full bg-secondary/50 flex items-center justify-center shrink-0">
-                        {getIcon(notification.type)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2">
-                          <h4 className={`text-sm font-semibold truncate ${notification.is_read ? 'text-foreground/70' : 'text-foreground'}`}>
-                            {notification.title}
-                          </h4>
-                          {!notification.is_read && (
-                            <span className="w-2 h-2 bg-primary rounded-full shrink-0 mt-1.5" />
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                          {notification.message}
-                        </p>
-                        <p className="text-[10px] text-muted-foreground/60 mt-1">
-                          {timeAgo(notification.created_at)}
-                        </p>
-                      </div>
-                    </div>
+            ) : (
+              // List View
+              <>
+                {notifications.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center text-muted-foreground text-sm">
+                    <Bell size={32} className="mb-3 opacity-30" />
+                    <p>Aucune notification</p>
                   </div>
-                ))
-              )}
-            </div>
-          )}
+                ) : (
+                  <div className="divide-y divide-border/20">
+                    {notifications.map((notification) => (
+                      <div
+                        key={notification.id}
+                        onClick={() => handleNotificationClick(notification)}
+                        className={`p-4 cursor-pointer transition-colors ${
+                          notification.is_read ? 'bg-transparent' : 'bg-primary/5'
+                        } hover:bg-secondary/50`}
+                      >
+                        <div className="flex gap-3">
+                          {/* Icon or mini image */}
+                          <div className="w-8 h-8 rounded-full bg-secondary/50 flex items-center justify-center shrink-0 overflow-hidden">
+                            {notification.image_url ? (
+                              <img 
+                                src={notification.image_url} 
+                                alt="" 
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              getIcon(notification.type)
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <h4 className={`text-sm font-semibold truncate ${notification.is_read ? 'text-foreground/70' : 'text-foreground'}`}>
+                                {notification.title}
+                              </h4>
+                              {!notification.is_read && (
+                                <span className="w-2 h-2 bg-primary rounded-full shrink-0 mt-1.5" />
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                              {notification.message}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground/60 mt-1">
+                              {timeAgo(notification.created_at)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>
